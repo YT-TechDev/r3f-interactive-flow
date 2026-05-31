@@ -1,16 +1,19 @@
 {
-  "name": "r3f-interactive-flow",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "name": "r3f-interactive-flow-workspace",
+  "private": true,
   "type": "module",
   "packageManager": "pnpm@11.5.0",
+  "scripts": {
+    "build": "pnpm --filter r3f-interactive-flow build",
+    "typecheck": "pnpm --filter r3f-interactive-flow typecheck",
+    "test": "pnpm --filter r3f-interactive-flow test",
+    "lint": "eslint .",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "pnpm build && changeset publish"
+  },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",
     "@react-three/fiber": "^9.6.1",
