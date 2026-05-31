@@ -2,9 +2,7 @@
 
 import { useFrame } from "@react-three/fiber";
 
-export type FlowFrameCallback = (progress: number, delta: number) => void;
-
-export function useFlowFrame(callback: FlowFrameCallback): void {
+export function useFlowFrame(callback: (progress: number, delta: number) => void): void {
   useFrame((_, delta) => {
     callback(0, delta);
   });
