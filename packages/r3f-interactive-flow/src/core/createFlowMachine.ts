@@ -1,6 +1,6 @@
 import { clamp01, linear } from "./easing";
 import type { EasingFunction } from "./easing";
-import type { FlowControls, FlowDirection, FlowSnapshot } from "./types";
+import type { FlowDirection, FlowMachine, FlowSnapshot } from "./types";
 
 const DEFAULT_TRANSITION_DURATION_MS = 1000;
 
@@ -43,7 +43,7 @@ function resolveTransitionDurationMs(transitionDurationMs?: number): number {
 
 export function createFlowMachine<TPhase extends string>(
   options: CreateFlowMachineOptions<TPhase>
-): FlowControls<TPhase> {
+): FlowMachine<TPhase> {
   const { phases } = options;
 
   assertPhases(phases);
