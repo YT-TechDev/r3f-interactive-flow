@@ -79,7 +79,7 @@ export function FlowProvider<TPhase extends string>({
   );
 
   return (
-    <FlowContext.Provider value={contextValue as FlowContextValue<string>}>
+    <FlowContext.Provider value={contextValue as unknown as FlowContextValue<string>}>
       {children}
     </FlowContext.Provider>
   );
