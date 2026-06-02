@@ -37,9 +37,11 @@ export function useWheelInput<TPhase extends string>(
     const preventDefault = options.preventDefault ?? true;
     const eventTarget = options.target?.current ?? window;
 
-    const handleWheel = (event: WheelEvent): void => {
+    const handleWheel: EventListener = (event): void => {
+      const wheelEvent = event as WheelEvent;
+
       if (preventDefault) {
-        event.preventDefault();
+        wheelEvent.preventDefault();
       }
 
       const currentFlow = flowRef.current;
@@ -48,12 +50,12 @@ export function useWheelInput<TPhase extends string>(
         return;
       }
 
-      if (event.deltaY > threshold) {
+      if (wheelEvent.deltaY > threshold) {
         currentFlow.next();
         return;
       }
 
-      if (event.deltaY < -threshold) {
+      if (wheelEvent.deltaY < -threshold) {
         currentFlow.prev();
       }
     };
