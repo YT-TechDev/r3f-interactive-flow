@@ -11,5 +11,5 @@ export function useFlow<TPhase extends string>(): FlowControls<TPhase> {
     throw new Error("useFlow must be used inside FlowProvider.");
   }
 
-  return context.controls as FlowControls<TPhase>;
+  return context.controls as unknown as FlowControls<TPhase>;
 }
