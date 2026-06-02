@@ -15,6 +15,9 @@ export type FlowControls<TPhase extends string> = FlowSnapshot<TPhase> & {
   goTo: (phase: TPhase) => void;
   lock: () => void;
   unlock: () => void;
+};
+
+export type FlowMachine<TPhase extends string> = FlowControls<TPhase> & {
   update: (deltaMs: number) => void;
   getSnapshot: () => FlowSnapshot<TPhase>;
 };
