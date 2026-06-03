@@ -12,7 +12,7 @@ export type CreateFlowMachineOptions<TPhase extends string> = {
 };
 
 function assertPhases<TPhase extends string>(
-  phases: readonly TPhase[]
+  phases: readonly TPhase[],
 ): asserts phases is readonly [TPhase, ...TPhase[]] {
   if (phases.length === 0) {
     throw new Error("createFlowMachine requires at least one phase.");
@@ -22,7 +22,9 @@ function assertPhases<TPhase extends string>(
 
   for (const phase of phases) {
     if (seen.has(phase)) {
-      throw new Error(`createFlowMachine received a duplicate phase: ${phase}.`);
+      throw new Error(
+        `createFlowMachine received a duplicate phase: ${phase}.`,
+      );
     }
 
     seen.add(phase);
@@ -42,19 +44,23 @@ function resolveTransitionDurationMs(transitionDurationMs?: number): number {
 }
 
 export function createFlowMachine<TPhase extends string>(
-  options: CreateFlowMachineOptions<TPhase>
+  options: CreateFlowMachineOptions<TPhase>,
 ): FlowMachine<TPhase> {
   const { phases } = options;
 
   assertPhases(phases);
 
-  const transitionDurationMs = resolveTransitionDurationMs(options.transitionDurationMs);
+  const transitionDurationMs = resolveTransitionDurationMs(
+    options.transitionDurationMs,
+  );
   const easing = options.easing ?? linear;
   const initialPhase = options.initialPhase ?? phases[0];
   const initialPhaseIndex = phases.indexOf(initialPhase);
 
   if (initialPhaseIndex === -1) {
-    throw new Error(`initialPhase must be included in phases: ${initialPhase}.`);
+    throw new Error(
+      `initialPhase must be included in phases: ${initialPhase}.`,
+    );
   }
 
   let phaseIndex = initialPhaseIndex;
@@ -80,7 +86,7 @@ export function createFlowMachine<TPhase extends string>(
     progress,
     direction,
     isTransitioning,
-    isLocked
+    isLocked,
   });
 
   const navigateToIndex = (targetPhaseIndex: number): void => {
@@ -161,6 +167,6 @@ export function createFlowMachine<TPhase extends string>(
       isLocked = false;
     },
     update,
-    getSnapshot
+    getSnapshot,
   };
 }
