@@ -21,18 +21,20 @@ export function FlowProvider<TPhase extends string>({
   initialPhase,
   transitionDurationMs,
   easing,
-  children
+  children,
 }: FlowProviderProps<TPhase>): ReactNode {
   const machine = useMemo(() => {
     return createFlowMachine({
       phases,
       ...(initialPhase !== undefined ? { initialPhase } : {}),
       ...(transitionDurationMs !== undefined ? { transitionDurationMs } : {}),
-      ...(easing !== undefined ? { easing } : {})
+      ...(easing !== undefined ? { easing } : {}),
     });
   }, [easing, initialPhase, phases, transitionDurationMs]);
 
-  const [snapshot, setSnapshot] = useState<FlowSnapshot<TPhase>>(() => machine.getSnapshot());
+  const [snapshot, setSnapshot] = useState<FlowSnapshot<TPhase>>(() =>
+    machine.getSnapshot(),
+  );
 
   const syncSnapshot = useCallback(() => {
     setSnapshot(machine.getSnapshot());
@@ -64,18 +66,18 @@ export function FlowProvider<TPhase extends string>({
       unlock: () => {
         machine.unlock();
         syncSnapshot();
-      }
+      },
     }),
-    [machine, snapshot, syncSnapshot]
+    [machine, snapshot, syncSnapshot],
   );
 
   const contextValue = useMemo<FlowContextValue<TPhase>>(
     () => ({
       controls,
       machine,
-      syncSnapshot
+      syncSnapshot,
     }),
-    [controls, machine, syncSnapshot]
+    [controls, machine, syncSnapshot],
   );
 
   return (
