@@ -1,4 +1,6 @@
 dist
 coverage
 node_modules
+packages/r3f-interactive-flow/dist
+examples/vite-basic/dist
 pnpm-lock.yaml
