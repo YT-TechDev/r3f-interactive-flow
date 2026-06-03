@@ -74,6 +74,12 @@ Input hooks must be used inside `FlowProvider`.
 
 `useFlowFrame` uses React Three Fiber's `useFrame`, so it must be used inside a Canvas-bound component.
 
+## Examples
+
+```bash
+pnpm --filter vite-basic dev
+```
+
 ## Repository structure
 
 ```txt
