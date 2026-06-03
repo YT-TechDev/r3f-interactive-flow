@@ -37,13 +37,13 @@ import {
   useFlowFrame,
   useWheelInput,
   useTouchInput,
-  useKeyboardInput,
+  useKeyboardInput
 } from "r3f-interactive-flow";
 
 import type {
   UseWheelInputOptions,
   UseTouchInputOptions,
-  UseKeyboardInputOptions,
+  UseKeyboardInputOptions
 } from "r3f-interactive-flow";
 ```
 
@@ -59,7 +59,7 @@ import {
   useFlow,
   useWheelInput,
   useTouchInput,
-  useKeyboardInput,
+  useKeyboardInput
 } from "r3f-interactive-flow";
 
 const phases = ["intro", "work", "contact"] as const;

@@ -7,7 +7,7 @@ import {
   useFlowFrame,
   useKeyboardInput,
   useTouchInput,
-  useWheelInput,
+  useWheelInput
 } from "r3f-interactive-flow";
 
 const phases = ["intro", "work", "contact"] as const;
@@ -71,8 +71,7 @@ function FlowControlsPanel() {
       </div>
 
       <p className="hint">
-        Try wheel scrolling, vertical touch swipes, or keyboard arrows / PageUp
-        / PageDown / Space.
+        Try wheel scrolling, vertical touch swipes, or keyboard arrows / PageUp / PageDown / Space.
       </p>
     </section>
   );

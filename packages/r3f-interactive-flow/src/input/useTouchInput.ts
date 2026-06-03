@@ -14,9 +14,7 @@ export type UseTouchInputOptions = {
   preventDefault?: boolean;
 };
 
-export function useTouchInput<TPhase extends string>(
-  options: UseTouchInputOptions = {}
-): void {
+export function useTouchInput<TPhase extends string>(options: UseTouchInputOptions = {}): void {
   const flow = useFlow<TPhase>();
   const flowRef = useRef<FlowControls<TPhase>>(flow);
   const startYRef = useRef<number | null>(null);
