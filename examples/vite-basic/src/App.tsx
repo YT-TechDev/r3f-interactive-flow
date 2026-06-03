@@ -78,7 +78,7 @@ function FlowControlsPanel() {
 }
 
 function FlowBox() {
-  const meshRef = useRef<THREE.Mesh>(null);
+  const meshRef = useRef<THREE.Mesh | null>(null);
 
   useFlowFrame((progress) => {
     if (!meshRef.current) {
