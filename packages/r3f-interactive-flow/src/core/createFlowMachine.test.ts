@@ -12,14 +12,14 @@ describe("createFlowMachine", () => {
       progress: 0,
       direction: "none",
       isTransitioning: false,
-      isLocked: false
+      isLocked: false,
     });
   });
 
   it("uses initialPhase when it is included in phases", () => {
     const machine = createFlowMachine({
       phases: ["intro", "work", "contact"] as const,
-      initialPhase: "work"
+      initialPhase: "work",
     });
 
     expect(machine.phase).toBe("work");
@@ -27,25 +27,30 @@ describe("createFlowMachine", () => {
   });
 
   it("throws when phases is empty", () => {
-    expect(() => createFlowMachine({ phases: [] })).toThrow(/at least one phase/);
+    expect(() => createFlowMachine({ phases: [] })).toThrow(
+      /at least one phase/,
+    );
   });
 
   it("throws when phases has duplicate values", () => {
-    expect(() => createFlowMachine({ phases: ["intro", "intro"] as const })).toThrow(
-      /duplicate phase/
-    );
+    expect(() =>
+      createFlowMachine({ phases: ["intro", "intro"] as const }),
+    ).toThrow(/duplicate phase/);
   });
 
   it("throws when initialPhase is not included in phases", () => {
     expect(() =>
-      createFlowMachine({ phases: ["intro", "work"] as const, initialPhase: "missing" })
+      createFlowMachine({
+        phases: ["intro", "work"] as const,
+        initialPhase: "missing",
+      }),
     ).toThrow(/initialPhase/);
   });
 
   it("moves to the next phase and completes the transition with update", () => {
     const machine = createFlowMachine({
       phases: ["intro", "work"] as const,
-      transitionDurationMs: 1000
+      transitionDurationMs: 1000,
     });
 
     machine.next();
@@ -56,7 +61,7 @@ describe("createFlowMachine", () => {
       progress: 0,
       direction: "next",
       isTransitioning: true,
-      isLocked: false
+      isLocked: false,
     });
 
     machine.update(500);
@@ -73,14 +78,14 @@ describe("createFlowMachine", () => {
       progress: 1,
       direction: "none",
       isTransitioning: false,
-      isLocked: false
+      isLocked: false,
     });
   });
 
   it("moves to the previous phase", () => {
     const machine = createFlowMachine({
       phases: ["intro", "work"] as const,
-      initialPhase: "work"
+      initialPhase: "work",
     });
 
     machine.prev();
@@ -92,7 +97,9 @@ describe("createFlowMachine", () => {
   });
 
   it("moves to a specific phase with goTo", () => {
-    const machine = createFlowMachine({ phases: ["intro", "work", "contact"] as const });
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+    });
 
     machine.goTo("contact");
 
@@ -103,7 +110,7 @@ describe("createFlowMachine", () => {
 
   it("throws when goTo receives an unknown phase", () => {
     const machine = createFlowMachine<"intro" | "work" | "missing">({
-      phases: ["intro", "work"]
+      phases: ["intro", "work"],
     });
 
     expect(() => machine.goTo("missing")).toThrow(/Unknown phase/);
@@ -137,7 +144,7 @@ describe("createFlowMachine", () => {
       progress: 0,
       direction: "none",
       isTransitioning: false,
-      isLocked: true
+      isLocked: true,
     });
 
     machine.unlock();
@@ -148,7 +155,9 @@ describe("createFlowMachine", () => {
   });
 
   it("ignores new navigation while transitioning", () => {
-    const machine = createFlowMachine({ phases: ["intro", "work", "contact"] as const });
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+    });
 
     machine.next();
     machine.next();
@@ -161,7 +170,7 @@ describe("createFlowMachine", () => {
     const machine = createFlowMachine({
       phases: ["intro", "work"] as const,
       transitionDurationMs: 1000,
-      easing: (progress) => progress * progress
+      easing: (progress) => progress * progress,
     });
 
     machine.next();
@@ -172,7 +181,10 @@ describe("createFlowMachine", () => {
 
   it("throws when transitionDurationMs is not positive", () => {
     expect(() =>
-      createFlowMachine({ phases: ["intro", "work"] as const, transitionDurationMs: 0 })
+      createFlowMachine({
+        phases: ["intro", "work"] as const,
+        transitionDurationMs: 0,
+      }),
     ).toThrow(/transitionDurationMs/);
   });
 
