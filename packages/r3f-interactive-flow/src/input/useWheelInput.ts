@@ -14,9 +14,7 @@ export type UseWheelInputOptions = {
   preventDefault?: boolean;
 };
 
-export function useWheelInput<TPhase extends string>(
-  options: UseWheelInputOptions = {},
-): void {
+export function useWheelInput<TPhase extends string>(options: UseWheelInputOptions = {}): void {
   const flow = useFlow<TPhase>();
   const flowRef = useRef<FlowControls<TPhase>>(flow);
 
