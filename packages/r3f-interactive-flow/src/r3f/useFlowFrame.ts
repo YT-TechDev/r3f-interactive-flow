@@ -4,9 +4,7 @@ import { useFrame } from "@react-three/fiber";
 import { useContext, useEffect, useRef } from "react";
 import { FlowContext } from "../react/FlowContext";
 
-export function useFlowFrame(
-  callback: (progress: number, delta: number) => void,
-): void {
+export function useFlowFrame(callback: (progress: number, delta: number) => void): void {
   const context = useContext(FlowContext);
   const callbackRef = useRef(callback);
 
