@@ -14,9 +14,7 @@ export type UseTouchInputOptions = {
   preventDefault?: boolean;
 };
 
-export function useTouchInput<TPhase extends string>(
-  options: UseTouchInputOptions = {}
-): void {
+export function useTouchInput<TPhase extends string>(options: UseTouchInputOptions = {}): void {
   const flow = useFlow<TPhase>();
   const flowRef = useRef<FlowControls<TPhase>>(flow);
   const startYRef = useRef<number | null>(null);
@@ -93,8 +91,12 @@ export function useTouchInput<TPhase extends string>(
       }
     };
 
-    eventTarget.addEventListener("touchstart", handleTouchStart, { passive: true });
-    eventTarget.addEventListener("touchmove", handleTouchMove, { passive: false });
+    eventTarget.addEventListener("touchstart", handleTouchStart, {
+      passive: true
+    });
+    eventTarget.addEventListener("touchmove", handleTouchMove, {
+      passive: false
+    });
     eventTarget.addEventListener("touchend", handleTouchEnd, { passive: true });
     eventTarget.addEventListener("touchcancel", resetTouch, { passive: true });
 

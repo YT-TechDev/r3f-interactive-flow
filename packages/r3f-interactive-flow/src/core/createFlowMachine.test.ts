@@ -38,7 +38,10 @@ describe("createFlowMachine", () => {
 
   it("throws when initialPhase is not included in phases", () => {
     expect(() =>
-      createFlowMachine({ phases: ["intro", "work"] as const, initialPhase: "missing" })
+      createFlowMachine({
+        phases: ["intro", "work"] as const,
+        initialPhase: "missing"
+      })
     ).toThrow(/initialPhase/);
   });
 
@@ -92,7 +95,9 @@ describe("createFlowMachine", () => {
   });
 
   it("moves to a specific phase with goTo", () => {
-    const machine = createFlowMachine({ phases: ["intro", "work", "contact"] as const });
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const
+    });
 
     machine.goTo("contact");
 
@@ -148,7 +153,9 @@ describe("createFlowMachine", () => {
   });
 
   it("ignores new navigation while transitioning", () => {
-    const machine = createFlowMachine({ phases: ["intro", "work", "contact"] as const });
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const
+    });
 
     machine.next();
     machine.next();
@@ -172,7 +179,10 @@ describe("createFlowMachine", () => {
 
   it("throws when transitionDurationMs is not positive", () => {
     expect(() =>
-      createFlowMachine({ phases: ["intro", "work"] as const, transitionDurationMs: 0 })
+      createFlowMachine({
+        phases: ["intro", "work"] as const,
+        transitionDurationMs: 0
+      })
     ).toThrow(/transitionDurationMs/);
   });
 
