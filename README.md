@@ -9,15 +9,70 @@ The v0.1.0 setup currently focuses on the library foundation only:
 - TypeScript / tsup / Vitest / ESLint / Prettier setup
 - minimal source skeleton for core, React, R3F, and input boundaries
 
-## Public API target
+## Public API
 
 The initial public API is intentionally small:
 
 ```ts
-import { FlowProvider, useFlow, useFlowProgress, useFlowFrame } from "r3f-interactive-flow";
+import {
+  FlowProvider,
+  useFlow,
+  useFlowProgress,
+  useFlowFrame,
+  useWheelInput,
+  useTouchInput,
+  useKeyboardInput
+} from "r3f-interactive-flow";
 ```
 
-Full flow-machine behavior is not implemented yet in this setup step.
+## Minimal usage
+
+```tsx
+"use client";
+
+import {
+  FlowProvider,
+  useFlow,
+  useWheelInput,
+  useTouchInput,
+  useKeyboardInput
+} from "r3f-interactive-flow";
+
+const phases = ["intro", "work", "contact"] as const;
+
+function FlowInputLayer() {
+  useWheelInput<(typeof phases)[number]>();
+  useTouchInput<(typeof phases)[number]>();
+  useKeyboardInput<(typeof phases)[number]>();
+
+  return null;
+}
+
+function FlowControlsPanel() {
+  const flow = useFlow<(typeof phases)[number]>();
+
+  return (
+    <div>
+      <p>Current phase: {flow.phase}</p>
+      <button onClick={flow.prev}>Prev</button>
+      <button onClick={flow.next}>Next</button>
+    </div>
+  );
+}
+
+export function App() {
+  return (
+    <FlowProvider phases={phases}>
+      <FlowInputLayer />
+      <FlowControlsPanel />
+    </FlowProvider>
+  );
+}
+```
+
+Input hooks must be used inside `FlowProvider`.
+
+`useFlowFrame` uses React Three Fiber's `useFrame`, so it must be used inside a Canvas-bound component.
 
 ## Repository structure
 
