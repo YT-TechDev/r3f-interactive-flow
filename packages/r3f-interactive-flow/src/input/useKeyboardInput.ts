@@ -32,7 +32,7 @@ function shouldIgnoreKeyboardEventTarget(target: EventTarget | null): boolean {
 }
 
 export function useKeyboardInput<TPhase extends string>(
-  options: UseKeyboardInputOptions = {}
+  options: UseKeyboardInputOptions = {},
 ): void {
   const flow = useFlow<TPhase>();
   const flowRef = useRef<FlowControls<TPhase>>(flow);
@@ -98,5 +98,11 @@ export function useKeyboardInput<TPhase extends string>(
     return () => {
       eventTarget.removeEventListener("keydown", handleKeyDown);
     };
-  }, [options.enabled, options.nextKeys, options.preventDefault, options.prevKeys, options.target]);
+  }, [
+    options.enabled,
+    options.nextKeys,
+    options.preventDefault,
+    options.prevKeys,
+    options.target,
+  ]);
 }
