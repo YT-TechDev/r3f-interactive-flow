@@ -222,6 +222,8 @@ pnpm release
 
 Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR.
 
+For bugs or feature suggestions, please use the GitHub issue templates.
+
 ## License
 
 MIT
