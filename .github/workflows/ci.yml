@@ -34,7 +34,7 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies and update lockfile
-        run: pnpm install
+        run: CI=false pnpm install
 
       - name: Commit lockfile
         run: |
