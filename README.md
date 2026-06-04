@@ -199,6 +199,22 @@ pnpm --filter vite-basic build
 pnpm pack:dry-run
 ```
 
+## Release readiness
+
+Before publishing, run:
+
+```bash
+pnpm release:check
+```
+
+To publish with Changesets after checks pass:
+
+```bash
+pnpm release
+```
+
+`pnpm release` publishes to npm, so only run it when you intentionally want to publish.
+
 ## License
 
 MIT
