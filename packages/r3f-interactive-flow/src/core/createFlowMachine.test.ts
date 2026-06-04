@@ -95,27 +95,24 @@ describe("createFlowMachine", () => {
     expect(machine.isTransitioning).toBe(true);
   });
 
-  it(
-    "clamps progress and completes when update receives a delta larger than the duration",
-    () => {
-      const machine = createFlowMachine({
-        phases: ["intro", "work"] as const,
-        transitionDurationMs: 1000
-      });
+  it("clamps progress and completes when update receives a delta larger than the duration", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work"] as const,
+      transitionDurationMs: 1000
+    });
 
-      machine.next();
-      machine.update(1500);
+    machine.next();
+    machine.update(1500);
 
-      expect(machine.getSnapshot()).toEqual({
-        phase: "work",
-        phaseIndex: 1,
-        progress: 1,
-        direction: "none",
-        isTransitioning: false,
-        isLocked: false
-      });
-    }
-  );
+    expect(machine.getSnapshot()).toEqual({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 1,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+  });
 
   it("moves to the previous phase", () => {
     const machine = createFlowMachine({
