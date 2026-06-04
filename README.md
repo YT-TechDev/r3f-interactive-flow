@@ -208,6 +208,8 @@ Before publishing, run:
 pnpm release:check
 ```
 
+For the full maintainer checklist, see [docs/release.md](docs/release.md).
+
 To publish with Changesets after checks pass:
 
 ```bash
