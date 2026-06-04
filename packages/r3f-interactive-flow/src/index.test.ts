@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import * as publicApi from ".";
-import type {
-  UseKeyboardInputOptions,
-  UseTouchInputOptions,
-  UseWheelInputOptions
-} from ".";
+import type { UseKeyboardInputOptions, UseTouchInputOptions, UseWheelInputOptions } from ".";
 
 const expectedRuntimeExports = [
   "FlowProvider",
