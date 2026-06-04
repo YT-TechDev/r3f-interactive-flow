@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "A small React Three Fiber utility for predictable phase-based interactive flow control.",
   "license": "MIT",
+  "author": "YT-TechDev",
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -16,8 +17,33 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
+  "keywords": [
+    "react-three-fiber",
+    "three",
+    "react",
+    "r3f",
+    "interactive",
+    "phase",
+    "flow",
+    "animation",
+    "webgl"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YT-TechDev/r3f-interactive-flow.git",
+    "directory": "packages/r3f-interactive-flow"
+  },
+  "homepage": "https://github.com/YT-TechDev/r3f-interactive-flow#readme",
+  "bugs": {
+    "url": "https://github.com/YT-TechDev/r3f-interactive-flow/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
