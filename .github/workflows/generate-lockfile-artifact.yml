@@ -1,0 +1,35 @@
+name: Generate lockfile artifact
+
+on:
+  pull_request:
+
+jobs:
+  generate-lockfile:
+    if: github.head_ref == 'fix/ci-lockfile-and-workflow-cleanup'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: fix/ci-lockfile-and-workflow-cleanup
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup pnpm
+        run: corepack prepare pnpm@11.5.0 --activate
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies and update lockfile
+        run: pnpm install
+
+      - name: Upload lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-pnpm-lock
+          path: pnpm-lock.yaml
