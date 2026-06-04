@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Contributing guide
+    url: https://github.com/YT-TechDev/r3f-interactive-flow/blob/main/CONTRIBUTING.md
+    about: Read the contribution guidelines before opening a PR.
+  - name: Release checklist
+    url: https://github.com/YT-TechDev/r3f-interactive-flow/blob/main/docs/release.md
+    about: Maintainer release checklist.
