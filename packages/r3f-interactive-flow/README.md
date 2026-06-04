@@ -270,6 +270,7 @@ Architecture rules:
 This package is designed to be usable from Next.js App Router Client Components.
 
 - Use `FlowProvider`, `useFlow`, `useFlowProgress`, `useFlowFrame`, and input hooks from Client Components.
+- The package entry is marked as a client entry for Next.js App Router compatibility.
 - The package does not add Next.js as a dependency.
 - Browser APIs are used inside hooks/effects, not at module import time.
 - No Next.js router integration is included in v0.1.0.

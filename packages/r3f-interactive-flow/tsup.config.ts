@@ -6,5 +6,8 @@ export default defineConfig({
   dts: true,
   sourcemap: true,
   clean: true,
-  external: ["react", "react-dom", "three", "@react-three/fiber"]
+  external: ["react", "react-dom", "three", "@react-three/fiber"],
+  banner: {
+    js: '"use client";'
+  }
 });
