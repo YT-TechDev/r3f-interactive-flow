@@ -32,6 +32,9 @@ jobs:
       - name: Build library
         run: pnpm build
 
+      - name: Verify package output
+        run: pnpm package:verify
+
       - name: Typecheck
         run: pnpm typecheck
 
