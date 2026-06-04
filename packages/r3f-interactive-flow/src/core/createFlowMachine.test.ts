@@ -80,6 +80,40 @@ describe("createFlowMachine", () => {
     });
   });
 
+  it("does not reduce progress when update receives a negative delta", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work"] as const,
+      transitionDurationMs: 1000
+    });
+
+    machine.next();
+    machine.update(500);
+    machine.update(-250);
+
+    expect(machine.progress).toBe(0.5);
+    expect(machine.direction).toBe("next");
+    expect(machine.isTransitioning).toBe(true);
+  });
+
+  it("clamps progress and completes when update receives a delta larger than the duration", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work"] as const,
+      transitionDurationMs: 1000
+    });
+
+    machine.next();
+    machine.update(1500);
+
+    expect(machine.getSnapshot()).toEqual({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 1,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+  });
+
   it("moves to the previous phase", () => {
     const machine = createFlowMachine({
       phases: ["intro", "work"] as const,
@@ -106,6 +140,24 @@ describe("createFlowMachine", () => {
     expect(machine.direction).toBe("next");
   });
 
+  it("does nothing when goTo receives the current phase", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      initialPhase: "work"
+    });
+
+    machine.goTo("work");
+
+    expect(machine.getSnapshot()).toEqual({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 0,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+  });
+
   it("throws when goTo receives an unknown phase", () => {
     const machine = createFlowMachine<"intro" | "work" | "missing">({
       phases: ["intro", "work"]
@@ -130,6 +182,44 @@ describe("createFlowMachine", () => {
     expect(machine.isTransitioning).toBe(false);
   });
 
+  it("preserves idle direction and transition state when prev or next are called at boundaries", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work"] as const,
+      transitionDurationMs: 1000
+    });
+
+    machine.prev();
+
+    expect(machine.direction).toBe("none");
+    expect(machine.isTransitioning).toBe(false);
+
+    machine.next();
+    machine.update(1000);
+    machine.next();
+
+    expect(machine.phase).toBe("work");
+    expect(machine.direction).toBe("none");
+    expect(machine.isTransitioning).toBe(false);
+  });
+
+  it("updates isLocked in snapshots when lock and unlock are called", () => {
+    const machine = createFlowMachine({ phases: ["intro", "work"] as const });
+
+    machine.lock();
+
+    expect(machine.getSnapshot()).toMatchObject({
+      isLocked: true,
+      isTransitioning: false
+    });
+
+    machine.unlock();
+
+    expect(machine.getSnapshot()).toMatchObject({
+      isLocked: false,
+      isTransitioning: false
+    });
+  });
+
   it("ignores navigation while locked", () => {
     const machine = createFlowMachine({ phases: ["intro", "work"] as const });
 
@@ -150,6 +240,68 @@ describe("createFlowMachine", () => {
 
     expect(machine.phase).toBe("work");
     expect(machine.isTransitioning).toBe(true);
+  });
+
+  it("continues updating an active transition after lock is called", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 1000
+    });
+
+    machine.next();
+    machine.lock();
+    machine.update(500);
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "work",
+      progress: 0.5,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: true
+    });
+  });
+
+  it("keeps navigation blocked while locked after an active transition completes", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 1000
+    });
+
+    machine.next();
+    machine.lock();
+    machine.update(1000);
+    machine.next();
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 1,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: true
+    });
+  });
+
+  it("allows navigation again after unlocking a completed transition", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 1000
+    });
+
+    machine.next();
+    machine.lock();
+    machine.update(1000);
+    machine.unlock();
+    machine.next();
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "contact",
+      phaseIndex: 2,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false
+    });
   });
 
   it("ignores new navigation while transitioning", () => {
