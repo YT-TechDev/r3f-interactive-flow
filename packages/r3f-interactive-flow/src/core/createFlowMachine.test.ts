@@ -182,7 +182,7 @@ describe("createFlowMachine", () => {
     expect(machine.isTransitioning).toBe(false);
   });
 
-  it("preserves idle direction and transition state when prev or next are called at boundaries", () => {
+  it("preserves idle state when prev or next are called at boundaries", () => {
     const machine = createFlowMachine({
       phases: ["intro", "work"] as const,
       transitionDurationMs: 1000
