@@ -13,7 +13,7 @@ permissions:
 jobs:
   update-lockfile:
     name: Update lockfile
-    if: github.ref == 'refs/heads/fix/ci-lockfile-and-workflow-cleanup' && github.actor != 'github-actions[bot]'
+    if: (github.head_ref == 'fix/ci-lockfile-and-workflow-cleanup' || github.ref == 'refs/heads/fix/ci-lockfile-and-workflow-cleanup') && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
