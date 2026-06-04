@@ -12,7 +12,8 @@
     "format:write": "prettier --write .",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "pnpm build && changeset publish",
+    "release:check": "pnpm build && pnpm typecheck && pnpm test && pnpm lint && pnpm format && pnpm --filter vite-basic build && pnpm pack:dry-run",
+    "release": "pnpm release:check && changeset publish",
     "pack:dry-run": "pnpm --filter r3f-interactive-flow pack:dry-run"
   },
   "devDependencies": {
