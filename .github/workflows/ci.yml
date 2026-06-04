@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - main
-      - fix/vite-basic-three-types
+      - fix/ci-lockfile-and-workflow-cleanup
 
 permissions:
   contents: write
@@ -13,13 +13,13 @@ permissions:
 jobs:
   update-lockfile:
     name: Update lockfile
-    if: github.ref == 'refs/heads/fix/vite-basic-three-types' && github.actor != 'github-actions[bot]'
+    if: github.ref == 'refs/heads/fix/ci-lockfile-and-workflow-cleanup' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: fix/vite-basic-three-types
+          ref: fix/ci-lockfile-and-workflow-cleanup
 
       - name: Enable Corepack
         run: corepack enable
@@ -45,8 +45,8 @@ jobs:
             echo "No lockfile changes"
             exit 0
           fi
-          git commit -m "fix: add three types to Vite example"
-          git push origin HEAD:fix/vite-basic-three-types
+          git commit -m "fix: update lockfile and clean up CI workflow"
+          git push origin HEAD:fix/ci-lockfile-and-workflow-cleanup
 
   checks:
     name: Checks
