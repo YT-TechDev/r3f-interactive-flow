@@ -191,6 +191,7 @@ Architecture rules:
 ```bash
 pnpm install
 pnpm build
+pnpm package:verify
 pnpm typecheck
 pnpm test
 pnpm lint
