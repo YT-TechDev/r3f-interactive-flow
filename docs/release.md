@@ -8,6 +8,7 @@ This document is for maintainers preparing a package release.
 - Confirm all intended PRs are merged.
 - Confirm the package version in `packages/r3f-interactive-flow/package.json` is correct.
 - Confirm `packages/r3f-interactive-flow/CHANGELOG.md` includes the release entry.
+- Confirm the GitHub release notes draft exists in `docs/releases/` for the release version.
 - Confirm the public API is intentional and documented.
 - Confirm no unrelated files are changed.
 
