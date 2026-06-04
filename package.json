@@ -12,7 +12,8 @@
     "format:write": "prettier --write .",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "pnpm build && changeset publish"
+    "release": "pnpm build && changeset publish",
+    "pack:dry-run": "pnpm --filter r3f-interactive-flow pack:dry-run"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",
