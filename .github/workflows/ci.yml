@@ -46,3 +46,6 @@ jobs:
 
       - name: Build Vite example
         run: pnpm --filter vite-basic build
+
+      - name: Package dry run
+        run: pnpm pack:dry-run
