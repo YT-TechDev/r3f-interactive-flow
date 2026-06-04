@@ -218,6 +218,10 @@ pnpm release
 
 `pnpm release` publishes to npm, so only run it when you intentionally want to publish.
 
+## Contributing
+
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR.
+
 ## License
 
 MIT
