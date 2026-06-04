@@ -5,6 +5,7 @@
   "packageManager": "pnpm@11.5.0",
   "scripts": {
     "build": "pnpm --filter r3f-interactive-flow build",
+    "package:verify": "node scripts/verify-package-output.mjs",
     "typecheck": "pnpm --filter r3f-interactive-flow typecheck",
     "test": "pnpm --filter r3f-interactive-flow test",
     "lint": "eslint .",
@@ -12,7 +13,7 @@
     "format:write": "prettier --write .",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release:check": "pnpm build && pnpm typecheck && pnpm test && pnpm lint && pnpm format && pnpm --filter vite-basic build && pnpm pack:dry-run",
+    "release:check": "pnpm build && pnpm package:verify && pnpm typecheck && pnpm test && pnpm lint && pnpm format && pnpm --filter vite-basic build && pnpm pack:dry-run",
     "release": "pnpm release:check && changeset publish",
     "pack:dry-run": "pnpm --filter r3f-interactive-flow pack:dry-run"
   },
