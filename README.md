@@ -194,7 +194,9 @@ pnpm build
 pnpm typecheck
 pnpm test
 pnpm lint
+pnpm format
 pnpm --filter vite-basic build
+pnpm pack:dry-run
 ```
 
 ## License
