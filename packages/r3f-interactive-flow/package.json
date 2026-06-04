@@ -48,7 +48,8 @@
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "pack:dry-run": "pnpm build && npm pack --dry-run"
   },
   "peerDependencies": {
     "@react-three/fiber": ">=8.0.0 <10.0.0",
