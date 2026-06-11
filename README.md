@@ -210,7 +210,7 @@ pnpm release:check
 
 For the full maintainer checklist, see [docs/release.md](docs/release.md).
 
-For the v0.2.0 implementation plan, see [docs/roadmap-v0.2.0.md](docs/roadmap-v0.2.0.md).
+For the v0.2.0 implementation plan, see [docs/roadmap-v0.2.0.md](docs/roadmap-v0.2.0.md). For the behavior audit and intended v0.2.0 rules, see [docs/behavior-v0.2.0.md](docs/behavior-v0.2.0.md).
 
 To publish with Changesets after checks pass:
 
