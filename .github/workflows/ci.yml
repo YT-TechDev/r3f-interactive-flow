@@ -12,8 +12,8 @@ permissions:
   contents: read
 
 jobs:
-  ci:
-    name: Typecheck, test, lint, and build
+  checks:
+    name: Checks
     runs-on: ubuntu-latest
 
     steps:
@@ -23,14 +23,23 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
 
+      - name: Setup pnpm
+        run: corepack prepare pnpm@11.5.0 --activate
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Build library
+        run: pnpm build
+
+      - name: Verify package output
+        run: pnpm package:verify
 
       - name: Typecheck
         run: pnpm typecheck
@@ -41,5 +50,11 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      - name: Build
-        run: pnpm build
+      - name: Format check
+        run: pnpm format
+
+      - name: Build Vite example
+        run: pnpm --filter vite-basic build
+
+      - name: Package dry run
+        run: pnpm pack:dry-run

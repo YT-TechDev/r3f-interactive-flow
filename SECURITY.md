@@ -5,8 +5,8 @@
 The project is currently in early public development. Security fixes are prioritized for the latest released version.
 
 | Version | Supported |
-| --- | --- |
-| latest | Yes |
+| ------- | --------- |
+| latest  | Yes       |
 
 ## Reporting a Vulnerability
 
