@@ -109,14 +109,23 @@ This roadmap is an implementation plan and requirements document. It does not ad
 
 ## 4. Public API policy
 
-The v0.2.0 public API direction is limited to:
+The v0.2.0 public API direction remains intentionally small and is limited to the existing flow, R3F bridge, and input hooks:
 
 - `FlowProvider`
 - `useFlow`
 - `useFlowProgress`
 - `useFlowFrame`
+- `useWheelInput`
+- `useTouchInput`
+- `useKeyboardInput`
 
-This roadmap must not be interpreted as approval to add new runtime APIs or exports in v0.2.0. If the current repository already contains exports or README examples beyond this list, those existing artifacts should not be changed by this documentation-only task. Any future API expansion requires a separate design discussion and should not be bundled into the v0.2.0 foundation work.
+The input hook option types are also exported as supporting TypeScript types for the existing input hooks:
+
+- `UseWheelInputOptions`
+- `UseTouchInputOptions`
+- `UseKeyboardInputOptions`
+
+This roadmap must not be interpreted as approval to add new runtime APIs or exports in v0.2.0. Any future API expansion requires a separate design discussion and should not be bundled into the v0.2.0 foundation work.
 
 ## 5. Architecture boundaries
 
@@ -226,7 +235,7 @@ These items may be explored separately in future releases or external examples, 
 - [ ] Confirm the docs-only roadmap PR does not change source code.
 - [ ] Confirm no dependencies were added.
 - [ ] Confirm package configuration was not changed unless needed only for documentation linking.
-- [ ] Confirm the public API direction remains limited to `FlowProvider`, `useFlow`, `useFlowProgress`, and `useFlowFrame`.
+- [ ] Confirm the public API direction remains limited to the existing flow, R3F bridge, and input hook exports documented in the Public API policy.
 - [ ] Confirm architecture boundaries are documented.
 - [ ] Confirm core behavior is specified before implementation starts.
 - [ ] Confirm tests cover core transition behavior before release.
