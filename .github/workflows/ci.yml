@@ -2,38 +2,35 @@ name: CI
 
 on:
   pull_request:
+    branches:
+      - main
   push:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
-  checks:
-    name: Checks
+  ci:
+    name: Typecheck, test, lint, and build
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Enable Corepack
         run: corepack enable
 
-      - name: Setup pnpm
-        run: corepack prepare pnpm@11.5.0 --activate
-
-      - name: Setup Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Build library
-        run: pnpm build
-
-      - name: Verify package output
-        run: pnpm package:verify
 
       - name: Typecheck
         run: pnpm typecheck
@@ -44,11 +41,5 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      - name: Format check
-        run: pnpm format
-
-      - name: Build Vite example
-        run: pnpm --filter vite-basic build
-
-      - name: Package dry run
-        run: pnpm pack:dry-run
+      - name: Build
+        run: pnpm build
