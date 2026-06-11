@@ -160,6 +160,8 @@ Architecture rules:
 
 ### Milestone 1: Audit current behavior
 
+The current behavior audit and intended v0.2.0 rules are documented in [docs/behavior-v0.2.0.md](behavior-v0.2.0.md).
+
 - Inventory the current provider, hooks, core machine, input hooks, examples, README snippets, and tests.
 - Record current behavior for `next`, `prev`, `goTo`, progress updates, loop boundaries, cooldown, and locks.
 - Identify behavior that is undocumented, inconsistent, or hard to test.
