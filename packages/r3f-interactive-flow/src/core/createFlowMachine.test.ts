@@ -404,6 +404,302 @@ describe("createFlowMachine", () => {
     });
   });
 
+  it("keeps default navigation behavior unchanged when cooldownMs is omitted", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 500
+    });
+
+    machine.next();
+    machine.update(500);
+    machine.next();
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "contact",
+      phaseIndex: 2,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true
+    });
+  });
+
+  it("does not block the next valid navigation after transition completion when cooldownMs is zero", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 500,
+      cooldownMs: 0
+    });
+
+    machine.next();
+    machine.update(500);
+    machine.next();
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "contact",
+      phaseIndex: 2,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true
+    });
+  });
+
+  it("blocks valid navigation after transition completion while a positive cooldown is active", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 500,
+      cooldownMs: 1000
+    });
+
+    machine.next();
+    machine.update(500);
+
+    const completedSnapshot = machine.getSnapshot();
+
+    machine.next();
+
+    expect(machine.getSnapshot()).toEqual(completedSnapshot);
+  });
+
+  it("allows navigation after both transition and cooldown gates are open", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 500,
+      cooldownMs: 1000
+    });
+
+    machine.next();
+    machine.update(500);
+    machine.update(500);
+    machine.next();
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "contact",
+      phaseIndex: 2,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true
+    });
+  });
+
+  it("starts cooldown on accepted navigation instead of transition completion", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 1000,
+      cooldownMs: 500
+    });
+
+    machine.next();
+    machine.update(500);
+
+    const activeTransitionSnapshot = machine.getSnapshot();
+
+    machine.next();
+
+    expect(machine.getSnapshot()).toEqual(activeTransitionSnapshot);
+
+    machine.update(500);
+    machine.next();
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "contact",
+      phaseIndex: 2,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true
+    });
+  });
+
+  it("does not start cooldown for same-phase goTo navigation", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      initialPhase: "work",
+      cooldownMs: 1000
+    });
+
+    machine.goTo("work");
+    machine.next();
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "contact",
+      phaseIndex: 2,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true
+    });
+  });
+
+  it("does not start cooldown for first-phase prev or last-phase next navigation", () => {
+    const firstPhaseMachine = createFlowMachine({
+      phases: ["intro", "work"] as const,
+      cooldownMs: 1000
+    });
+    const lastPhaseMachine = createFlowMachine({
+      phases: ["intro", "work"] as const,
+      initialPhase: "work",
+      cooldownMs: 1000
+    });
+
+    firstPhaseMachine.prev();
+    firstPhaseMachine.next();
+
+    lastPhaseMachine.next();
+    lastPhaseMachine.prev();
+
+    expect(firstPhaseMachine.getSnapshot()).toMatchObject({
+      phase: "work",
+      direction: "next",
+      isTransitioning: true
+    });
+    expect(lastPhaseMachine.getSnapshot()).toMatchObject({
+      phase: "intro",
+      direction: "prev",
+      isTransitioning: true
+    });
+  });
+
+  it("does not start cooldown when valid navigation is ignored while locked", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work"] as const,
+      cooldownMs: 1000
+    });
+
+    machine.lock();
+    machine.next();
+    machine.unlock();
+    machine.next();
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false
+    });
+  });
+
+  it("does not reset cooldown when valid navigation is ignored while locked", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 500,
+      cooldownMs: 1000
+    });
+
+    machine.next();
+    machine.lock();
+    machine.update(500);
+    machine.prev();
+    machine.unlock();
+    machine.update(500);
+    machine.next();
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "contact",
+      phaseIndex: 2,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false
+    });
+  });
+
+  it("does not reset cooldown when valid navigation is ignored while transitioning", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 1000,
+      cooldownMs: 1500
+    });
+
+    machine.next();
+    machine.update(500);
+
+    const activeTransitionSnapshot = machine.getSnapshot();
+
+    machine.next();
+
+    expect(machine.getSnapshot()).toEqual(activeTransitionSnapshot);
+
+    machine.update(500);
+    machine.update(500);
+    machine.next();
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "contact",
+      phaseIndex: 2,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true
+    });
+  });
+
+  it("continues to throw for invalid goTo targets without mutating state during cooldown", () => {
+    const machine = createFlowMachine<"intro" | "work" | "contact" | "missing">({
+      phases: ["intro", "work", "contact"],
+      transitionDurationMs: 500,
+      cooldownMs: 1000
+    });
+
+    machine.next();
+    machine.update(500);
+
+    const completedSnapshot = machine.getSnapshot();
+
+    expect(() => machine.goTo("missing")).toThrow(/Unknown phase/);
+    expect(machine.getSnapshot()).toEqual(completedSnapshot);
+  });
+
+  it("does not reduce cooldown time when update receives a negative delta", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 500,
+      cooldownMs: 1000
+    });
+
+    machine.next();
+    machine.update(500);
+    machine.update(-500);
+
+    const completedSnapshot = machine.getSnapshot();
+
+    machine.next();
+
+    expect(machine.getSnapshot()).toEqual(completedSnapshot);
+
+    machine.update(500);
+    machine.next();
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "contact",
+      phaseIndex: 2,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true
+    });
+  });
+
+  it("throws when cooldownMs is invalid", () => {
+    expect(() =>
+      createFlowMachine({
+        phases: ["intro", "work"] as const,
+        cooldownMs: Number.NaN
+      })
+    ).toThrow(/cooldownMs/);
+
+    expect(() =>
+      createFlowMachine({
+        phases: ["intro", "work"] as const,
+        cooldownMs: Number.POSITIVE_INFINITY
+      })
+    ).toThrow(/cooldownMs/);
+
+    expect(() =>
+      createFlowMachine({
+        phases: ["intro", "work"] as const,
+        cooldownMs: -1
+      })
+    ).toThrow(/cooldownMs/);
+  });
+
   it("keeps completed transitions stable after extra updates", () => {
     const machine = createFlowMachine({
       phases: ["intro", "work"] as const,
