@@ -1,8 +1,8 @@
-# v0.2.0 Current Behavior Audit
+# v0.2.0 Current Behavior Audit and Intended Rules
 
 ## 1. Purpose
 
-This document records the current observed behavior of `r3f-interactive-flow` before v0.2.0 implementation work. It is an audit document, not an implementation plan.
+This document records the current observed behavior of `r3f-interactive-flow` before v0.2.0 implementation work and preserves the intended v0.2.0 behavior rules that guide that work.
 
 This PR is documentation-only. It does not change runtime behavior, add dependencies, expand the public API, add public exports, or implement cooldown, lock, transition, or input behavior changes.
 
@@ -458,6 +458,98 @@ Existing tests are concentrated in core behavior, easing helpers, and the packag
 - Improve README and example guidance for v0.2.0.
 - Specify DOM progress versus frame progress expectations.
 - Decide whether invalid `goTo` target priority should remain throw-first across all gates.
+
+## 11. Intended v0.2.0 behavior rules
+
+The current behavior audit above is the baseline. The rules below describe intended v0.2.0 stabilization behavior and should guide later implementation PRs without changing runtime behavior in this documentation PR.
+
+- Default behavior should remain predictable and conservative.
+- Navigation during an active transition should be ignored by default unless a future explicit option changes that behavior.
+- Boundary navigation should remain a no-op by default unless a future explicit loop option is added.
+- Same-phase navigation should remain a no-op.
+- Invalid phase targets should fail predictably and must never leave the machine in a partial transition state.
+- Transition progress should remain normalized to `0..1`.
+- Completion should update transition state exactly once per accepted transition.
+- Cooldown behavior should remain specified before further changes, including timing, scope, and interaction with accepted or ignored navigation.
+- `lockDuringTransition` behavior should be specified before implementation. The default should remain equivalent to ignoring navigation during active transitions unless a deliberate option changes it.
+- Browser input hooks should not access `window`, `document`, `HTMLElement`, or other browser APIs at module import time.
+- R3F hooks must remain Canvas-bound and should continue to rely on React Three Fiber APIs only from Canvas components.
+- DOM input logic must stay separate from R3F scene logic.
+- Frame-driven visual updates should use refs or mutable state rather than React state updates every frame.
+- The public API should remain narrow and should not grow as part of the v0.2.0 stabilization work unless separately designed.
+
+### Cooldown semantics
+
+This section defines the intended v0.2.0 cooldown behavior. It does not change cooldown configuration, exports, or runtime behavior in this documentation PR.
+
+#### Conceptual ownership
+
+- Cooldown should be an authoritative core-machine navigation gate. The core machine is the only layer that can consistently decide whether a navigation request is accepted, ignored by a lock, ignored by an active transition, ignored by cooldown, or rejected because the target is invalid.
+- `FlowProvider` should pass cooldown configuration into the core machine and expose controls that delegate to the machine. It should not maintain a separate provider-level cooldown timer that can diverge from direct machine behavior.
+- Browser input hooks should not own independent cooldown state. Wheel, touch, and keyboard hooks may keep their existing input-specific threshold and event filtering responsibilities, but once an input gesture maps to `next()` or `prev()`, it should use the same provider controls and core-machine gates as direct calls.
+
+#### Scope and consistency
+
+- Cooldown should apply consistently to accepted `next`, `prev`, and valid `goTo` navigation regardless of whether the call originates from app code, DOM controls, `FlowProvider` controls, or browser input hooks.
+- Cooldown should not be input-only. A direct call and an input-driven call made at the same machine state should have the same accepted-or-ignored outcome.
+- Same-phase `goTo`, first-phase `prev`, and last-phase `next` should remain no-ops and should not start or reset cooldown.
+- Invalid `goTo` targets should continue to fail predictably and should not be converted into cooldown ignores.
+
+#### Timing
+
+- Cooldown should start immediately when a navigation request is accepted. An accepted request is one that passes validation, is not blocked by lock, is not blocked by an active transition, is not blocked by an existing cooldown, is not a same-phase no-op, and is not a boundary no-op.
+- Transition completion should not start a second cooldown window or reset the cooldown window. If cooldown is longer than the transition duration, navigation should remain ignored after completion until cooldown expires. If the transition is longer than cooldown, the existing active-transition gate should continue to ignore navigation until completion.
+- Locking or unlocking should not pause, restart, or clear cooldown. Cooldown time should be based on elapsed machine time from the accepted navigation.
+
+#### Gating outcomes
+
+- Navigation attempted during cooldown should be ignored. It should not mutate `phase`, `phaseIndex`, `progress`, `direction`, `isTransitioning`, or `isLocked`. It should not queue a pending request, restart the transition, retarget the transition, extend the cooldown, or throw for otherwise valid navigation.
+- Valid navigation attempted while locked should be ignored before any cooldown decision starts a new transition. It should not start, reset, extend, or clear cooldown. Existing active transitions should continue to progress when `update()` is called, matching current lock behavior.
+- Valid navigation attempted while a transition is active should be ignored by the active-transition gate. It should not queue, interrupt, restart, retarget, start a new cooldown, or reset an existing cooldown.
+- When multiple gates could apply, the outcome should remain conservative and observable state should not change. For implementation and tests, invalid target validation should remain explicit, while valid navigation should only be accepted from an unlocked, idle, non-cooling-down machine.
+
+#### Interaction with current transition behavior
+
+- The existing default behavior is that navigation during active transitions is ignored. Cooldown should layer onto that behavior rather than replacing it.
+- Because cooldown starts on accepted navigation, cooldown and transition time can overlap. The next navigation may be accepted only after both gates are open: the previous transition has completed and the cooldown window has expired.
+- v0.2.0 should not add queued, interrupted, restarted, or retargeted transitions as part of cooldown work.
+
+#### Cooldown non-goals for v0.2.0
+
+- No input-only cooldown semantics.
+- No separate wheel, touch, or keyboard cooldown timers.
+- No transition queue, restart, interrupt, or retarget behavior.
+- No loop behavior or boundary wrapping.
+- No public source/target phase snapshot expansion solely for cooldown.
+- No router integration, animation timelines, camera presets, shader APIs, particle APIs, or third-party animation/state/demo-framework integrations.
+
+## 12. Open decisions for later PRs
+
+- Should an explicit loop option be added later, and if so should it live in the core machine, provider, or input layer?
+- Should `lockDuringTransition` be exposed as an option or remain the default internal behavior?
+- If `lockDuringTransition` becomes configurable, should non-default behavior ignore, queue, restart, or retarget active transitions?
+- Do transition snapshots need source and target phase information internally without expanding the public API?
+- Should accepted navigation continue to update the public `phase` at transition start, or should public phase updates move to completion in a future major behavior change?
+- Do input hooks need additional filtering for trackpad bursts, swipe cancellation, multi-touch gestures, focus handling, or nested scroll containers?
+- Should invalid `goTo` continue throwing, or should a future strictness option allow ignored invalid targets?
+
+## 13. Non-goals
+
+v0.2.0 does not include:
+
+- visual effects collection
+- camera presets
+- shader APIs
+- particle APIs
+- animation timeline
+- GSAP wrapper
+- Framer Motion wrapper
+- Next.js-specific router integration
+- visual editor
+- large demo template
+- new runtime dependencies
+
+These items may be explored separately in future releases or examples, but they are outside the v0.2.0 foundation scope.
 
 ## References
 
