@@ -166,6 +166,31 @@ describe("createFlowMachine", () => {
     expect(() => machine.goTo("missing")).toThrow(/Unknown phase/);
   });
 
+  it("does not mutate an idle snapshot when goTo receives an unknown phase", () => {
+    const machine = createFlowMachine<"intro" | "work" | "missing">({
+      phases: ["intro", "work"]
+    });
+    const snapshot = machine.getSnapshot();
+
+    expect(() => machine.goTo("missing")).toThrow(/Unknown phase/);
+    expect(machine.getSnapshot()).toEqual(snapshot);
+  });
+
+  it("does not mutate an active transition snapshot when goTo receives an unknown phase", () => {
+    const machine = createFlowMachine<"intro" | "work" | "missing">({
+      phases: ["intro", "work"],
+      transitionDurationMs: 1000
+    });
+
+    machine.next();
+    machine.update(250);
+
+    const snapshot = machine.getSnapshot();
+
+    expect(() => machine.goTo("missing")).toThrow(/Unknown phase/);
+    expect(machine.getSnapshot()).toEqual(snapshot);
+  });
+
   it("does nothing when moving beyond the phase bounds", () => {
     const machine = createFlowMachine({ phases: ["intro", "work"] as const });
 
@@ -200,6 +225,27 @@ describe("createFlowMachine", () => {
     expect(machine.phase).toBe("work");
     expect(machine.direction).toBe("none");
     expect(machine.isTransitioning).toBe(false);
+  });
+
+  it("preserves the full snapshot when prev or next are called at boundaries", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work"] as const,
+      transitionDurationMs: 1000
+    });
+    const firstPhaseSnapshot = machine.getSnapshot();
+
+    machine.prev();
+
+    expect(machine.getSnapshot()).toEqual(firstPhaseSnapshot);
+
+    machine.next();
+    machine.update(1000);
+
+    const lastPhaseSnapshot = machine.getSnapshot();
+
+    machine.next();
+
+    expect(machine.getSnapshot()).toEqual(lastPhaseSnapshot);
   });
 
   it("updates isLocked in snapshots when lock and unlock are called", () => {
@@ -240,6 +286,24 @@ describe("createFlowMachine", () => {
 
     expect(machine.phase).toBe("work");
     expect(machine.isTransitioning).toBe(true);
+  });
+
+  it("ignores valid goTo navigation while locked", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const
+    });
+
+    machine.lock();
+    machine.goTo("contact");
+
+    expect(machine.getSnapshot()).toEqual({
+      phase: "intro",
+      phaseIndex: 0,
+      progress: 0,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: true
+    });
   });
 
   it("continues updating an active transition after lock is called", () => {
@@ -316,6 +380,46 @@ describe("createFlowMachine", () => {
     expect(machine.phaseIndex).toBe(1);
   });
 
+  it("ignores all navigation methods while transitioning", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 1000
+    });
+
+    machine.next();
+
+    const activeTransitionSnapshot = machine.getSnapshot();
+
+    machine.next();
+    machine.prev();
+    machine.goTo("contact");
+
+    expect(machine.getSnapshot()).toEqual(activeTransitionSnapshot);
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true
+    });
+  });
+
+  it("keeps completed transitions stable after extra updates", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work"] as const,
+      transitionDurationMs: 1000
+    });
+
+    machine.next();
+    machine.update(1000);
+
+    const completedSnapshot = machine.getSnapshot();
+
+    machine.update(100);
+
+    expect(machine.getSnapshot()).toEqual(completedSnapshot);
+  });
+
   it("applies a custom easing function", () => {
     const machine = createFlowMachine({
       phases: ["intro", "work"] as const,
@@ -329,11 +433,77 @@ describe("createFlowMachine", () => {
     expect(machine.progress).toBe(0.25);
   });
 
+  it("clamps custom easing output above one during a transition", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work"] as const,
+      transitionDurationMs: 1000,
+      easing: () => 2
+    });
+
+    machine.next();
+    machine.update(500);
+
+    expect(machine.getSnapshot()).toMatchObject({
+      progress: 1,
+      direction: "next",
+      isTransitioning: true
+    });
+
+    machine.update(500);
+
+    expect(machine.getSnapshot()).toMatchObject({
+      progress: 1,
+      direction: "none",
+      isTransitioning: false
+    });
+  });
+
+  it("clamps custom easing output below zero during a transition", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work"] as const,
+      transitionDurationMs: 1000,
+      easing: () => -1
+    });
+
+    machine.next();
+    machine.update(500);
+
+    expect(machine.getSnapshot()).toMatchObject({
+      progress: 0,
+      direction: "next",
+      isTransitioning: true
+    });
+
+    machine.update(500);
+
+    expect(machine.getSnapshot()).toMatchObject({
+      progress: 1,
+      direction: "none",
+      isTransitioning: false
+    });
+  });
+
   it("throws when transitionDurationMs is not positive", () => {
     expect(() =>
       createFlowMachine({
         phases: ["intro", "work"] as const,
         transitionDurationMs: 0
+      })
+    ).toThrow(/transitionDurationMs/);
+  });
+
+  it("throws when transitionDurationMs is not finite", () => {
+    expect(() =>
+      createFlowMachine({
+        phases: ["intro", "work"] as const,
+        transitionDurationMs: Number.NaN
+      })
+    ).toThrow(/transitionDurationMs/);
+
+    expect(() =>
+      createFlowMachine({
+        phases: ["intro", "work"] as const,
+        transitionDurationMs: Number.POSITIVE_INFINITY
       })
     ).toThrow(/transitionDurationMs/);
   });
