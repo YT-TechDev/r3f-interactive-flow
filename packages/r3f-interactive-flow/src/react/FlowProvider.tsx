@@ -12,6 +12,7 @@ export type FlowProviderProps<TPhase extends string> = {
   phases: readonly TPhase[];
   initialPhase?: TPhase;
   transitionDurationMs?: number;
+  cooldownMs?: number;
   easing?: EasingFunction;
   children: ReactNode;
 };
@@ -20,6 +21,7 @@ export function FlowProvider<TPhase extends string>({
   phases,
   initialPhase,
   transitionDurationMs,
+  cooldownMs,
   easing,
   children
 }: FlowProviderProps<TPhase>): ReactNode {
@@ -28,9 +30,10 @@ export function FlowProvider<TPhase extends string>({
       phases,
       ...(initialPhase !== undefined ? { initialPhase } : {}),
       ...(transitionDurationMs !== undefined ? { transitionDurationMs } : {}),
+      ...(cooldownMs !== undefined ? { cooldownMs } : {}),
       ...(easing !== undefined ? { easing } : {})
     });
-  }, [easing, initialPhase, phases, transitionDurationMs]);
+  }, [cooldownMs, easing, initialPhase, phases, transitionDurationMs]);
 
   const [snapshot, setSnapshot] = useState<FlowSnapshot<TPhase>>(() => machine.getSnapshot());
 
