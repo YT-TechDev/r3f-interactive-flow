@@ -50,10 +50,13 @@ This roadmap is an implementation plan and requirements document. It does not ad
 
 ### Cooldown
 
-- Cooldown must prevent accidental rapid repeated navigation.
-- Cooldown start and end timing must be specified relative to accepted navigation and transition completion.
-- Cooldown must apply consistently to wheel, touch, keyboard, and direct navigation calls if that is the chosen rule.
-- Tests must cover accepted calls, ignored calls, and calls after the cooldown expires.
+- Cooldown must prevent accidental rapid repeated navigation without broadening the public API beyond the separately approved v0.2.0 surface.
+- If a cooldown option is added, the core machine must own the authoritative cooldown gate; `FlowProvider` should delegate to the core machine, and browser input hooks should not maintain independent cooldown timers.
+- Cooldown must start on accepted navigation, not on transition completion. Completion must not restart or extend cooldown.
+- Cooldown must apply consistently to wheel, touch, keyboard, provider controls, and direct `next`, `prev`, and valid `goTo` calls.
+- Navigation attempted during cooldown must be ignored without queuing, interrupting, restarting, retargeting, mutating state, or extending the cooldown.
+- Navigation attempted while locked or transitioning must keep the existing conservative outcome: valid navigation is ignored, active transitions continue to completion, and no new cooldown window starts.
+- Tests must cover accepted calls, ignored calls during cooldown, ignored calls while locked, ignored calls during transitions, and calls after both transition and cooldown gates are open.
 
 ### Input lock
 
@@ -183,7 +186,8 @@ The current behavior audit and intended v0.2.0 rules are documented in [docs/beh
 
 ### Milestone 4: Stabilize lock and cooldown behavior
 
-- Implement the specified cooldown timing model.
+- Implement the specified cooldown timing model without adding queues, restarts, interrupts, retargeting, or loop behavior.
+- Keep cooldown gating centralized in the core machine so direct navigation and input-driven navigation remain consistent.
 - Implement the specified input lock behavior.
 - Implement or refine `lockDuringTransition` according to the documented transition rules.
 - Verify direct navigation and input-driven navigation use the same gating behavior where required.
