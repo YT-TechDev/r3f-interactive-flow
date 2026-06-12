@@ -3,11 +3,13 @@ import type { EasingFunction } from "./easing";
 import type { FlowDirection, FlowMachine, FlowSnapshot } from "./types";
 
 const DEFAULT_TRANSITION_DURATION_MS = 1000;
+const DEFAULT_COOLDOWN_MS = 0;
 
 export type CreateFlowMachineOptions<TPhase extends string> = {
   phases: readonly TPhase[];
   initialPhase?: TPhase;
   transitionDurationMs?: number;
+  cooldownMs?: number;
   easing?: EasingFunction;
 };
 
@@ -41,6 +43,18 @@ function resolveTransitionDurationMs(transitionDurationMs?: number): number {
   return transitionDurationMs;
 }
 
+function resolveCooldownMs(cooldownMs?: number): number {
+  if (cooldownMs === undefined) {
+    return DEFAULT_COOLDOWN_MS;
+  }
+
+  if (!Number.isFinite(cooldownMs) || cooldownMs < 0) {
+    throw new Error("cooldownMs must be a finite number greater than or equal to 0.");
+  }
+
+  return cooldownMs;
+}
+
 export function createFlowMachine<TPhase extends string>(
   options: CreateFlowMachineOptions<TPhase>
 ): FlowMachine<TPhase> {
@@ -49,6 +63,7 @@ export function createFlowMachine<TPhase extends string>(
   assertPhases(phases);
 
   const transitionDurationMs = resolveTransitionDurationMs(options.transitionDurationMs);
+  const cooldownMs = resolveCooldownMs(options.cooldownMs);
   const easing = options.easing ?? linear;
   const initialPhase = options.initialPhase ?? phases[0];
   const initialPhaseIndex = phases.indexOf(initialPhase);
@@ -63,6 +78,7 @@ export function createFlowMachine<TPhase extends string>(
   let isTransitioning = false;
   let isLocked = false;
   let elapsedMs = 0;
+  let cooldownRemainingMs = 0;
 
   const getCurrentPhase = (): TPhase => {
     const phase = phases[phaseIndex];
@@ -84,11 +100,11 @@ export function createFlowMachine<TPhase extends string>(
   });
 
   const navigateToIndex = (targetPhaseIndex: number): void => {
-    if (isLocked || isTransitioning || targetPhaseIndex === phaseIndex) {
+    if (targetPhaseIndex < 0 || targetPhaseIndex >= phases.length) {
       return;
     }
 
-    if (targetPhaseIndex < 0 || targetPhaseIndex >= phases.length) {
+    if (isLocked || isTransitioning || cooldownRemainingMs > 0 || targetPhaseIndex === phaseIndex) {
       return;
     }
 
@@ -96,6 +112,7 @@ export function createFlowMachine<TPhase extends string>(
     phaseIndex = targetPhaseIndex;
     progress = 0;
     elapsedMs = 0;
+    cooldownRemainingMs = cooldownMs;
     isTransitioning = true;
   };
 
@@ -104,11 +121,17 @@ export function createFlowMachine<TPhase extends string>(
       throw new Error("deltaMs must be a finite number.");
     }
 
+    const elapsedDeltaMs = Math.max(0, deltaMs);
+
+    if (cooldownRemainingMs > 0) {
+      cooldownRemainingMs = Math.max(0, cooldownRemainingMs - elapsedDeltaMs);
+    }
+
     if (!isTransitioning) {
       return;
     }
 
-    elapsedMs += Math.max(0, deltaMs);
+    elapsedMs += elapsedDeltaMs;
 
     const rawProgress = clamp01(elapsedMs / transitionDurationMs);
     progress = rawProgress >= 1 ? 1 : clamp01(easing(rawProgress));
