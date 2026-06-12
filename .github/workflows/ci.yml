@@ -27,7 +27,7 @@ jobs:
         run: corepack prepare pnpm@11.5.0 --activate
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: pnpm
