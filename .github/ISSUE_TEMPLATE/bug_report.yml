@@ -1,0 +1,52 @@
+name: Bug report
+description: Report a bug or unexpected behavior
+title: "Bug: "
+labels:
+  - "type: bug"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug.
+        Please include a small reproduction when possible.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Link to a reproduction or provide minimal code.
+    validations:
+      required: false
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Package versions and runtime environment.
+      placeholder: |
+        r3f-interactive-flow:
+        react:
+        @react-three/fiber:
+        three:
+        browser:
+    validations:
+      required: false
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - label: This bug is related to phase control, transition progress, input handling, or R3F flow bridging.
+          required: false
