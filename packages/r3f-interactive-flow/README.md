@@ -141,11 +141,19 @@ export function App() {
 
 Input hooks and flow hooks must be used inside `FlowProvider`.
 
+## FlowProvider options
+
+`FlowProvider` accepts an optional `cooldownMs` prop for input pacing. When set, accepted `next`, `prev`, and valid `goTo` calls are gated for that many milliseconds to prevent rapid repeated navigation. Omitting `cooldownMs` preserves the default behavior, while `cooldownMs={0}` disables cooldown behavior.
+
+Keep `phases` and configuration props passed to `FlowProvider` stable between renders, for example by defining phase tuples outside components or memoizing derived configuration.
+
 ## R3F usage with useFlowFrame
 
 Use `useFlowFrame` inside a Canvas-bound component to receive frame-driven transition progress.
 
 `useFlowFrame` uses React Three Fiber's `useFrame` internally, so it must be called inside a component rendered within `<Canvas>`. Do not call R3F hooks outside Canvas-bound components.
+
+DOM-facing `flow.progress` is useful for stateful UI, but it is not intended as a frame-perfect animated value. Use `useFlowFrame` for frame-driven scene updates.
 
 ```tsx
 import { Canvas } from "@react-three/fiber";
