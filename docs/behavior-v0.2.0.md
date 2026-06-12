@@ -523,6 +523,8 @@ This section defines the intended v0.2.0 cooldown behavior. It does not change c
 - No public source/target phase snapshot expansion solely for cooldown.
 - No router integration, animation timelines, camera presets, shader APIs, particle APIs, or third-party animation/state/demo-framework integrations.
 
+For detailed transition lifecycle decisions, see `docs/transition-lifecycle-v0.2.0.md`.
+
 ## 12. Open decisions for later PRs
 
 - Should an explicit loop option be added later, and if so should it live in the core machine, provider, or input layer?
