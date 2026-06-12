@@ -1,0 +1,61 @@
+name: Feature proposal
+description: Propose a focused feature or behavior improvement
+title: "Feature: "
+labels:
+  - "type: feature"
+  - "needs: discussion"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for proposing an improvement.
+        This project intentionally keeps a narrow scope. Please explain the problem first.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem are you trying to solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What change are you proposing?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - core
+        - react
+        - r3f
+        - input
+        - examples
+        - docs
+        - package
+        - unsure
+    validations:
+      required: true
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - label: This is related to phase management, transition progress, input handling, or R3F frame bridging.
+          required: true
+        - label: This does not add camera presets, shader effects, particle APIs, timelines, or large demo templates.
+          required: true
+        - label: This does not require a new runtime dependency.
+          required: false
+        - label: This does not require expanding the public API.
+          required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Could this be solved in userland?
+    validations:
+      required: false

@@ -1,56 +1,106 @@
 # Contributing
 
-Thank you for your interest in contributing to `r3f-interactive-flow`.
+Thank you for your interest in `r3f-interactive-flow`.
 
-This project is a small React Three Fiber utility for predictable phase-based interactive flow control.
+This project is currently focused on stabilizing the v0.2.0 foundation.
 
 ## Project scope
 
-Focus on:
+In scope:
 
 - phase management
 - transition progress
 - `next`, `prev`, and `goTo`
 - wheel, touch, and keyboard input
-- cooldown / input lock behavior
+- cooldown and input lock behavior
+- `lockDuringTransition`
 - DOM/UI to R3F Canvas connection
-- `useFrame` bridge for R3F scenes
+- `useFlowFrame`
+- TypeScript safety
+- tests
+- documentation and small examples
 
-This project is not:
+Out of scope:
 
-- a visual effects collection
-- a replacement for `@react-three/drei`
-- a particle library
-- a camera preset library
-- a shader effect library
-- a portfolio template
-- a full animation framework
-- a GSAP or Framer Motion wrapper
+- particle APIs
+- camera presets
+- shader effects
+- animation timelines
+- GSAP integration
+- Framer Motion integration
+- router integration
+- large demo templates
+- full website templates
 
 ## Branch policy
 
 Do not work directly on `main`.
 
-Create a focused branch for every change:
-
-```bash
-git checkout main
-git pull origin main
-git checkout -b docs/update-readme
-```
-
-Use clear branch names such as:
+Use a focused branch for each change, with names such as:
 
 - `fix/progress-locking`
 - `test/add-core-machine-tests`
 - `docs/update-readme`
 - `chore/update-release-checks`
 
-## Keep PRs small
+## Development
 
-Prefer small focused PRs.
+Use pnpm.
 
-Avoid mixing unrelated changes such as implementation changes, README rewrites, dependency updates, formatting-only changes, and example changes in the same PR.
+```bash
+pnpm install
+pnpm build
+pnpm package:verify
+pnpm typecheck
+pnpm test
+pnpm lint
+pnpm format
+pnpm --filter vite-basic build
+pnpm pack:dry-run
+```
+
+Before release-related work, run:
+
+```bash
+pnpm release:check
+```
+
+Do not run publishing commands unless you intentionally want to publish:
+
+```bash
+pnpm release
+changeset publish
+npm publish
+```
+
+## Pull requests
+
+Please keep PRs small and focused.
+
+Good PRs:
+
+- fix a cooldown edge case
+- add core flow machine tests
+- improve input handling behavior
+- clarify README usage
+- improve TypeScript types
+- fix package output issues
+
+Avoid:
+
+- broad rewrites
+- new runtime dependencies
+- large demo templates
+- new public APIs without prior discussion
+- visual effect collections
+- camera/shader/particle/timeline features
+
+Before requesting review:
+
+- confirm there are no unrelated file changes
+- confirm public API changes are intentional and documented
+- confirm dependencies were not added accidentally
+- list checks run, failed, or skipped
 
 ## Architecture rules
 
@@ -62,19 +112,25 @@ Avoid mixing unrelated changes such as implementation changes, README rewrites, 
 - Do not call R3F hooks such as `useFrame` or `useThree` outside Canvas-bound components.
 - Do not put frame-driven values into React state unless there is a clear reason.
 
-## Public API rules
+## Public API changes
 
 The public API should stay small and predictable.
 
-Current public exports are documented in the README.
+Current public exports are documented in the README. Do not remove, rename, add, or otherwise expand public exports without explaining:
 
-Do not remove or rename public exports without maintainer discussion.
+- the problem being solved
+- why userland code cannot solve it
+- the impact on README examples
+- the impact on package exports
+- the impact on TypeScript types
 
-Input hooks are currently public convenience hooks and should not be removed silently.
+Input hooks are public convenience hooks and should not be removed silently.
 
-## Dependency rules
+## Dependencies
 
-Keep dependencies minimal.
+The core package should keep dependencies minimal.
+
+Do not add runtime dependencies unless the change has been discussed first.
 
 The library package should keep these as peer dependencies:
 
@@ -83,9 +139,7 @@ The library package should keep these as peer dependencies:
 - `three`
 - `@react-three/fiber`
 
-Do not add runtime dependencies without a clear maintainer-approved reason.
-
-Avoid adding the following to the core library:
+Avoid adding these to the core library:
 
 - `@react-three/drei`
 - `zustand`
@@ -101,59 +155,9 @@ Avoid adding the following to the core library:
 
 Client-facing React/R3F entry files should be safe for Next.js App Router Client Components.
 
-Do not access `window`, `document`, or browser event APIs at module import time.
-
-Browser APIs should only be used inside effects, event handlers, or guarded client-side code.
+Do not access `window`, `document`, or browser event APIs at module import time. Use browser APIs inside effects, event handlers, or guarded client-side code.
 
 Do not add Next.js as a dependency.
-
-## Development setup
-
-Use pnpm.
-
-```bash
-pnpm install
-```
-
-## Verification
-
-Before opening a PR, run as many of these as possible:
-
-```bash
-pnpm build
-pnpm package:verify
-pnpm typecheck
-pnpm test
-pnpm lint
-pnpm format
-pnpm --filter vite-basic build
-pnpm pack:dry-run
-```
-
-For full release readiness:
-
-```bash
-pnpm release:check
-```
-
-Do not run publishing commands unless you intentionally want to publish:
-
-```bash
-pnpm release
-changeset publish
-npm publish
-```
-
-## PR checklist
-
-Before requesting review:
-
-- Keep the branch focused.
-- Confirm there are no unrelated file changes.
-- Confirm public API changes are intentional and documented.
-- Confirm dependencies were not added accidentally.
-- Confirm checks were run or clearly marked as not run.
-- Explain any failed or skipped checks.
 
 ## If something fails
 
