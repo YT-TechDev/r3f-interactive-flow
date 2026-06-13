@@ -218,6 +218,7 @@ The current behavior audit and intended v0.2.0 rules are documented in [docs/beh
 
 - Confirm behavior requirements are reflected in tests.
 - Run all available checks.
+- Use the focused [v0.2.0 release readiness checklist](release-v0.2.0-checklist.md) for the final maintainer pass before publishing.
 - Verify package contents and README guidance.
 - Prepare release notes that emphasize the production-ready flow-control foundation and narrow scope.
 - Remaining status: run and record final release checks, including package verification and the Vite example build.
