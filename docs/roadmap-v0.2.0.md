@@ -206,13 +206,13 @@ The current behavior audit and intended v0.2.0 rules are documented in [docs/beh
 - Ensure input hooks access browser APIs only after mount and clean up listeners on unmount or target changes.
 - Current status: wheel, touch, and keyboard hook tests cover listener lifecycle, targets, thresholds/keys, prevention behavior, disabled state, lock/transition gating, and import-time browser guards.
 
-### Milestone 6: Improve examples and README — remaining docs pass
+### Milestone 6: Improve examples and README — docs clarified
 
 - Update README examples to match the v0.2.0 public API direction where appropriate.
 - Add concise `useFlowFrame` examples that mutate R3F objects through refs.
 - Show DOM controls and Canvas components sharing flow state through `FlowProvider`.
 - Avoid presenting non-goal features as built-in capabilities.
-- Remaining status: keep DOM progress versus frame progress expectations clear in docs/examples.
+- Current status: DOM progress versus frame progress expectations are clarified in README and lifecycle documentation; keep future examples aligned with that distinction.
 
 ### Milestone 7: Prepare release checklist — remaining release pass
 

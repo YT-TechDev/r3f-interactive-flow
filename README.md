@@ -178,11 +178,11 @@ type FlowControls<TPhase extends string> = {
 };
 ```
 
-This shape is useful for DOM UI, labels, buttons, and phase-aware React components.
+This shape is useful for DOM UI, labels, buttons, and phase-aware React components. Treat the returned `progress` as part of the public React snapshot: it is useful for coarse UI status, but it is not intended to be a frame-perfect animation value.
 
 ## Transition progress
 
-`useFlowProgress` returns the current transition progress from the active `FlowProvider`.
+`useFlowProgress` returns the current transition progress from the active `FlowProvider` snapshot. Use it for DOM labels, status displays, and phase-aware UI that can follow React state updates.
 
 ```tsx
 import { useFlowProgress } from "r3f-interactive-flow";
@@ -194,7 +194,41 @@ function ProgressLabel() {
 }
 ```
 
-For frame-driven R3F scene updates, prefer `useFlowFrame` instead of pushing every frame into React state.
+`useFlowProgress` is intentionally DOM-facing. Do not rely on React state from `useFlow` or `useFlowProgress` to update every frame. For frame-driven R3F scene updates, use `useFlowFrame` inside Canvas-bound components instead of pushing every frame into React state.
+
+## DOM state and frame state
+
+DOM/UI components and R3F scene components can share the same `FlowProvider`, but they should read progress at different layers:
+
+```tsx
+function PhaseStatus() {
+  const flow = useFlow<Phase>();
+
+  return (
+    <div>
+      <p>Phase: {flow.phase}</p>
+      <p>Status progress: {flow.progress.toFixed(2)}</p>
+      <button onClick={flow.next}>Next</button>
+    </div>
+  );
+}
+
+function FlowMesh() {
+  const meshRef = useRef<THREE.Mesh | null>(null);
+
+  useFlowFrame((progress) => {
+    if (!meshRef.current) {
+      return;
+    }
+
+    meshRef.current.position.x = progress * 2;
+  });
+
+  return <mesh ref={meshRef} />;
+}
+```
+
+Use `useFlow` and `useFlowProgress` for DOM state, controls, labels, and coarse transition status. Use `useFlowFrame` for per-frame R3F visuals that mutate refs or other Canvas-local frame state.
 
 ## R3F usage with useFlowFrame
 
