@@ -337,7 +337,7 @@ The Vite example behavior below is observed from `examples/vite-basic/src/App.ts
 - **Documented current behavior**: `FlowControlsPanel` uses `useFlow<Phase>()`.
 - **Documented current behavior**: the panel displays `phase`, `phaseIndex`, `progress`, `direction`, and `isTransitioning`.
 - **Documented current behavior**: DOM buttons call `prev`, `next`, and `goTo` for each known phase.
-- **Unclear behavior**: the DOM `progress` display may not animate every frame because frame-driven progress is not synced to React state every frame.
+- **Clarified documentation behavior**: the DOM `progress` display is React snapshot state for coarse UI status and should not be presented as a frame-perfect animation value.
 
 ### R3F scene use of `useFlowFrame`
 
@@ -355,7 +355,7 @@ The Vite example behavior below is observed from `examples/vite-basic/src/App.ts
 
 - **Missing test coverage**: no example tests were observed.
 - **Unclear behavior**: the example does not demonstrate `cooldownMs`, `lock`, `unlock`, disabled inputs, custom targets, or custom thresholds.
-- **Unclear behavior**: the example does not explain that DOM progress and R3F frame progress may update at different frequencies.
+- **Clarified documentation behavior**: the README and lifecycle docs explain that DOM progress and R3F frame progress may update at different frequencies.
 - **Unclear behavior**: the example does not show recommended handling for locked UI controls or boundary-disabled buttons.
 
 ## 8. Existing tests audit
@@ -397,7 +397,7 @@ Existing tests cover the core machine, easing helpers, package entry public API,
 ### Remaining test and release-readiness gaps
 
 - **Missing test coverage**: Vite example behavior or build-only smoke coverage beyond release checks.
-- **Needs documentation pass**: DOM `flow.progress` expectations versus frame-driven progress from `useFlowFrame` should remain explicit in docs and examples.
+- **Clarified documentation behavior**: DOM `flow.progress` expectations versus frame-driven progress from `useFlowFrame` are now explicit in docs and examples.
 - **Needs release pass**: final v0.2.0 readiness should confirm the current test matrix, package contents, README guidance, and release checklist.
 
 ### Prioritized remaining work for v0.2.0
@@ -405,7 +405,7 @@ Existing tests cover the core machine, easing helpers, package entry public API,
 1. Keep core initialization, `next`, `prev`, `goTo`, invalid targets, boundaries, progress completion, lock behavior, and cooldown behavior covered as regression tests.
 2. Keep React provider/hooks, `useFlowFrame`, and wheel/touch/keyboard input hook coverage in place as behavior changes are reviewed.
 3. Run and record release checks, including package verification and the Vite example build where feasible.
-4. Clarify DOM progress versus frame progress expectations in docs/examples without changing runtime behavior.
+4. Keep DOM progress versus frame progress expectations explicit in docs/examples without changing runtime behavior.
 5. Preserve invalid `goTo` throw-first priority as an explicitly documented stable rule unless a separate design issue changes it.
 
 ## 9. Findings summary
@@ -426,7 +426,7 @@ Existing tests cover the core machine, easing helpers, package entry public API,
 
 - Whether invalid `goTo` should continue to throw before lock/transition/cooldown gates in every future scenario.
 - Whether public `phase` should continue to switch to the destination at transition start.
-- Whether consumers should expect DOM `flow.progress` to update only at navigation start/completion while R3F callbacks receive frame-driven progress.
+- Whether future docs should add more examples for DOM `flow.progress` as coarse React state while R3F callbacks receive frame-driven progress.
 - Whether remaining cooldown time should stay internal or become observable in some future design.
 - Whether overlapping custom keyboard next/prev key lists should be specified or guarded.
 - How touch multi-touch, swipe cancellation, nested scroll containers, and trackpad bursts should behave.
@@ -434,7 +434,7 @@ Existing tests cover the core machine, easing helpers, package entry public API,
 ### Behavior that still needs release-readiness attention
 
 - Example/build smoke coverage where feasible.
-- Documentation clarity for DOM progress versus frame progress expectations.
+- Ongoing review that examples keep DOM progress versus frame progress expectations clear.
 - Final release checklist verification against the current coverage and package output.
 
 ### Behavior that should not change without a separate design issue
@@ -455,7 +455,7 @@ Existing tests cover the core machine, easing helpers, package entry public API,
 - Keep wheel, touch, and keyboard input reliability covered by direct hook tests.
 - Keep React provider/hooks and `useFlowFrame` bridge behavior covered by direct tests.
 - Improve README and example guidance for v0.2.0 where it clarifies existing behavior.
-- Specify DOM progress versus frame progress expectations.
+- Keep DOM progress versus frame progress expectations specified in docs and examples.
 - Keep invalid `goTo` target priority documented as throw-first across all gates unless a separate design issue changes it.
 - Complete a final v0.2.0 release-readiness pass, including package verification and example build checks.
 

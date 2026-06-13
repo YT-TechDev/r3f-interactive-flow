@@ -15,7 +15,7 @@ At a high level, navigation and transition behavior follows these outcomes:
 - **Idle**: no active transition is running and navigation may be accepted only if all gates allow it.
 - **Accepted navigation**: a valid navigation request passes boundary, same-phase, lock, transition, and cooldown gates.
 - **Transition start**: accepted navigation immediately publishes the destination phase and starts transition progress at `0`.
-- **Transition progress**: frame or machine updates advance normalized progress toward completion.
+- **Transition progress**: frame or machine updates advance normalized progress toward completion; Canvas-bound R3F components should consume frame progress through `useFlowFrame`.
 - **Transition completion**: raw progress reaches `1`, final progress is reported as `1`, and transition flags reset.
 - **Ignored navigation**: otherwise valid navigation is ignored because it is blocked by boundary, same-phase, lock, active transition, or cooldown behavior.
 - **Rejected invalid navigation**: invalid `goTo` targets throw predictably and do not mutate machine state.
@@ -50,6 +50,7 @@ Transition progress follows these rules:
 - Progress is normalized to `0..1`.
 - Progress begins at `0` for each accepted transition.
 - Progress advances through `update(deltaMs)` and through `useFlowFrame` when used from a Canvas-bound R3F component.
+- React snapshots exposed through `useFlow` and `useFlowProgress` are DOM-facing state and should not be treated as a per-frame animation channel.
 - Non-finite deltas should fail predictably.
 - Negative deltas should not reverse progress.
 - Easing affects reported progress during transition.
@@ -166,11 +167,12 @@ Boundary behavior follows these rules:
 
 DOM and R3F progress expectations are intentionally different:
 
-- DOM controls read React snapshot state through `useFlow`.
-- R3F scene components receive frame-driven progress through `useFlowFrame`.
+- DOM controls read React snapshot state through `useFlow`; DOM-only progress labels may also use `useFlowProgress`.
+- React snapshot sync remains conservative and should not imply React state updates every frame.
+- R3F scene components receive frame-driven progress through `useFlowFrame`, which must be called from Canvas-bound components.
 - `useFlowFrame` may receive progress every frame without forcing React state updates every frame.
-- DOM `flow.progress` should not be documented as a frame-perfect animated value.
-- Examples should make this distinction clear.
+- DOM `flow.progress` and `useFlowProgress` values should not be documented as frame-perfect animated values.
+- Examples should make this distinction clear by keeping DOM labels/buttons in React components and R3F visual mutation in Canvas-bound components.
 - Frame-driven visual updates should use refs or mutable state, not React state updates every frame.
 
 ## 17. Non-goals for v0.2.0
