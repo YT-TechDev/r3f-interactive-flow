@@ -16,7 +16,7 @@ The project is currently moving toward `v0.2.0`, with a focus on stabilizing the
 - more reliable wheel, touch, and keyboard input handling
 - better transition locking and cooldown behavior
 - safer TypeScript types
-- tests for core behavior
+- tests for core, React provider/hooks, R3F bridge, and input hook behavior
 - clearer examples and documentation
 
 ## Why this exists
