@@ -200,19 +200,19 @@ The React behavior below is observed from `FlowProvider`, `FlowContext`, `useFlo
 - **Documented current behavior**: `FlowProvider` creates a core machine with `useMemo` from `phases`, `initialPhase`, `transitionDurationMs`, `cooldownMs`, and `easing`.
 - **Documented current behavior**: if any of those dependencies change, a new core machine is created and the provider syncs React snapshot state from it.
 - **Documented current behavior**: provider calls do not catch machine errors; for example, `goTo` can throw through the provider control.
-- **Missing test coverage**: no direct React provider tests were observed.
+- **Documented current behavior**: direct React provider tests cover initial snapshot provisioning and snapshot updates after navigation and lock controls.
 
 ### `useFlow` return shape
 
 - **Documented current behavior**: `useFlow` returns the current `FlowControls` shape: `phase`, `phaseIndex`, `progress`, `direction`, `isTransitioning`, `isLocked`, `next`, `prev`, `goTo`, `lock`, and `unlock`.
 - **Documented current behavior**: the controls call the underlying machine and then call `syncSnapshot()`.
 - **Documented current behavior**: controls are memoized from the current snapshot, machine, and sync function.
-- **Missing test coverage**: no hook-level tests were observed for the returned shape or memoization behavior.
+- **Documented current behavior**: hook-level tests cover the returned `useFlow` control shape in a mounted React tree and snapshot updates after navigation and lock controls.
 
 ### `useFlowProgress` behavior
 
 - **Documented current behavior**: `useFlowProgress` returns `context.controls.progress`.
-- **Missing test coverage**: no direct tests were observed for `useFlowProgress`.
+- **Documented current behavior**: direct tests cover `useFlowProgress` returning the provider progress value.
 
 ### Hooks outside `FlowProvider`
 
@@ -220,7 +220,7 @@ The React behavior below is observed from `FlowProvider`, `FlowContext`, `useFlo
 - **Documented current behavior**: `useFlowProgress` throws `useFlowProgress must be used inside FlowProvider.` when context is missing.
 - **Documented current behavior**: `useFlowFrame` throws `useFlowFrame must be used inside FlowProvider.` when context is missing.
 - **Documented current behavior**: input hooks call `useFlow`, so they inherit the `useFlow` provider requirement.
-- **Missing test coverage**: no direct tests were observed for outside-provider errors.
+- **Documented current behavior**: direct tests cover clear outside-provider errors for `useFlow`, `useFlowProgress`, and `useFlowFrame`. Input hooks inherit the `useFlow` provider requirement.
 
 ### React state updates
 
@@ -263,7 +263,7 @@ The R3F bridge behavior below is observed from `useFlowFrame` and the Vite examp
 ### Observed limitations
 
 - **Documented current behavior**: React snapshot state is synced on transition completion, not every frame.
-- **Missing test coverage**: no direct tests were observed for `useFlowFrame` update behavior, callback shape, completion sync, or provider error behavior.
+- **Documented current behavior**: direct `useFlowFrame` tests cover frame registration, millisecond machine updates, callback progress and delta arguments, latest-callback ref behavior, transition-completion React sync, and provider error behavior.
 - **Unclear behavior**: consumers needing per-frame source/target phase details cannot read them because the public snapshot only exposes the destination phase during a transition.
 
 ## 6. Input hook behavior audit
@@ -283,7 +283,7 @@ The input hook behavior below is observed from `useWheelInput`, `useTouchInput`,
 - **Documented current behavior**: wheel input checks `isLocked` and `isTransitioning` before calling navigation.
 - **Documented current behavior**: cooldown is not checked directly in the hook; cooldown gating happens in the core machine after the hook calls `next()` or `prev()`.
 - **Unclear behavior**: there is no input-specific debouncing or trackpad-burst filtering beyond transition and cooldown gates.
-- **Missing test coverage**: no direct wheel input tests were observed.
+- **Documented current behavior**: direct wheel input tests cover listener setup and cleanup, default and custom targets, enabled behavior, threshold behavior, default and disabled `preventDefault`, lock and transition gates, and no browser API access at module import time.
 
 ### `useTouchInput`
 
@@ -303,7 +303,7 @@ The input hook behavior below is observed from `useWheelInput`, `useTouchInput`,
 - **Documented current behavior**: cooldown is not checked directly in the hook; cooldown gating happens in the core machine after the hook calls `next()` or `prev()`.
 - **Unclear behavior**: multi-touch behavior is not explicitly specified; the hook uses the first available touch in the relevant event arrays.
 - **Unclear behavior**: swipe cancellation and nested scroll-container behavior are not explicitly specified.
-- **Missing test coverage**: no direct touch input tests were observed.
+- **Documented current behavior**: direct touch input tests cover listener setup and cleanup, default and custom targets, enabled behavior, default threshold behavior, swipe direction mapping, threshold no-ops, `touchcancel`, missing touch guards, default and disabled `preventDefault`, lock and transition gates, and no browser API access at module import time.
 
 ### `useKeyboardInput`
 
@@ -320,7 +320,7 @@ The input hook behavior below is observed from `useWheelInput`, `useTouchInput`,
 - **Documented current behavior**: keyboard input checks `isLocked` and `isTransitioning` before calling navigation.
 - **Documented current behavior**: cooldown is not checked directly in the hook; cooldown gating happens in the core machine after the hook calls `next()` or `prev()`.
 - **Unclear behavior**: if a key appears in both `nextKeys` and `prevKeys`, `next()` wins because the hook checks next before previous.
-- **Missing test coverage**: no direct keyboard input tests were observed.
+- **Documented current behavior**: direct keyboard input tests cover listener setup and cleanup, default and custom targets, enabled behavior, unmapped and repeated key filtering, editable-target filtering, default and custom key mapping, default and disabled `preventDefault`, lock and transition gates, and no browser API access at module import time.
 
 ## 7. Example behavior audit
 
@@ -360,7 +360,7 @@ The Vite example behavior below is observed from `examples/vite-basic/src/App.ts
 
 ## 8. Existing tests audit
 
-Existing tests are concentrated in core behavior, easing helpers, and the package entry public API.
+Existing tests cover the core machine, easing helpers, package entry public API, React provider and hooks, the R3F frame bridge, and browser input hooks. Input hook tests share private test utilities for minimal DOM setup and provider rendering so the repeated listener, target, and cleanup scenarios stay maintainable without adding public API.
 
 ### Behavior already tested
 
@@ -386,28 +386,27 @@ Existing tests are concentrated in core behavior, easing helpers, and the packag
 - **Documented current behavior**: `clamp01` and `linear` helpers.
 - **Documented current behavior**: public runtime exports and exported input hook option types.
 
-### Missing tests
+### Current test coverage
 
-- **Missing test coverage**: React `FlowProvider` render behavior and prop reinitialization.
-- **Missing test coverage**: `useFlow` return shape in a mounted React tree.
-- **Missing test coverage**: `useFlowProgress` behavior.
-- **Missing test coverage**: outside-provider errors for React, R3F, and input hooks.
-- **Missing test coverage**: `useFlowFrame` frame update behavior, callback arguments, latest-callback ref behavior, and completion-only React sync behavior.
-- **Missing test coverage**: wheel input listener setup/cleanup, target handling, threshold behavior, preventDefault behavior, enabled behavior, lock/transition/cooldown interaction, and browser guard behavior.
-- **Missing test coverage**: touch input listener setup/cleanup, target handling, threshold behavior, preventDefault behavior, cancel behavior, lock/transition/cooldown interaction, and browser guard behavior.
-- **Missing test coverage**: keyboard input listener setup/cleanup, target handling, key mapping, repeat filtering, editable-target filtering, preventDefault behavior, lock/transition/cooldown interaction, and browser guard behavior.
+- **Documented current behavior**: React `FlowProvider` and hook tests cover initial render behavior, `useFlow` return shape, navigation and lock snapshot updates, `useFlowProgress`, and outside-provider errors for React hooks.
+- **Documented current behavior**: `useFlowFrame` tests cover frame registration, machine update timing, callback arguments, latest-callback ref behavior, completion-only React sync, and outside-provider errors.
+- **Documented current behavior**: wheel input tests cover listener setup and cleanup, target handling, threshold behavior, `preventDefault` behavior, enabled behavior, lock/transition gating, and browser guard behavior.
+- **Documented current behavior**: touch input tests cover listener setup and cleanup, target handling, threshold behavior, swipe direction mapping, cancel behavior, missing touch guards, `preventDefault` behavior, enabled behavior, lock/transition gating, and browser guard behavior.
+- **Documented current behavior**: keyboard input tests cover listener setup and cleanup, target handling, key mapping, repeat filtering, editable-target filtering, `preventDefault` behavior, enabled behavior, lock/transition gating, and browser guard behavior.
+
+### Remaining test and release-readiness gaps
+
 - **Missing test coverage**: Vite example behavior or build-only smoke coverage beyond release checks.
+- **Needs documentation pass**: DOM `flow.progress` expectations versus frame-driven progress from `useFlowFrame` should remain explicit in docs and examples.
+- **Needs release pass**: final v0.2.0 readiness should confirm the current test matrix, package contents, README guidance, and release checklist.
 
-### Prioritized missing tests for v0.2.0
+### Prioritized remaining work for v0.2.0
 
-1. Core initialization, `next`, `prev`, and `goTo` should remain covered as regression tests.
-2. Invalid targets should remain covered, including the interaction with lock/transition/cooldown gates.
-3. Boundary behavior should remain covered, including first-phase `prev` and last-phase `next` no-ops.
-4. Transition progress completion should remain covered, including eased progress, oversized deltas, negative deltas, and final `progress: 1`.
-5. Lock behavior should remain covered, including lock during active transitions and unlock after completion.
-6. Cooldown behavior should remain covered, including default `0`, positive cooldown, cooldown start timing, and ignored navigation not resetting cooldown.
-7. Input gating should be added for wheel, touch, and keyboard hooks, especially repeated wheel/keyboard input, touch thresholds, preventDefault timing, and lock/transition/cooldown interaction.
-8. React/R3F integration tests should be added for provider sync behavior and `useFlowFrame` completion sync.
+1. Keep core initialization, `next`, `prev`, `goTo`, invalid targets, boundaries, progress completion, lock behavior, and cooldown behavior covered as regression tests.
+2. Keep React provider/hooks, `useFlowFrame`, and wheel/touch/keyboard input hook coverage in place as behavior changes are reviewed.
+3. Run and record release checks, including package verification and the Vite example build where feasible.
+4. Clarify DOM progress versus frame progress expectations in docs/examples without changing runtime behavior.
+5. Preserve invalid `goTo` throw-first priority as an explicitly documented stable rule unless a separate design issue changes it.
 
 ## 9. Findings summary
 
@@ -418,6 +417,9 @@ Existing tests are concentrated in core behavior, easing helpers, and the packag
 - `next`, `prev`, `goTo`, same-phase no-ops, invalid targets, and boundary no-ops have direct core coverage.
 - Transition progress, completion, custom easing, and final progress clamping have direct core coverage.
 - Lock and cooldown behavior are implemented in the core machine and have direct core coverage.
+- React provider and hook behavior has direct mounted-tree coverage.
+- `useFlowFrame` bridge behavior has direct frame-callback coverage.
+- Wheel, touch, and keyboard input hooks have direct event-behavior coverage.
 - Public package entry exports are tested.
 
 ### Behavior that needs clearer specification
@@ -429,12 +431,11 @@ Existing tests are concentrated in core behavior, easing helpers, and the packag
 - Whether overlapping custom keyboard next/prev key lists should be specified or guarded.
 - How touch multi-touch, swipe cancellation, nested scroll containers, and trackpad bursts should behave.
 
-### Behavior that needs tests
+### Behavior that still needs release-readiness attention
 
-- React provider and hook behavior.
-- R3F bridge behavior.
-- Wheel, touch, and keyboard input behavior.
 - Example/build smoke coverage where feasible.
+- Documentation clarity for DOM progress versus frame progress expectations.
+- Final release checklist verification against the current coverage and package output.
 
 ### Behavior that should not change without a separate design issue
 
@@ -449,15 +450,14 @@ Existing tests are concentrated in core behavior, easing helpers, and the packag
 
 ## 10. Recommended follow-up issues
 
-- Define transition lifecycle rules for v0.2.0.
-- Add core transition behavior tests.
-- Stabilize cooldown and lock behavior.
-- Improve wheel, touch, and keyboard input reliability.
-- Add React provider and hook tests.
-- Add R3F bridge tests for `useFlowFrame`.
-- Improve README and example guidance for v0.2.0.
+- Preserve transition lifecycle rules for v0.2.0 as regression coverage evolves.
+- Keep core transition, cooldown, and lock behavior covered by regression tests.
+- Keep wheel, touch, and keyboard input reliability covered by direct hook tests.
+- Keep React provider/hooks and `useFlowFrame` bridge behavior covered by direct tests.
+- Improve README and example guidance for v0.2.0 where it clarifies existing behavior.
 - Specify DOM progress versus frame progress expectations.
-- Decide whether invalid `goTo` target priority should remain throw-first across all gates.
+- Keep invalid `goTo` target priority documented as throw-first across all gates unless a separate design issue changes it.
+- Complete a final v0.2.0 release-readiness pass, including package verification and example build checks.
 
 ## 11. Intended v0.2.0 behavior rules
 
@@ -471,7 +471,7 @@ The current behavior audit above is the baseline. The rules below describe inten
 - Transition progress should remain normalized to `0..1`.
 - Completion should update transition state exactly once per accepted transition.
 - Cooldown behavior should remain specified before further changes, including timing, scope, and interaction with accepted or ignored navigation.
-- `lockDuringTransition` behavior should be specified before implementation. The default should remain equivalent to ignoring navigation during active transitions unless a deliberate option changes it.
+- No `lockDuringTransition` option should be added for v0.2.0. The current behavior should remain equivalent to ignoring navigation during active transitions unless a separate future design changes it.
 - Browser input hooks should not access `window`, `document`, `HTMLElement`, or other browser APIs at module import time.
 - R3F hooks must remain Canvas-bound and should continue to rely on React Three Fiber APIs only from Canvas components.
 - DOM input logic must stay separate from R3F scene logic.
@@ -525,11 +525,11 @@ This section defines the intended v0.2.0 cooldown behavior. It does not change c
 
 For detailed transition lifecycle decisions, see `docs/transition-lifecycle-v0.2.0.md`.
 
-## 12. Open decisions for later PRs
+## 12. Open decisions for later releases
 
 - Should an explicit loop option be added later, and if so should it live in the core machine, provider, or input layer?
-- Should `lockDuringTransition` be exposed as an option or remain the default internal behavior?
-- If `lockDuringTransition` becomes configurable, should non-default behavior ignore, queue, restart, or retarget active transitions?
+- Should a future release expose transition-gating configuration, or should the current internal behavior remain fixed?
+- If transition-gating behavior ever becomes configurable, should non-default behavior ignore, queue, restart, or retarget active transitions?
 - Do transition snapshots need source and target phase information internally without expanding the public API?
 - Should accepted navigation continue to update the public `phase` at transition start, or should public phase updates move to completion in a future major behavior change?
 - Do input hooks need additional filtering for trackpad bursts, swipe cancellation, multi-touch gestures, focus handling, or nested scroll containers?

@@ -193,7 +193,7 @@ v0.2.0 does not include:
 
 ## 18. Test implications
 
-Later implementation and test PRs should add or preserve coverage for:
+Current v0.2.0 tests cover the core lifecycle cases below. Later implementation and test PRs should preserve this coverage:
 
 - Accepted `next`.
 - Accepted `prev`.
@@ -210,10 +210,12 @@ Later implementation and test PRs should add or preserve coverage for:
 - Ignored navigation does not reset cooldown.
 - DOM progress versus `useFlowFrame` expectations where feasible.
 
+React provider/hooks, `useFlowFrame`, and wheel/touch/keyboard input hooks also have direct tests for the current v0.2.0 scope. Example behavior and build-only smoke coverage remain part of release-readiness checks where feasible.
+
 ## 19. Relationship to existing docs
 
 `docs/behavior-v0.2.0.md` records the current behavior audit and intended high-level rules.
 
 `docs/transition-lifecycle-v0.2.0.md` defines the transition lifecycle decisions for issue #53.
 
-Later implementation and test PRs should follow these docs.
+Later implementation and test PRs should preserve the covered behavior described in these docs unless a separate design issue changes it.

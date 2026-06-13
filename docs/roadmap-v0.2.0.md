@@ -13,12 +13,12 @@ This roadmap is an implementation plan and requirements document. It does not ad
 - Stabilize the core flow machine so phase changes are deterministic and easy to test.
 - Define transition progress behavior before implementation work begins.
 - Make `next`, `prev`, and `goTo` behavior consistent across direct calls and browser input hooks.
-- Clarify cooldown, input lock, and `lockDuringTransition` semantics.
-- Document expected loop behavior at the first and last phases.
+- Clarify cooldown and input lock semantics, and document the built-in transition gate without adding a `lockDuringTransition` API.
+- Document non-looping boundary behavior at the first and last phases.
 - Improve reliability expectations for wheel, touch, and keyboard navigation.
 - Preserve a clean connection model between DOM UI controls and R3F Canvas components.
 - Provide practical `useFlowFrame` examples that use refs or mutable frame state instead of pushing frame-driven values into React state every frame.
-- Strengthen tests around core transition logic before release.
+- Preserve strengthened tests around core transition logic before release.
 - Improve README guidance while keeping the library's scope narrow.
 
 ## 3. v0.2.0 requirements
@@ -27,7 +27,7 @@ This roadmap is an implementation plan and requirements document. It does not ad
 
 - Phase ordering must be derived from the configured `phases` tuple and remain stable for the lifetime of a provider instance.
 - The active phase must always be one of the configured phases.
-- Transition state must have explicit source, target, progress, direction, and completion rules.
+- Transition state must have explicit progress, direction, and completion rules using the current public snapshot shape.
 - Invalid phase targets must be handled predictably and must not leave the machine in a partial transition state.
 - Repeated navigation calls during locks, cooldowns, or transitions must have documented outcomes.
 
@@ -37,7 +37,7 @@ This roadmap is an implementation plan and requirements document. It does not ad
 - Progress must begin at `0`, complete at `1`, and avoid overshooting.
 - Easing behavior must be deterministic and testable.
 - Completion must update the current phase exactly once per transition.
-- Interrupted, ignored, or queued navigation requests must be explicitly specified before implementation.
+- Ignored navigation requests must be explicitly specified; queues, restarts, interrupts, and retargeting remain out of scope for v0.2.0.
 
 ### Navigation behavior: `next`, `prev`, and `goTo`
 
@@ -45,13 +45,13 @@ This roadmap is an implementation plan and requirements document. It does not ad
 - `prev` must target the previous phase in the configured order.
 - `goTo` must target the requested configured phase.
 - Calls that resolve to the current phase must have a documented no-op behavior.
-- Boundary behavior must respect the configured loop policy.
+- Boundary behavior must remain documented as non-looping no-ops unless a separate future design adds a loop option.
 - Navigation methods must share the same lock, cooldown, and transition gating rules regardless of whether they are called from DOM UI, input hooks, or app code.
 
 ### Cooldown
 
 - Cooldown must prevent accidental rapid repeated navigation without broadening the public API beyond the separately approved v0.2.0 surface.
-- If a cooldown option is added, the core machine must own the authoritative cooldown gate; `FlowProvider` should delegate to the core machine, and browser input hooks should not maintain independent cooldown timers.
+- The cooldown option is owned by the core machine as the authoritative cooldown gate; `FlowProvider` delegates to the core machine, and browser input hooks do not maintain independent cooldown timers.
 - Cooldown must start on accepted navigation, not on transition completion. Completion must not restart or extend cooldown.
 - Cooldown must apply consistently to wheel, touch, keyboard, provider controls, and direct `next`, `prev`, and valid `goTo` calls.
 - Navigation attempted during cooldown must be ignored without queuing, interrupting, restarting, retargeting, mutating state, or extending the cooldown.
@@ -64,16 +64,16 @@ This roadmap is an implementation plan and requirements document. It does not ad
 - Locked input must not mutate transition progress or phase state.
 - Lock state changes must not require remounting Canvas scene components.
 
-### `lockDuringTransition`
+### Transition gating
 
-- When enabled, navigation requests during an active transition must follow one specified behavior, such as ignore, queue, or restart.
-- When disabled, the allowed transition-interruption behavior must be specified and tested.
+- Navigation requests during an active transition are ignored by the current core machine.
+- v0.2.0 should preserve this conservative behavior without adding queues, restarts, interrupts, retargeting, or a `lockDuringTransition` option.
 - The default should favor predictable production behavior over surprising visual effects.
 
-### Loop behavior
+### Boundary behavior
 
-- Looping must define `next` from the last phase and `prev` from the first phase.
-- Non-looping boundary calls must be documented as no-ops or rejected requests.
+- The current v0.2.0 scope does not add loop behavior.
+- First-phase `prev` and last-phase `next` calls are documented no-ops.
 - Boundary behavior must be identical for direct calls and browser input hooks.
 
 ### Wheel, touch, and keyboard input reliability
@@ -98,11 +98,13 @@ This roadmap is an implementation plan and requirements document. It does not ad
 - Examples should avoid setting React state every frame for visual-only values.
 - Examples should show how DOM controls and Canvas animation can be connected through the shared flow provider.
 
-### Tests for core logic
+### Tests for core, React, R3F, and input behavior
 
-- Core transition tests should cover initialization, `next`, `prev`, `goTo`, progress completion, lock behavior, cooldown behavior, loop boundaries, and invalid targets.
-- Tests should prefer React-independent core logic where possible.
-- Browser input tests should focus on event behavior and integration boundaries without coupling DOM input logic to R3F scene logic.
+- Core transition tests cover initialization, `next`, `prev`, `goTo`, progress completion, lock behavior, cooldown behavior, non-looping boundaries, and invalid targets.
+- React provider and hook tests cover mounted provider behavior, `useFlow`, `useFlowProgress`, and outside-provider errors.
+- R3F bridge tests cover `useFlowFrame` frame updates, callback arguments, latest-callback behavior, completion sync, and outside-provider errors.
+- Browser input tests cover wheel, touch, and keyboard event behavior and integration boundaries without coupling DOM input logic to R3F scene logic.
+- Input hook tests use shared private test utilities for minimal DOM setup and provider rendering; those utilities are not public API.
 
 ### README improvements
 
@@ -161,7 +163,7 @@ Architecture rules:
 
 ## 6. Implementation milestones
 
-### Milestone 1: Audit current behavior
+### Milestone 1: Audit current behavior — complete
 
 The current behavior audit and intended v0.2.0 rules are documented in [docs/behavior-v0.2.0.md](behavior-v0.2.0.md).
 
@@ -169,49 +171,56 @@ The current behavior audit and intended v0.2.0 rules are documented in [docs/beh
 - Record current behavior for `next`, `prev`, `goTo`, progress updates, loop boundaries, cooldown, and locks.
 - Identify behavior that is undocumented, inconsistent, or hard to test.
 - Confirm no implementation work starts until the expected behavior is written down.
+- Current status: documented in the behavior audit.
 
-### Milestone 2: Define transition rules
+### Milestone 2: Define transition rules — complete
 
 - Specify transition lifecycle states and their allowed transitions.
 - Decide how navigation calls behave during active transitions.
 - Define progress timing, easing, completion, cancellation, and same-phase navigation behavior.
-- Document default boundary behavior for looped and non-looped flows.
+- Document default non-looping boundary behavior.
+- Current status: transition lifecycle rules are documented for the v0.2.0 scope.
 
-### Milestone 3: Strengthen core tests
+### Milestone 3: Strengthen core tests — complete
 
 - Add or update tests for React-independent transition behavior first.
-- Cover initialization, ordered navigation, invalid targets, loop boundaries, progress completion, locks, and cooldown.
+- Cover initialization, ordered navigation, invalid targets, non-looping boundaries, progress completion, locks, and cooldown.
 - Add regression tests for any behavior discovered during the audit.
 - Keep tests focused on stable behavior rather than implementation details.
+- Current status: core lifecycle and gating behavior has direct regression coverage.
 
-### Milestone 4: Stabilize lock and cooldown behavior
+### Milestone 4: Stabilize lock and cooldown behavior — complete
 
 - Implement the specified cooldown timing model without adding queues, restarts, interrupts, retargeting, or loop behavior.
 - Keep cooldown gating centralized in the core machine so direct navigation and input-driven navigation remain consistent.
 - Implement the specified input lock behavior.
-- Implement or refine `lockDuringTransition` according to the documented transition rules.
+- Preserve the built-in transition gate without adding `lockDuringTransition`, queues, restarts, interrupts, or retargeting.
 - Verify direct navigation and input-driven navigation use the same gating behavior where required.
+- Current status: lock and cooldown behavior is covered in core tests, with hook tests covering lock and transition gates at input boundaries.
 
-### Milestone 5: Improve input reliability
+### Milestone 5: Improve input reliability — covered by current hook tests
 
 - Review wheel handling for noisy deltas, trackpad bursts, thresholds, and cooldown interactions.
 - Review touch handling for swipe thresholds, direction, cancellation, and listener cleanup.
 - Review keyboard handling for key mapping, focus behavior, repeated key events, and prevention behavior.
 - Ensure input hooks access browser APIs only after mount and clean up listeners on unmount or target changes.
+- Current status: wheel, touch, and keyboard hook tests cover listener lifecycle, targets, thresholds/keys, prevention behavior, disabled state, lock/transition gating, and import-time browser guards.
 
-### Milestone 6: Improve examples and README
+### Milestone 6: Improve examples and README — remaining docs pass
 
 - Update README examples to match the v0.2.0 public API direction where appropriate.
 - Add concise `useFlowFrame` examples that mutate R3F objects through refs.
 - Show DOM controls and Canvas components sharing flow state through `FlowProvider`.
 - Avoid presenting non-goal features as built-in capabilities.
+- Remaining status: keep DOM progress versus frame progress expectations clear in docs/examples.
 
-### Milestone 7: Prepare release checklist
+### Milestone 7: Prepare release checklist — remaining release pass
 
 - Confirm behavior requirements are reflected in tests.
 - Run all available checks.
 - Verify package contents and README guidance.
 - Prepare release notes that emphasize the production-ready flow-control foundation and narrow scope.
+- Remaining status: run and record final release checks, including package verification and the Vite example build.
 
 ## 7. Non-goals
 
@@ -244,13 +253,17 @@ These items may be explored separately in future releases or external examples, 
 - [ ] Confirm the public API direction remains limited to the existing flow, R3F bridge, and input hook exports documented in the Public API policy.
 - [ ] Confirm architecture boundaries are documented.
 - [ ] Confirm core behavior is specified before implementation starts.
-- [ ] Confirm tests cover core transition behavior before release.
-- [ ] Confirm input behavior is tested or manually verified where automated coverage is not practical.
+- [x] Confirm tests cover core transition behavior before release.
+- [x] Confirm wheel, touch, and keyboard input hook behavior has direct test coverage for current v0.2.0 scope.
 - [ ] Confirm README guidance remains concise and aligned with the narrow library scope.
 - [ ] Run `pnpm build`.
 - [ ] Run `pnpm typecheck`.
 - [ ] Run `pnpm test`.
 - [ ] Run `pnpm lint`.
+- [ ] Run `pnpm format`.
+- [ ] Run `pnpm package:verify`.
+- [ ] Run `pnpm --filter vite-basic build`.
+- [ ] Run `pnpm pack:dry-run`.
 
 ## 9. Maintainer notes
 
