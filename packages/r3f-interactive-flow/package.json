@@ -1,6 +1,6 @@
 {
   "name": "r3f-interactive-flow",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A small React Three Fiber utility for predictable phase-based interactive flow control.",
   "license": "MIT",
   "author": "YT-TechDev",
