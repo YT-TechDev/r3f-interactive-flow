@@ -157,13 +157,17 @@ Prepare release notes that summarize the stabilization work without implying a m
 - [ ] Summarize shared private input test utilities while noting they are not public API.
 - [ ] Summarize README/docs clarifications, especially DOM progress versus frame-driven `useFlowFrame` progress.
 - [ ] Summarize cooldown and input behavior stabilization.
-- [ ] Explicitly mention that v0.2.0 does not include a major public API expansion.
+- [ ] Confirm `CHANGELOG.md` or the repository's required changelog entry includes v0.2.0 notes.
+- [ ] Confirm a GitHub release notes or npm release notes draft exists and matches the final package contents.
+- [ ] Explicitly mention that v0.2.0 is a stabilization release and does not include a major public API expansion.
 - [ ] Mention that no particle, camera preset, shader effect, timeline, router, GSAP, or Framer Motion integration features were added.
 
 ## 11. Final maintainer sign-off
 
 Before publishing, confirm:
 
+- [ ] `packages/r3f-interactive-flow/package.json` has been bumped to `0.2.0` through the approved release process.
+- [ ] Any required workspace or package metadata is consistent with the v0.2.0 release.
 - [ ] No package versions were changed outside the approved release process.
 - [ ] No changeset was added unless the repository's release process explicitly requires it.
 - [ ] No release command has been run during readiness validation.
