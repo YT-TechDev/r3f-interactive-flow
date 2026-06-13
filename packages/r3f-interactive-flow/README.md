@@ -281,7 +281,7 @@ This package is designed to be usable from Next.js App Router Client Components.
 - The package entry is marked as a client entry for Next.js App Router compatibility.
 - The package does not add Next.js as a dependency.
 - Browser APIs are used inside hooks/effects, not at module import time.
-- No Next.js router integration is included in v0.1.0.
+- No Next.js router integration is included.
 - `useFlowFrame` still follows React Three Fiber rules and must be used inside a Canvas-bound component.
 
 ## Development commands
