@@ -8,16 +8,9 @@ The goal is not to provide visual effects. The goal is to make interactive R3F s
 
 ## Project status
 
-Current published package version: `0.1.0`.
+Current package version on `main`: `0.3.0`.
 
-The project is currently moving toward `v0.2.0`, with a focus on stabilizing the existing foundation:
-
-- clearer phase transition behavior
-- more reliable wheel, touch, and keyboard input handling
-- better transition locking and cooldown behavior
-- safer TypeScript types
-- tests for core, React provider/hooks, R3F bridge, and input hook behavior
-- clearer examples and documentation
+The `v0.3.0` work is complete on `main`, with the package focused on a small, stable set of phase flow primitives for React Three Fiber. For the v0.3.0 design baseline, see [docs/v0.3.0-spec.md](docs/v0.3.0-spec.md). For release notes, see [packages/r3f-interactive-flow/CHANGELOG.md](packages/r3f-interactive-flow/CHANGELOG.md).
 
 ## Why this exists
 
@@ -265,7 +258,7 @@ Use `useFlow` and `useFlowProgress` for DOM state, controls, labels, and coarse 
 
 ## R3F usage with useFlowFrame
 
-Use `useFlowFrame` inside a Canvas-bound component to receive frame-driven transition progress.
+Use `useFlowFrame` inside a Canvas-bound component to receive frame-driven transition progress. `useFlowFrame` advances transition progress by calling the core flow machine update from the R3F frame loop.
 
 ```tsx
 import { Canvas } from "@react-three/fiber";
