@@ -13,10 +13,12 @@ class MinimalWheelEvent {
   defaultPrevented = false;
   target: EventTarget | MinimalEventTarget | null = null;
   readonly type: string;
+  readonly deltaX: number;
   readonly deltaY: number;
 
   constructor(type: string, eventInitDict: WheelEventInit = {}) {
     this.type = type;
+    this.deltaX = eventInitDict.deltaX ?? 0;
     this.deltaY = eventInitDict.deltaY ?? 0;
   }
 
@@ -43,9 +45,12 @@ function WheelInputProbe({ options = {} }: { options?: UseWheelInputOptions }) {
 
 function dispatchWheel(
   deltaY: number,
-  target: MinimalEventTarget = windowTarget
+  target: MinimalEventTarget = windowTarget,
+  eventInitDict: WheelEventInit & { target?: EventTarget | MinimalEventTarget | null } = {}
 ): MinimalWheelEvent {
-  const event = new WheelEvent("wheel", { deltaY }) as MinimalWheelEvent;
+  const { target: eventTarget, ...wheelInit } = eventInitDict;
+  const event = new WheelEvent("wheel", { ...wheelInit, deltaY }) as MinimalWheelEvent;
+  event.target = eventTarget ?? null;
 
   act(() => {
     target.dispatchEvent(event);
@@ -240,5 +245,165 @@ describe("useWheelInput", () => {
     dispatchWheel(41, minimalTarget);
 
     expect(latestControls?.phase).toBe("work");
+  });
+
+  it("can attach directly to a provided HTMLElement target", () => {
+    const target = document.createElement("div");
+    const minimalTarget = target as unknown as MinimalElement;
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ target }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(windowTarget.listenerCount("wheel")).toBe(0);
+    expect(minimalTarget.listenerCount("wheel")).toBe(1);
+
+    dispatchWheel(41, minimalTarget);
+
+    expect(latestControls?.phase).toBe("work");
+  });
+
+  it("can attach explicitly to window", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ target: window }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(windowTarget.listenerCount("wheel")).toBe(1);
+
+    dispatchWheel(41);
+
+    expect(latestControls?.phase).toBe("work");
+  });
+
+  it("uses deltaY for the y axis and deltaX for the x axis", () => {
+    const yTarget = document.createElement("div") as unknown as MinimalElement;
+    const xTarget = document.createElement("div") as unknown as MinimalElement;
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe
+          options={{ axis: "y", threshold: 40, target: yTarget as unknown as HTMLElement }}
+        />
+        <WheelInputProbe
+          options={{ axis: "x", threshold: 40, target: xTarget as unknown as HTMLElement }}
+        />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchWheel(0, yTarget, { deltaX: 41 });
+
+    expect(latestControls?.phase).toBe("intro");
+
+    dispatchWheel(0, xTarget, { deltaX: 41 });
+
+    expect(latestControls?.phase).toBe("work");
+  });
+
+  it("uses selected-axis sign for next and previous navigation", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ axis: "x", threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>,
+      "work"
+    );
+
+    dispatchWheel(0, windowTarget, { deltaX: -41 });
+
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("prev");
+  });
+
+  it("ignores user-provided selector matches without preventing default", () => {
+    const ignored = document.createElement("div");
+    ignored.setAttribute("class", "ignore-wheel");
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ ignore: [".ignore-wheel"] }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    const event = dispatchWheel(41, windowTarget, {
+      target: ignored as unknown as EventTarget
+    });
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("intro");
+  });
+
+  it("keeps preventDefault enabled by default for non-ignored events", () => {
+    renderFlow(<WheelInputProbe options={{ ignore: [".ignore-wheel"] }} />);
+
+    const event = dispatchWheel(41);
+
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it("blocks rapid repeated navigation with hook-local cooldown", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ cooldown: 500 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchWheel(-41);
+
+    vi.setSystemTime(250);
+    dispatchWheel(41);
+
+    expect(latestControls?.phase).toBe("intro");
+
+    vi.setSystemTime(500);
+    dispatchWheel(41);
+
+    expect(latestControls?.phase).toBe("work");
+    vi.useRealTimers();
+  });
+
+  it("removes the listener from the old target when the target changes", () => {
+    const firstTarget = document.createElement("div") as unknown as MinimalElement;
+    const secondTarget = document.createElement("div") as unknown as MinimalElement;
+
+    function RetargetingProbe({ target }: { target: HTMLElement }) {
+      useWheelInput<TestPhase>({ target });
+
+      return null;
+    }
+
+    renderFlow(<RetargetingProbe target={firstTarget as unknown as HTMLElement} />);
+
+    expect(firstTarget.listenerCount("wheel")).toBe(1);
+
+    renderFlow(<RetargetingProbe target={secondTarget as unknown as HTMLElement} />);
+
+    expect(firstTarget.listenerCount("wheel")).toBe(0);
+    expect(secondTarget.listenerCount("wheel")).toBe(1);
+  });
+
+  it("throws a clear error for invalid cooldown values", () => {
+    expect(() => renderFlow(<WheelInputProbe options={{ cooldown: -1 }} />)).toThrow(
+      "useWheelInput cooldown must be a finite non-negative number."
+    );
   });
 });

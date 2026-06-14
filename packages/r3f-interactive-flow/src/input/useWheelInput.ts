@@ -6,17 +6,61 @@ import type { FlowControls } from "../core/types";
 import { useFlow } from "../react/useFlow";
 
 const DEFAULT_THRESHOLD = 40;
+const DEFAULT_AXIS = "y";
+const DEFAULT_COOLDOWN = 0;
+
+export type FlowInputTarget = RefObject<HTMLElement | null> | HTMLElement | Window;
 
 export type UseWheelInputOptions = {
-  target?: RefObject<HTMLElement | null>;
+  target?: FlowInputTarget;
   threshold?: number;
+  axis?: "x" | "y";
+  cooldown?: number;
   enabled?: boolean;
   preventDefault?: boolean;
+  ignore?: readonly string[];
 };
+
+function isRefObjectTarget(target: FlowInputTarget): target is RefObject<HTMLElement | null> {
+  return typeof target === "object" && target !== null && "current" in target;
+}
+
+function resolveInputTarget(target: FlowInputTarget | undefined): HTMLElement | Window {
+  if (target === undefined) {
+    return window;
+  }
+
+  if (isRefObjectTarget(target)) {
+    return target.current ?? window;
+  }
+
+  return target;
+}
+
+function getWheelDelta(event: WheelEvent, axis: "x" | "y"): number {
+  return axis === "x" ? event.deltaX : event.deltaY;
+}
+
+function validateCooldown(cooldown: number): void {
+  if (!Number.isFinite(cooldown) || cooldown < 0) {
+    throw new Error("useWheelInput cooldown must be a finite non-negative number.");
+  }
+}
+
+function shouldIgnoreWheelEvent(event: WheelEvent, ignore: readonly string[]): boolean {
+  const target = event.target;
+
+  if (ignore.length === 0 || typeof Element === "undefined" || !(target instanceof Element)) {
+    return false;
+  }
+
+  return ignore.some((selector) => target.closest(selector) !== null);
+}
 
 export function useWheelInput<TPhase extends string>(options: UseWheelInputOptions = {}): void {
   const flow = useFlow<TPhase>();
   const flowRef = useRef<FlowControls<TPhase>>(flow);
+  const lastNavigationAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     flowRef.current = flow;
@@ -32,11 +76,20 @@ export function useWheelInput<TPhase extends string>(options: UseWheelInputOptio
     }
 
     const threshold = options.threshold ?? DEFAULT_THRESHOLD;
+    const axis = options.axis ?? DEFAULT_AXIS;
+    const cooldown = options.cooldown ?? DEFAULT_COOLDOWN;
+    const ignore = options.ignore ?? [];
     const preventDefault = options.preventDefault ?? true;
-    const eventTarget = options.target?.current ?? window;
+    const eventTarget = resolveInputTarget(options.target);
+
+    validateCooldown(cooldown);
 
     const handleWheel: EventListener = (event): void => {
       const wheelEvent = event as WheelEvent;
+
+      if (shouldIgnoreWheelEvent(wheelEvent, ignore)) {
+        return;
+      }
 
       if (preventDefault) {
         wheelEvent.preventDefault();
@@ -48,14 +101,26 @@ export function useWheelInput<TPhase extends string>(options: UseWheelInputOptio
         return;
       }
 
-      if (wheelEvent.deltaY > threshold) {
+      const delta = getWheelDelta(wheelEvent, axis);
+
+      if (delta <= threshold && delta >= -threshold) {
+        return;
+      }
+
+      const now = Date.now();
+
+      if (lastNavigationAtRef.current !== null && now - lastNavigationAtRef.current < cooldown) {
+        return;
+      }
+
+      lastNavigationAtRef.current = now;
+
+      if (delta > threshold) {
         currentFlow.next();
         return;
       }
 
-      if (wheelEvent.deltaY < -threshold) {
-        currentFlow.prev();
-      }
+      currentFlow.prev();
     };
 
     eventTarget.addEventListener("wheel", handleWheel, { passive: false });
@@ -63,5 +128,13 @@ export function useWheelInput<TPhase extends string>(options: UseWheelInputOptio
     return () => {
       eventTarget.removeEventListener("wheel", handleWheel);
     };
-  }, [options.enabled, options.preventDefault, options.target, options.threshold]);
+  }, [
+    options.axis,
+    options.cooldown,
+    options.enabled,
+    options.ignore,
+    options.preventDefault,
+    options.target,
+    options.threshold
+  ]);
 }
