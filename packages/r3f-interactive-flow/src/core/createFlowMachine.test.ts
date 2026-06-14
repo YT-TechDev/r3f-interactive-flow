@@ -924,6 +924,160 @@ describe("createFlowMachine", () => {
     expect(machine.progress).toBe(0.25);
   });
 
+  it("uses legacy transitionDurationMs, cooldownMs, and easing options", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 200,
+      cooldownMs: 400,
+      easing: (progress) => progress * progress
+    });
+
+    machine.next();
+    machine.update(100);
+
+    expect(machine.progress).toBe(0.25);
+
+    machine.update(100);
+    machine.next();
+    expect(machine.phase).toBe("work");
+
+    machine.update(200);
+    machine.next();
+    expect(machine.phase).toBe("contact");
+  });
+
+  it("lets global transition options override overlapping legacy options per field", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 1000,
+      cooldownMs: 1000,
+      easing: () => 0,
+      transition: {
+        duration: 200,
+        cooldown: 500,
+        easing: (progress) => progress
+      }
+    });
+
+    machine.next();
+    machine.update(100);
+    expect(machine.progress).toBe(0.5);
+
+    machine.update(100);
+    machine.update(200);
+    machine.next();
+    expect(machine.phase).toBe("work");
+
+    machine.update(100);
+    machine.next();
+    expect(machine.phase).toBe("contact");
+  });
+
+  it("resolves transition.byPhase options from the source phase for next, prev, and goTo", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transition: {
+        duration: 1000,
+        cooldown: 0,
+        easing: () => 0,
+        byPhase: {
+          intro: { duration: 200, easing: (progress) => progress },
+          work: { cooldown: 300, easing: (progress) => progress * progress },
+          contact: { duration: 400, cooldown: 0, easing: (progress) => progress }
+        }
+      }
+    });
+
+    machine.next();
+    machine.update(100);
+    expect(machine.progress).toBe(0.5);
+
+    machine.update(100);
+    machine.goTo("contact");
+    machine.update(500);
+    expect(machine.progress).toBe(0.25);
+
+    machine.update(500);
+    machine.update(300);
+    machine.prev();
+    machine.update(200);
+    expect(machine.progress).toBe(0.5);
+  });
+
+  it("falls back from missing phase transition fields to global, legacy, and defaults per field", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 400,
+      cooldownMs: 200,
+      easing: (progress) => progress * progress,
+      transition: {
+        cooldown: 0,
+        byPhase: {
+          intro: { duration: 200 }
+        }
+      }
+    });
+
+    machine.next();
+    machine.update(100);
+    expect(machine.progress).toBe(0.25);
+
+    machine.update(100);
+    machine.next();
+    machine.update(200);
+    expect(machine.progress).toBe(0.25);
+  });
+
+  it("uses defaults when transition and legacy timing fields are omitted", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work"] as const,
+      transition: {}
+    });
+
+    machine.next();
+    machine.update(500);
+
+    expect(machine.progress).toBe(0.5);
+  });
+
+  it("throws clear errors for invalid global transition values", () => {
+    expect(() =>
+      createFlowMachine({ phases: ["intro", "work"] as const, transition: { duration: 0 } })
+    ).toThrow("transition.duration must be a finite positive number.");
+    expect(() =>
+      createFlowMachine({ phases: ["intro", "work"] as const, transition: { cooldown: -1 } })
+    ).toThrow("transition.cooldown must be a finite number greater than or equal to 0.");
+    expect(() =>
+      createFlowMachine({
+        phases: ["intro", "work"] as const,
+        transition: { easing: "linear" as never }
+      })
+    ).toThrow("transition.easing must be a function.");
+  });
+
+  it("throws clear errors for invalid phase-specific transition values", () => {
+    expect(() =>
+      createFlowMachine({
+        phases: ["intro", "work"] as const,
+        transition: { byPhase: { intro: { duration: Number.NaN } } }
+      })
+    ).toThrow("transition.byPhase.intro.duration must be a finite positive number.");
+    expect(() =>
+      createFlowMachine({
+        phases: ["intro", "work"] as const,
+        transition: { byPhase: { intro: { cooldown: -1 } } }
+      })
+    ).toThrow(
+      "transition.byPhase.intro.cooldown must be a finite number greater than or equal to 0."
+    );
+    expect(() =>
+      createFlowMachine({
+        phases: ["intro", "work"] as const,
+        transition: { byPhase: { intro: { easing: "linear" as never } } }
+      })
+    ).toThrow("transition.byPhase.intro.easing must be a function.");
+  });
+
   it("clamps custom easing output above one during a transition", () => {
     const machine = createFlowMachine({
       phases: ["intro", "work"] as const,

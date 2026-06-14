@@ -4,6 +4,8 @@ import * as publicApi from ".";
 import type {
   FlowFrameCallback,
   FlowFrameState,
+  FlowTransitionBaseOptions,
+  FlowTransitionOptions,
   UseKeyboardInputOptions,
   UseTouchInputOptions,
   UseWheelInputOptions
@@ -63,5 +65,21 @@ describe("public API", () => {
     expect(wheelOptions.threshold).toBe(40);
     expect(touchOptions.threshold).toBe(50);
     expect(keyboardOptions.nextKeys).toEqual(["ArrowDown"]);
+  });
+
+  it("exposes transition option types", () => {
+    const baseOptions: FlowTransitionBaseOptions = {
+      duration: 1000,
+      cooldown: 500,
+      easing: (progress) => progress
+    };
+    const options: FlowTransitionOptions<"intro" | "work"> = {
+      ...baseOptions,
+      byPhase: {
+        intro: { duration: 1600 }
+      }
+    };
+
+    expect(options.byPhase?.intro?.duration).toBe(1600);
   });
 });

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { createFlowMachine } from "../core/createFlowMachine";
 import type { EasingFunction } from "../core/easing";
-import type { FlowControls, FlowSnapshot } from "../core/types";
+import type { FlowControls, FlowSnapshot, FlowTransitionOptions } from "../core/types";
 import { FlowContext } from "./FlowContext";
 import type { FlowContextValue } from "./FlowContext";
 
@@ -14,6 +14,7 @@ export type FlowProviderProps<TPhase extends string> = {
   transitionDurationMs?: number;
   cooldownMs?: number;
   easing?: EasingFunction;
+  transition?: FlowTransitionOptions<TPhase>;
   children: ReactNode;
 };
 
@@ -23,6 +24,7 @@ export function FlowProvider<TPhase extends string>({
   transitionDurationMs,
   cooldownMs,
   easing,
+  transition,
   children
 }: FlowProviderProps<TPhase>): ReactNode {
   const machine = useMemo(() => {
@@ -31,9 +33,10 @@ export function FlowProvider<TPhase extends string>({
       ...(initialPhase !== undefined ? { initialPhase } : {}),
       ...(transitionDurationMs !== undefined ? { transitionDurationMs } : {}),
       ...(cooldownMs !== undefined ? { cooldownMs } : {}),
-      ...(easing !== undefined ? { easing } : {})
+      ...(easing !== undefined ? { easing } : {}),
+      ...(transition !== undefined ? { transition } : {})
     });
-  }, [cooldownMs, easing, initialPhase, phases, transitionDurationMs]);
+  }, [cooldownMs, easing, initialPhase, phases, transition, transitionDurationMs]);
 
   const [snapshot, setSnapshot] = useState<FlowSnapshot<TPhase>>(() => machine.getSnapshot());
 

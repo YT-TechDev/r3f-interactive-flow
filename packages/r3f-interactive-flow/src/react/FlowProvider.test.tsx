@@ -1,9 +1,11 @@
-import React, { act } from "react";
+import React, { act, useContext } from "react";
 import type { ReactNode } from "react";
 import type { Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FlowControls } from "../core/types";
+import { FlowContext } from "./FlowContext";
+import type { FlowProviderProps } from "./FlowProvider";
 import { FlowProvider } from "./FlowProvider";
 import { useFlow } from "./useFlow";
 import { useFlowProgress } from "./useFlowProgress";
@@ -217,11 +219,32 @@ function ProgressProbe({ onRender }: { onRender: (progress: number) => void }) {
   return <output data-testid="progress">{progress}</output>;
 }
 
-function renderFlow(children: ReactNode, initialPhase?: TestPhase) {
+function MachineProbe({
+  onRender
+}: {
+  onRender: (value: NonNullable<React.ContextType<typeof FlowContext>>) => void;
+}) {
+  const value = useContext(FlowContext);
+
+  if (value === null) {
+    throw new Error("missing FlowContext");
+  }
+
+  onRender(value);
+
+  return null;
+}
+
+function renderFlow(
+  children: ReactNode,
+  initialPhase?: TestPhase,
+  props?: Partial<Omit<FlowProviderProps<TestPhase>, "children" | "phases" | "initialPhase">>
+) {
   act(() => {
     const providerProps = {
       phases,
-      ...(initialPhase !== undefined ? { initialPhase } : {})
+      ...(initialPhase !== undefined ? { initialPhase } : {}),
+      ...props
     };
 
     root?.render(<FlowProvider {...providerProps}>{children}</FlowProvider>);
@@ -366,6 +389,69 @@ describe("FlowProvider and hooks", () => {
 
     expect(latestProgress).toBe(0);
     expect(latestProgress).toBe(latestControls?.progress);
+  });
+
+  it("accepts transition options and passes them to the core machine", () => {
+    let context: NonNullable<React.ContextType<typeof FlowContext>> | undefined;
+
+    renderFlow(<MachineProbe onRender={(value) => (context = value)} />, undefined, {
+      transition: {
+        duration: 200,
+        byPhase: {
+          intro: { easing: (progress) => progress * progress }
+        }
+      }
+    });
+
+    act(() => {
+      context?.machine.next();
+      context?.syncSnapshot();
+    });
+
+    act(() => {
+      context?.machine.update(100);
+      context?.syncSnapshot();
+    });
+
+    expect(context?.machine.progress).toBe(0.25);
+  });
+
+  it("keeps legacy timing props working through the provider", () => {
+    let context: NonNullable<React.ContextType<typeof FlowContext>> | undefined;
+
+    renderFlow(<MachineProbe onRender={(value) => (context = value)} />, undefined, {
+      transitionDurationMs: 200,
+      easing: (progress) => progress * progress
+    });
+
+    act(() => {
+      context?.machine.next();
+      context?.machine.update(100);
+      context?.syncSnapshot();
+    });
+
+    expect(context?.machine.progress).toBe(0.25);
+  });
+
+  it("lets transition props take precedence over legacy timing props through the provider", () => {
+    let context: NonNullable<React.ContextType<typeof FlowContext>> | undefined;
+
+    renderFlow(<MachineProbe onRender={(value) => (context = value)} />, undefined, {
+      transitionDurationMs: 1000,
+      easing: () => 0,
+      transition: {
+        duration: 200,
+        easing: (progress) => progress
+      }
+    });
+
+    act(() => {
+      context?.machine.next();
+      context?.machine.update(100);
+      context?.syncSnapshot();
+    });
+
+    expect(context?.machine.progress).toBe(0.5);
   });
 
   it("throws a clear error when useFlow is rendered outside FlowProvider", () => {

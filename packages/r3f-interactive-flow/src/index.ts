@@ -11,3 +11,4 @@ export { useKeyboardInput } from "./input/useKeyboardInput";
 export type { FlowInputTarget, UseWheelInputOptions } from "./input/useWheelInput";
 export type { UseTouchInputOptions } from "./input/useTouchInput";
 export type { UseKeyboardInputOptions } from "./input/useKeyboardInput";
+export type { FlowTransitionBaseOptions, FlowTransitionOptions } from "./core/types";
