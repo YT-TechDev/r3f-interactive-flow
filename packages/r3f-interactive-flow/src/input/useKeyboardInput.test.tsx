@@ -295,6 +295,21 @@ describe("useKeyboardInput", () => {
     expect(latestControls?.isTransitioning).toBe(true);
   });
 
+  it("moves the keydown listener when the target changes", () => {
+    const firstTarget = document.createElement("div") as unknown as MinimalElement;
+    const secondTarget = document.createElement("div") as unknown as MinimalElement;
+
+    renderFlow(<KeyboardInputProbe options={{ target: firstTarget as unknown as HTMLElement }} />);
+
+    expect(firstTarget.listenerCount("keydown")).toBe(1);
+    expect(secondTarget.listenerCount("keydown")).toBe(0);
+
+    renderFlow(<KeyboardInputProbe options={{ target: secondTarget as unknown as HTMLElement }} />);
+
+    expect(firstTarget.listenerCount("keydown")).toBe(0);
+    expect(secondTarget.listenerCount("keydown")).toBe(1);
+  });
+
   it("cleans up the keydown event listener on unmount", () => {
     const removeEventListenerSpy = vi.spyOn(globalThis, "removeEventListener");
 
@@ -320,6 +335,181 @@ describe("useKeyboardInput", () => {
 
     Object.assign(globalThis, { window: originalWindow });
   });
+
+  it("can attach directly to a target element", () => {
+    const target = document.createElement("div");
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ target }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(windowTarget.listenerCount("keydown")).toBe(0);
+    const minimalTarget = target as unknown as MinimalElement;
+
+    expect(minimalTarget.listenerCount("keydown")).toBe(1);
+
+    dispatchKeyDown("ArrowDown", {}, minimalTarget);
+
+    expect(latestControls?.phase).toBe("work");
+  });
+
+  it("can attach explicitly to window", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ target: window }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(windowTarget.listenerCount("keydown")).toBe(1);
+
+    dispatchKeyDown("ArrowDown");
+
+    expect(latestControls?.phase).toBe("work");
+  });
+
+  it("uses grouped keys.next and keys.prev mappings", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ keys: { next: ["n"], prev: ["p"] } }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>,
+      "work"
+    );
+
+    dispatchKeyDown("ArrowDown");
+    expect(latestControls?.phase).toBe("work");
+
+    dispatchKeyDown("n");
+    expect(latestControls?.phase).toBe("contact");
+    expect(latestControls?.direction).toBe("next");
+  });
+
+  it("uses grouped keys.prev mappings", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ keys: { next: ["n"], prev: ["p"] } }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>,
+      "work"
+    );
+
+    dispatchKeyDown("ArrowUp");
+    expect(latestControls?.phase).toBe("work");
+
+    dispatchKeyDown("p");
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("prev");
+  });
+
+  it("prefers grouped keys over legacy key aliases", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe
+          options={{ keys: { next: ["n"], prev: ["p"] }, nextKeys: ["x"], prevKeys: ["y"] }}
+        />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>,
+      "work"
+    );
+
+    dispatchKeyDown("x");
+    dispatchKeyDown("y");
+    expect(latestControls?.phase).toBe("work");
+
+    dispatchKeyDown("n");
+    expect(latestControls?.phase).toBe("contact");
+  });
+
+  it("prefers next when a key is mapped to both directions", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ keys: { next: ["k"], prev: ["k"] } }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>,
+      "work"
+    );
+
+    dispatchKeyDown("k");
+
+    expect(latestControls?.phase).toBe("contact");
+    expect(latestControls?.direction).toBe("next");
+  });
+
+  it("allows mapped keys from typing targets when ignoreWhenTyping is false", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    const input = document.createElement("input");
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ ignoreWhenTyping: false }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    const event = dispatchKeyDown("ArrowDown", { target: input });
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(latestControls?.phase).toBe("work");
+  });
+
+  it("defaults ignoreWhenTyping to true", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    const input = document.createElement("input");
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    const event = dispatchKeyDown("ArrowDown", { target: input });
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("intro");
+  });
+
+  it("blocks rapid repeated keyboard navigation with hook-local cooldown", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    vi.spyOn(Date, "now").mockReturnValueOnce(1_000).mockReturnValueOnce(1_050);
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ cooldown: 100 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchKeyDown("ArrowDown");
+    dispatchKeyDown("ArrowRight");
+
+    expect(latestControls?.phase).toBe("work");
+  });
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, -1])(
+    "throws a clear error for invalid cooldown %s",
+    (cooldown) => {
+      expect(() => renderFlow(<KeyboardInputProbe options={{ cooldown }} />)).toThrow(
+        "useKeyboardInput cooldown must be a finite, non-negative number."
+      );
+    }
+  );
 
   it("can attach to a provided target element", () => {
     const target = document.createElement("div");
