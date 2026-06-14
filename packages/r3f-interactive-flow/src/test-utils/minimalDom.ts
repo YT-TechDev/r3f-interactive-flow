@@ -163,6 +163,34 @@ export class MinimalElement extends MinimalNode {
       this.isContentEditable = false;
     }
   }
+
+  closest(selector: string): MinimalElement | null {
+    function findClosest(current: MinimalNode | null): MinimalElement | null {
+      if (current === null) {
+        return null;
+      }
+
+      if (current instanceof MinimalElement && current.matches(selector)) {
+        return current;
+      }
+
+      return findClosest(current.parentNode);
+    }
+
+    return findClosest(this);
+  }
+
+  matches(selector: string): boolean {
+    if (selector.startsWith(".")) {
+      return (this.attributes.class ?? "").split(/\s+/u).includes(selector.slice(1));
+    }
+
+    if (selector.startsWith("#")) {
+      return this.attributes.id === selector.slice(1);
+    }
+
+    return this.tagName.toLowerCase() === selector.toLowerCase();
+  }
 }
 
 export class MinimalDocument extends MinimalNode {
