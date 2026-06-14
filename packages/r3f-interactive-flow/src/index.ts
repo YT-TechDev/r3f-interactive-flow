@@ -4,6 +4,7 @@ export { FlowProvider } from "./react/FlowProvider";
 export { useFlow } from "./react/useFlow";
 export { useFlowProgress } from "./react/useFlowProgress";
 export { useFlowFrame } from "./r3f/useFlowFrame";
+export type { FlowFrameCallback, FlowFrameState } from "./r3f/useFlowFrame";
 export { useWheelInput } from "./input/useWheelInput";
 export { useTouchInput } from "./input/useTouchInput";
 export { useKeyboardInput } from "./input/useKeyboardInput";

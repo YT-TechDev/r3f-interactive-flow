@@ -151,6 +151,28 @@ Keep `phases` and configuration props passed to `FlowProvider` stable between re
 
 Use `useFlowFrame` inside a Canvas-bound component to receive frame-driven transition progress.
 
+### v0.3.0 `useFlowFrame` migration
+
+`useFlowFrame` now passes a typed frame state object as the first callback argument.
+
+Before:
+
+```tsx
+useFlowFrame((progress, delta) => {
+  // ...
+});
+```
+
+After:
+
+```tsx
+useFlowFrame(({ progress }, delta) => {
+  // ...
+});
+```
+
+The frame state also includes `phase`, `phaseIndex`, `direction`, and `isTransitioning`.
+
 `useFlowFrame` uses React Three Fiber's `useFrame` internally, so it must be called inside a component rendered within `<Canvas>`. Do not call R3F hooks outside Canvas-bound components.
 
 DOM-facing `flow.progress` is useful for stateful UI, but it is not intended as a frame-perfect animated value. Use `useFlowFrame` for frame-driven scene updates.
@@ -166,7 +188,7 @@ const phases = ["intro", "work", "contact"] as const;
 function FlowBox() {
   const meshRef = useRef<THREE.Mesh | null>(null);
 
-  useFlowFrame((progress, delta) => {
+  useFlowFrame(({ progress }, delta) => {
     if (!meshRef.current) {
       return;
     }

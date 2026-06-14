@@ -7,6 +7,7 @@ import type { FlowControls } from "../core/types";
 import { FlowProvider } from "../react/FlowProvider";
 import { useFlow } from "../react/useFlow";
 import { useFlowFrame } from "./useFlowFrame";
+import type { FlowFrameCallback } from "./useFlowFrame";
 
 const useFrameMock = vi.hoisted(() => vi.fn());
 
@@ -226,7 +227,7 @@ function ControlsProbe({ onRender }: { onRender: (controls: FlowControls<TestPha
   );
 }
 
-function FrameProbe({ onFrame }: { onFrame: (progress: number, delta: number) => void }) {
+function FrameProbe({ onFrame }: { onFrame: FlowFrameCallback<TestPhase> }) {
   useFlowFrame(onFrame);
 
   return null;
@@ -286,7 +287,16 @@ describe("useFlowFrame", () => {
     });
 
     expect(onFrame).toHaveBeenCalledTimes(1);
-    expect(onFrame).toHaveBeenLastCalledWith(0.25, 0.25);
+    expect(onFrame).toHaveBeenLastCalledWith(
+      {
+        phase: "work",
+        phaseIndex: 1,
+        progress: 0.25,
+        direction: "next",
+        isTransitioning: true
+      },
+      0.25
+    );
     expect(container.textContent).toContain('"progress":0');
     expect(container.textContent).toContain('"isTransitioning":true');
   });
@@ -307,7 +317,16 @@ describe("useFlowFrame", () => {
 
     expect(initialCallback).not.toHaveBeenCalled();
     expect(latestCallback).toHaveBeenCalledTimes(1);
-    expect(latestCallback).toHaveBeenLastCalledWith(0, 0.1);
+    expect(latestCallback).toHaveBeenLastCalledWith(
+      {
+        phase: "intro",
+        phaseIndex: 0,
+        progress: 0,
+        direction: "none",
+        isTransitioning: false
+      },
+      0.1
+    );
   });
 
   it("syncs the React snapshot when an active transition completes", () => {
@@ -333,7 +352,16 @@ describe("useFlowFrame", () => {
       getRegisteredFrame()(undefined, 0.5);
     });
 
-    expect(onFrame).toHaveBeenLastCalledWith(0.5, 0.5);
+    expect(onFrame).toHaveBeenLastCalledWith(
+      {
+        phase: "work",
+        phaseIndex: 1,
+        progress: 0.5,
+        direction: "next",
+        isTransitioning: true
+      },
+      0.5
+    );
     expect(container.textContent).toContain('"progress":0');
     expect(container.textContent).toContain('"isTransitioning":true');
 
@@ -341,7 +369,16 @@ describe("useFlowFrame", () => {
       getRegisteredFrame()(undefined, 0.5);
     });
 
-    expect(onFrame).toHaveBeenLastCalledWith(1, 0.5);
+    expect(onFrame).toHaveBeenLastCalledWith(
+      {
+        phase: "work",
+        phaseIndex: 1,
+        progress: 1,
+        direction: "none",
+        isTransitioning: false
+      },
+      0.5
+    );
     expect(latestControls).toMatchObject({
       phase: "work",
       phaseIndex: 1,

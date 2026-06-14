@@ -2,9 +2,23 @@
 
 import { useFrame } from "@react-three/fiber";
 import { useContext, useEffect, useRef } from "react";
+import type { FlowDirection } from "../core/types";
 import { FlowContext } from "../react/FlowContext";
 
-export function useFlowFrame(callback: (progress: number, delta: number) => void): void {
+export type FlowFrameState<TPhase extends string> = {
+  phase: TPhase;
+  phaseIndex: number;
+  progress: number;
+  direction: FlowDirection;
+  isTransitioning: boolean;
+};
+
+export type FlowFrameCallback<TPhase extends string> = (
+  state: FlowFrameState<TPhase>,
+  delta: number
+) => void;
+
+export function useFlowFrame<TPhase extends string>(callback: FlowFrameCallback<TPhase>): void {
   const context = useContext(FlowContext);
   const callbackRef = useRef(callback);
 
@@ -25,7 +39,16 @@ export function useFlowFrame(callback: (progress: number, delta: number) => void
 
     const after = machine.getSnapshot();
 
-    callbackRef.current(after.progress, delta);
+    callbackRef.current(
+      {
+        phase: after.phase as TPhase,
+        phaseIndex: after.phaseIndex,
+        progress: after.progress,
+        direction: after.direction,
+        isTransitioning: after.isTransitioning
+      },
+      delta
+    );
 
     if (before.isTransitioning && !after.isTransitioning) {
       syncSnapshot();

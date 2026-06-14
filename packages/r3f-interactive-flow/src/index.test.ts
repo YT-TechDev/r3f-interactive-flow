@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import * as publicApi from ".";
-import type { UseKeyboardInputOptions, UseTouchInputOptions, UseWheelInputOptions } from ".";
+import type {
+  FlowFrameCallback,
+  FlowFrameState,
+  UseKeyboardInputOptions,
+  UseTouchInputOptions,
+  UseWheelInputOptions
+} from ".";
 
 const expectedRuntimeExports = [
   "FlowProvider",
@@ -16,6 +22,22 @@ const expectedRuntimeExports = [
 describe("public API", () => {
   it("exposes the expected runtime exports", () => {
     expect(Object.keys(publicApi).sort()).toEqual(expectedRuntimeExports);
+  });
+
+  it("exposes flow frame types", () => {
+    const state: FlowFrameState<"intro"> = {
+      phase: "intro",
+      phaseIndex: 0,
+      progress: 0,
+      direction: "none",
+      isTransitioning: false
+    };
+    const callback: FlowFrameCallback<"intro"> = (frameState, delta) => {
+      expect(frameState).toBe(state);
+      expect(delta).toBe(0.1);
+    };
+
+    callback(state, 0.1);
   });
 
   it("exposes input hook option types", () => {
