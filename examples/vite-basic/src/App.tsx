@@ -12,12 +12,28 @@ import {
 
 const phases = ["intro", "work", "contact"] as const;
 
+const ignore = [
+  "input",
+  "textarea",
+  "select",
+  "button",
+  "a",
+  "[contenteditable]",
+  "[data-flow-ignore]"
+] as const;
+
 type Phase = (typeof phases)[number];
 
 function FlowInputs() {
-  useWheelInput<Phase>();
-  useTouchInput<Phase>();
-  useKeyboardInput<Phase>();
+  useWheelInput<Phase>({ threshold: 40, cooldown: 500, ignore });
+  useTouchInput<Phase>({ threshold: 50, cooldown: 500, ignore });
+  useKeyboardInput<Phase>({
+    keys: {
+      next: ["ArrowDown", "ArrowRight", "PageDown", " "],
+      prev: ["ArrowUp", "ArrowLeft", "PageUp"]
+    },
+    cooldown: 500
+  });
 
   return null;
 }
@@ -111,7 +127,7 @@ function FlowCanvas() {
 
 export function App() {
   return (
-    <FlowProvider phases={phases}>
+    <FlowProvider phases={phases} transition={{ cooldown: 500 }}>
       <FlowInputs />
       <main className="app-shell">
         <FlowControlsPanel />
