@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { RefObject } from "react";
 import type { FlowControls } from "../core/types";
 import { useFlow } from "../react/useFlow";
+import { resolveInputTarget, shouldIgnoreInputEvent } from "./inputUtils";
+import type { FlowInputTarget } from "./inputUtils";
 
 const DEFAULT_THRESHOLD = 40;
 const DEFAULT_AXIS = "y";
 const DEFAULT_COOLDOWN = 0;
 
-export type FlowInputTarget = RefObject<HTMLElement | null> | HTMLElement | Window;
+export type { FlowInputTarget } from "./inputUtils";
 
 export type UseWheelInputOptions = {
   target?: FlowInputTarget;
@@ -21,22 +22,6 @@ export type UseWheelInputOptions = {
   ignore?: readonly string[];
 };
 
-function isRefObjectTarget(target: FlowInputTarget): target is RefObject<HTMLElement | null> {
-  return typeof target === "object" && target !== null && "current" in target;
-}
-
-function resolveInputTarget(target: FlowInputTarget | undefined): HTMLElement | Window {
-  if (target === undefined) {
-    return window;
-  }
-
-  if (isRefObjectTarget(target)) {
-    return target.current ?? window;
-  }
-
-  return target;
-}
-
 function getWheelDelta(event: WheelEvent, axis: "x" | "y"): number {
   return axis === "x" ? event.deltaX : event.deltaY;
 }
@@ -45,16 +30,6 @@ function validateCooldown(cooldown: number): void {
   if (!Number.isFinite(cooldown) || cooldown < 0) {
     throw new Error("useWheelInput cooldown must be a finite non-negative number.");
   }
-}
-
-function shouldIgnoreWheelEvent(event: WheelEvent, ignore: readonly string[]): boolean {
-  const target = event.target;
-
-  if (ignore.length === 0 || typeof Element === "undefined" || !(target instanceof Element)) {
-    return false;
-  }
-
-  return ignore.some((selector) => target.closest(selector) !== null);
 }
 
 export function useWheelInput<TPhase extends string>(options: UseWheelInputOptions = {}): void {
@@ -87,7 +62,7 @@ export function useWheelInput<TPhase extends string>(options: UseWheelInputOptio
     const handleWheel: EventListener = (event): void => {
       const wheelEvent = event as WheelEvent;
 
-      if (shouldIgnoreWheelEvent(wheelEvent, ignore)) {
+      if (shouldIgnoreInputEvent(wheelEvent, ignore)) {
         return;
       }
 
