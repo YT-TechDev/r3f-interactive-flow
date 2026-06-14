@@ -10,6 +10,7 @@ import { useTouchInput } from "./useTouchInput";
 import type { UseTouchInputOptions } from "./useTouchInput";
 
 type MinimalTouch = {
+  clientX: number;
   clientY: number;
 };
 
@@ -66,8 +67,17 @@ function dispatchTouch(
 }
 
 function swipe(startY: number, endY: number, target: MinimalEventTarget = windowTarget): void {
-  dispatchTouch("touchstart", { touches: [{ clientY: startY }] }, target);
-  dispatchTouch("touchend", { changedTouches: [{ clientY: endY }] }, target);
+  dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: startY }] }, target);
+  dispatchTouch("touchend", { changedTouches: [{ clientX: 0, clientY: endY }] }, target);
+}
+
+function horizontalSwipe(
+  startX: number,
+  endX: number,
+  target: MinimalEventTarget = windowTarget
+): void {
+  dispatchTouch("touchstart", { touches: [{ clientX: startX, clientY: 0 }] }, target);
+  dispatchTouch("touchend", { changedTouches: [{ clientX: endX, clientY: 0 }] }, target);
 }
 
 describe("useTouchInput", () => {
@@ -140,6 +150,47 @@ describe("useTouchInput", () => {
     }
 
     swipe(100, 49, minimalTarget);
+
+    expect(latestControls?.phase).toBe("work");
+  });
+
+  it("can attach directly to a provided HTMLElement target", () => {
+    const target = document.createElement("div");
+    const minimalTarget = target as unknown as MinimalElement;
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ target }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    for (const type of touchEventTypes) {
+      expect(windowTarget.listenerCount(type)).toBe(0);
+      expect(minimalTarget.listenerCount(type)).toBe(1);
+    }
+
+    swipe(100, 49, minimalTarget);
+
+    expect(latestControls?.phase).toBe("work");
+  });
+
+  it("can attach explicitly to window", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ target: window }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    for (const type of touchEventTypes) {
+      expect(windowTarget.listenerCount(type)).toBe(1);
+    }
+
+    swipe(100, 49);
 
     expect(latestControls?.phase).toBe("work");
   });
@@ -261,9 +312,9 @@ describe("useTouchInput", () => {
       </>
     );
 
-    dispatchTouch("touchstart", { touches: [{ clientY: 100 }] });
+    dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] });
     dispatchTouch("touchcancel");
-    dispatchTouch("touchend", { changedTouches: [{ clientY: 0 }] });
+    dispatchTouch("touchend", { changedTouches: [{ clientX: 0, clientY: 0 }] });
 
     expect(latestControls?.phase).toBe("intro");
     expect(latestControls?.direction).toBe("none");
@@ -281,7 +332,7 @@ describe("useTouchInput", () => {
 
     expect(() => {
       dispatchTouch("touchstart", { touches: [] });
-      dispatchTouch("touchend", { changedTouches: [{ clientY: 0 }] });
+      dispatchTouch("touchend", { changedTouches: [{ clientX: 0, clientY: 0 }] });
     }).not.toThrow();
     expect(latestControls?.phase).toBe("intro");
     expect(latestControls?.direction).toBe("none");
@@ -298,7 +349,7 @@ describe("useTouchInput", () => {
     );
 
     expect(() => {
-      dispatchTouch("touchstart", { touches: [{ clientY: 100 }] });
+      dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] });
       dispatchTouch("touchend", { changedTouches: [] });
     }).not.toThrow();
     expect(latestControls?.phase).toBe("intro");
@@ -350,5 +401,164 @@ describe("useTouchInput", () => {
     await expect(import("./useTouchInput")).resolves.toHaveProperty("useTouchInput");
 
     Object.assign(globalThis, { window: originalWindow });
+  });
+
+  it("axis y swipe up calls next", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ axis: "y", threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    swipe(100, 59);
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
+  it("axis y swipe down calls prev", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ axis: "y", threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>,
+      "work"
+    );
+
+    swipe(100, 141);
+
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("prev");
+  });
+
+  it("axis x swipe left calls next", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ axis: "x", threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    horizontalSwipe(100, 59);
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
+  it("axis x swipe right calls prev", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ axis: "x", threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>,
+      "work"
+    );
+
+    horizontalSwipe(100, 141);
+
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("prev");
+  });
+
+  it("ignores user-provided selector matches without preventing default or navigating", () => {
+    const ignored = document.createElement("div");
+    const minimalIgnored = ignored as unknown as MinimalElement;
+    ignored.setAttribute("class", "ignore-touch");
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ ignore: [".ignore-touch"] }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] }, minimalIgnored);
+    const moveEvent = dispatchTouch(
+      "touchmove",
+      { touches: [{ clientX: 0, clientY: 90 }] },
+      minimalIgnored
+    );
+    dispatchTouch("touchend", { changedTouches: [{ clientX: 0, clientY: 0 }] }, minimalIgnored);
+
+    expect(moveEvent.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("intro");
+  });
+
+  it("keeps preventDefault enabled by default for non-ignored touchmove", () => {
+    renderFlow(<TouchInputProbe options={{ ignore: [".ignore-touch"] }} />);
+
+    const event = dispatchTouch("touchmove");
+
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it("blocks rapid repeated navigation with hook-local cooldown", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ cooldown: 500 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    swipe(100, 151);
+
+    vi.setSystemTime(250);
+    swipe(100, 49);
+
+    expect(latestControls?.phase).toBe("intro");
+
+    vi.setSystemTime(500);
+    swipe(100, 49);
+
+    expect(latestControls?.phase).toBe("work");
+    vi.useRealTimers();
+  });
+
+  it("removes listeners from the old target when the target changes", () => {
+    const firstTarget = document.createElement("div") as unknown as MinimalElement;
+    const secondTarget = document.createElement("div") as unknown as MinimalElement;
+
+    function RetargetingProbe({ target }: { target: HTMLElement }) {
+      useTouchInput<TestPhase>({ target });
+
+      return null;
+    }
+
+    renderFlow(<RetargetingProbe target={firstTarget as unknown as HTMLElement} />);
+
+    for (const type of touchEventTypes) {
+      expect(firstTarget.listenerCount(type)).toBe(1);
+    }
+
+    renderFlow(<RetargetingProbe target={secondTarget as unknown as HTMLElement} />);
+
+    for (const type of touchEventTypes) {
+      expect(firstTarget.listenerCount(type)).toBe(0);
+      expect(secondTarget.listenerCount(type)).toBe(1);
+    }
+  });
+
+  it("throws a clear error for invalid cooldown values", () => {
+    expect(() => renderFlow(<TouchInputProbe options={{ cooldown: -1 }} />)).toThrow(
+      "useTouchInput cooldown must be a finite non-negative number."
+    );
+
+    expect(() =>
+      renderFlow(<TouchInputProbe options={{ cooldown: Number.POSITIVE_INFINITY }} />)
+    ).toThrow("useTouchInput cooldown must be a finite non-negative number.");
   });
 });
