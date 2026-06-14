@@ -146,7 +146,7 @@ function FlowControlsPanel() {
 
 export function App() {
   return (
-    <FlowProvider phases={phases} cooldownMs={600}>
+    <FlowProvider phases={phases} transition={{ cooldown: 600 }}>
       <FlowInputLayer />
       <FlowControlsPanel />
     </FlowProvider>
@@ -155,6 +155,39 @@ export function App() {
 ```
 
 `FlowProvider` should receive stable `phases` and configuration props. Define phase tuples outside components or memoize derived configuration.
+
+## FlowProvider transition options
+
+`transition` is the preferred timing API for `FlowProvider`. It supports global defaults and source-phase overrides:
+
+```tsx
+<FlowProvider
+  phases={["intro", "skills", "projects", "contact"] as const}
+  transition={{
+    duration: 1000,
+    cooldown: 500,
+    byPhase: {
+      intro: {
+        duration: 1600,
+        cooldown: 800
+      },
+      skills: {
+        duration: 800
+      }
+    }
+  }}
+>
+  <App />
+</FlowProvider>
+```
+
+- `transition.duration` sets transition duration in milliseconds.
+- `transition.cooldown` sets accepted-navigation cooldown in milliseconds.
+- `transition.easing` sets the easing function.
+- `transition.byPhase` overrides any of those fields for transitions that start from a specific source phase. For example, `byPhase.intro` is used when leaving `intro`, regardless of the target phase.
+- Fallback is per field: a phase override with only `duration` still uses global, legacy, or default cooldown/easing.
+- `transition` wins over legacy `transitionDurationMs`, `cooldownMs`, and `easing` when both are provided. The legacy props still work for compatibility.
+- `lockDuringTransition` is intentionally not part of this API yet; transitions still ignore new navigation while active.
 
 ## Flow controls
 

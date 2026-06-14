@@ -143,7 +143,36 @@ Input hooks and flow hooks must be used inside `FlowProvider`.
 
 ## FlowProvider options
 
-`FlowProvider` accepts an optional `cooldownMs` prop for input pacing. When set, accepted `next`, `prev`, and valid `goTo` calls are gated for that many milliseconds to prevent rapid repeated navigation. Omitting `cooldownMs` preserves the default behavior, while `cooldownMs={0}` disables cooldown behavior.
+`transition` is the preferred timing API for `FlowProvider`. It supports global defaults and source-phase overrides:
+
+```tsx
+<FlowProvider
+  phases={["intro", "skills", "projects", "contact"] as const}
+  transition={{
+    duration: 1000,
+    cooldown: 500,
+    byPhase: {
+      intro: {
+        duration: 1600,
+        cooldown: 800
+      },
+      skills: {
+        duration: 800
+      }
+    }
+  }}
+>
+  <App />
+</FlowProvider>
+```
+
+- `transition.duration` sets transition duration in milliseconds.
+- `transition.cooldown` sets accepted-navigation cooldown in milliseconds.
+- `transition.easing` sets the easing function.
+- `transition.byPhase` overrides any of those fields for transitions that start from a specific source phase. For example, `byPhase.intro` is used when leaving `intro`, regardless of the target phase.
+- Fallback is per field: a phase override with only `duration` still uses global, legacy, or default cooldown/easing.
+- `transition` wins over legacy `transitionDurationMs`, `cooldownMs`, and `easing` when both are provided. The legacy props still work for compatibility.
+- `lockDuringTransition` is intentionally not part of this API yet; transitions still ignore new navigation while active.
 
 Keep `phases` and configuration props passed to `FlowProvider` stable between renders, for example by defining phase tuples outside components or memoizing derived configuration.
 
