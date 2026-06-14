@@ -1,5 +1,47 @@
 # r3f-interactive-flow
 
+## 0.3.0
+
+v0.3.0 expands the phase/input/frame foundation while keeping the library focused on predictable control flow for interactive React Three Fiber websites.
+
+### Added
+
+- Added scoped wheel input options, including direct element/window targets, axis selection, ignore selectors, and hook-local cooldown.
+- Added improved touch input options, including direct element/window targets, axis selection, ignore selectors, and hook-local cooldown.
+- Added improved keyboard input guards with grouped `keys.next` / `keys.prev`, configurable typing guards, direct target support, and hook-local cooldown.
+- Added `FlowFrameState` and `FlowFrameCallback`.
+- Added a typed `useFlowFrame((state, delta) => ...)` callback payload.
+- Added `transition` and `transition.byPhase` options for global and source-phase transition timing.
+- Added public transition option types.
+
+### Changed
+
+- Changed `useFlowFrame` callback from `(progress, delta)` to `(state, delta)`.
+- Made `transition` the preferred timing API while preserving legacy `transitionDurationMs`, `cooldownMs`, and `easing` props.
+- Updated the Vite basic example to demonstrate the current DOM UI to Canvas usage pattern.
+
+### Documentation
+
+- Added v0.3.0 planning, readiness, and migration documentation.
+- Reworked README guidance for DOM React UI controls, Canvas-bound frame updates, input hooks, transition options, and Next.js/browser safety.
+- Documented `useFlowFrame` migration from `(progress, delta)` to `({ progress }, delta)`.
+
+### Compatibility
+
+- `nextKeys` and `prevKeys` remain as deprecated compatibility aliases for keyboard input.
+- `transitionDurationMs`, `cooldownMs`, and `easing` remain supported for compatibility.
+- `createFlowMachine` remains internal and is not exported from the package root.
+
+### Scope
+
+- No visual effect APIs were added.
+- No camera preset APIs were added.
+- No shader effect APIs were added.
+- No animation timeline APIs were added.
+- No router integration was added.
+- No GSAP or Framer Motion integration was added.
+- No runtime dependencies were added.
+
 ## 0.2.0
 
 v0.2.0 is a stabilization release for the existing phase-based flow-control foundation. It focuses on documenting and validating current behavior rather than expanding the public API.
