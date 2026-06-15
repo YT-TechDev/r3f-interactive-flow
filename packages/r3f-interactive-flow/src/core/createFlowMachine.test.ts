@@ -417,6 +417,47 @@ describe("createFlowMachine", () => {
     });
   });
 
+  it("does not restart or extend an active transition when navigation is ignored", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 1000,
+      cooldownMs: 1500
+    });
+
+    machine.next();
+    machine.update(750);
+
+    const activeTransitionSnapshot = machine.getSnapshot();
+
+    machine.prev();
+    machine.goTo("contact");
+    machine.next();
+
+    expect(machine.getSnapshot()).toEqual(activeTransitionSnapshot);
+
+    machine.update(250);
+
+    expect(machine.getSnapshot()).toEqual({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 1,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+
+    machine.update(500);
+    machine.next();
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "contact",
+      phaseIndex: 2,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true
+    });
+  });
+
   it("keeps default navigation behavior unchanged when cooldownMs is omitted", () => {
     const machine = createFlowMachine({
       phases: ["intro", "work", "contact"] as const,
@@ -536,6 +577,28 @@ describe("createFlowMachine", () => {
       phase: "contact",
       phaseIndex: 2,
       progress: 0,
+      direction: "next",
+      isTransitioning: true
+    });
+  });
+
+  it("preserves the full snapshot when same-phase goTo is rejected", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      initialPhase: "work",
+      cooldownMs: 1000
+    });
+    const snapshot = machine.getSnapshot();
+
+    machine.goTo("work");
+
+    expect(machine.getSnapshot()).toEqual(snapshot);
+
+    machine.next();
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "contact",
+      phaseIndex: 2,
       direction: "next",
       isTransitioning: true
     });
@@ -677,6 +740,33 @@ describe("createFlowMachine", () => {
       phase: "contact",
       phaseIndex: 2,
       progress: 0,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false
+    });
+  });
+
+  it("preserves the full snapshot when valid navigation is rejected while locked", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      cooldownMs: 1000
+    });
+
+    machine.lock();
+
+    const lockedSnapshot = machine.getSnapshot();
+
+    machine.next();
+    machine.goTo("contact");
+
+    expect(machine.getSnapshot()).toEqual(lockedSnapshot);
+
+    machine.unlock();
+    machine.next();
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "work",
+      phaseIndex: 1,
       direction: "next",
       isTransitioning: true,
       isLocked: false
