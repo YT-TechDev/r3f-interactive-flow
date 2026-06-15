@@ -182,6 +182,16 @@ export function App() {
 - `transition` wins over legacy `transitionDurationMs`, `cooldownMs`, and `easing` when both are provided. The legacy props still work for compatibility.
 - `lockDuringTransition` is intentionally not part of this API yet; transitions still ignore new navigation while active.
 
+## Tested navigation guards and cooldown behavior
+
+The v0.4.0 hardening work keeps navigation behavior narrow and predictable:
+
+- `next()`, `prev()`, and `goTo(phase)` start transitions only when the request is valid.
+- Navigation requested while a transition is already active is ignored. Ignored navigation does not restart, reset, or extend the active transition or its cooldown.
+- `lock()` blocks otherwise valid navigation requests. `unlock()` allows navigation again. Locking does not cancel a transition that has already started.
+- Core transition cooldown starts from accepted navigation only. Boundary no-ops, same-phase `goTo`, locked navigation, and active-transition navigation do not start, reset, or extend that cooldown.
+- Input hook cooldown and core transition cooldown are separate concepts. Hook cooldown throttles repeated browser input before it reaches the flow controls; core cooldown guards accepted phase navigation in the flow machine.
+
 ## Flow controls
 
 `useFlow` returns the current flow snapshot and control functions.
@@ -340,7 +350,9 @@ The input hooks connect browser input to `next` and `prev`.
   - `ArrowUp`, `ArrowLeft`, `PageUp` -> `prev`
   - options: `target`, `enabled`, `preventDefault`, `nextKeys`, `prevKeys`
 
-Input hooks only attach browser event listeners inside React effects and are guarded for non-browser environments.
+Input hooks only attach browser event listeners inside React effects and are guarded for non-browser environments. They do not access browser APIs at module import time.
+
+`enabled: false` disables listener behavior. `target` accepts a direct `Window` or element target, or a React ref object pointing to an element. If `target` is omitted, or a ref is currently empty, the hooks fall back to `window`. When a target changes, the hooks clean up listeners from the old target before attaching to the new one.
 
 ## Next.js compatibility
 
