@@ -4,6 +4,7 @@ import * as publicApi from ".";
 import type {
   FlowFrameCallback,
   FlowFrameState,
+  FlowInputTarget,
   FlowTransitionBaseOptions,
   FlowTransitionOptions,
   UseKeyboardInputOptions,
@@ -56,26 +57,45 @@ describe("public API", () => {
     callback(state, 0.1);
   });
 
+  it("exposes the public input target type", () => {
+    const element = {} as HTMLElement;
+    const elementTarget: FlowInputTarget = element;
+    const windowTarget: FlowInputTarget = {} as Window;
+    const refTarget: FlowInputTarget = { current: element };
+    const nullableRefTarget: FlowInputTarget = { current: null };
+
+    expect(elementTarget).toBe(element);
+    expect(windowTarget).toBeTypeOf("object");
+    expect(refTarget.current).toBe(element);
+    expect(nullableRefTarget.current).toBeNull();
+  });
+
   it("exposes input hook option types", () => {
+    const inputTarget: FlowInputTarget = { current: {} as HTMLElement };
+
     const wheelOptions: UseWheelInputOptions = {
+      target: inputTarget,
       threshold: 40,
       enabled: true,
       preventDefault: true
     };
 
     const touchOptions: UseTouchInputOptions = {
+      target: inputTarget,
       threshold: 50,
       enabled: true,
       preventDefault: true
     };
 
     const keyboardOptions: UseKeyboardInputOptions = {
+      target: inputTarget,
       nextKeys: ["ArrowDown"],
       prevKeys: ["ArrowUp"],
       enabled: true,
       preventDefault: true
     };
 
+    expect(wheelOptions.target).toBe(inputTarget);
     expect(wheelOptions.threshold).toBe(40);
     expect(touchOptions.threshold).toBe(50);
     expect(keyboardOptions.nextKeys).toEqual(["ArrowDown"]);
