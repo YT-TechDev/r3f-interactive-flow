@@ -1,5 +1,33 @@
 # r3f-interactive-flow
 
+## 0.4.0
+
+v0.4.0 is an input, transition, and test hardening release for the existing phase flow foundation. It focuses on regression coverage, documented guard behavior, and release-readiness documentation without adding visual-effect APIs, release automation, or runtime dependencies.
+
+### Improved
+
+- Added core cooldown guard regression coverage for accepted navigation and ignored requests.
+- Clarified and covered accepted and rejected navigation guard behavior, including transition, lock, cooldown, boundary, same-phase, and invalid-target cases.
+- Added wheel input lifecycle tests for listener attachment, cleanup, disabled state, retargeting, ignore selectors, and cooldown behavior.
+- Added touch input lifecycle tests for listener attachment, cleanup, disabled state, retargeting, threshold handling, axis handling, and cooldown behavior.
+- Added keyboard input lifecycle tests for listener attachment, cleanup, disabled state, retargeting, repeat handling, typing guards, and cooldown behavior.
+- Added public type export coverage to keep exported types intentional.
+- Synchronized README behavior guidance with the tested navigation guards, cooldown, locking, and input hook lifecycle behavior.
+- Added v0.4.0 release-readiness checklist documentation for maintainers.
+
+### Documentation
+
+- Added a v0.4.0 release notes draft in `docs/releases/v0.4.0.md`.
+- Kept the v0.4.0 scope focused on stabilization, verification, and package metadata preparation.
+
+### Scope
+
+- No publishing, tag creation, or GitHub Release creation is included in this release-prep change.
+- No release automation changes were made.
+- No runtime dependencies were added.
+- No public runtime API expansion was introduced.
+- No visual effects, particle, camera preset, shader, timeline, router, GSAP, or Framer Motion integration features were added.
+
 ## 0.3.0
 
 v0.3.0 expands the phase/input/frame foundation while keeping the library focused on predictable control flow for interactive React Three Fiber websites.
