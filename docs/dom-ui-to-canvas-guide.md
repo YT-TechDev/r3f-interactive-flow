@@ -28,17 +28,19 @@ Use each layer for the job it owns:
 Place one `FlowProvider` above the DOM UI and the Canvas subtree that should share the same phase state:
 
 ```tsx
-<FlowProvider phases={phases} transition={{ duration: 900, cooldown: 400 }}>
+const flowTransition = { duration: 900, cooldown: 400 } as const;
+
+<FlowProvider phases={phases} transition={flowTransition}>
   <InputLayer />
   <PageChrome />
 
   <Canvas>
     <Scene />
   </Canvas>
-</FlowProvider>
+</FlowProvider>;
 ```
 
-Keep `phases` and configuration props stable. Define phase tuples outside components, or memoize derived configuration before passing it to `FlowProvider`.
+Keep `phases` and configuration props stable. Define phase tuples and configuration objects outside components, or memoize derived configuration before passing it to `FlowProvider`.
 
 ## DOM controls with `useFlow`
 
@@ -146,10 +148,15 @@ const inputIgnore = [
   "[data-flow-ignore]"
 ] as const;
 
+const keyboardKeys = {
+  next: ["ArrowDown", "ArrowRight", "PageDown"],
+  prev: ["ArrowUp", "ArrowLeft", "PageUp"]
+} as const;
+
 function FlowInputLayer() {
   useWheelInput<Phase>({ ignore: inputIgnore });
   useTouchInput<Phase>({ ignore: inputIgnore });
-  useKeyboardInput<Phase>();
+  useKeyboardInput<Phase>({ keys: keyboardKeys });
 
   return null;
 }
@@ -157,7 +164,7 @@ function FlowInputLayer() {
 
 Wheel and touch input support `ignore` selectors. Use them so scrolling or swiping over buttons, links, forms, and `[data-flow-ignore]` UI does not hijack those controls.
 
-Keyboard input ignores typing in inputs, textareas, selects, and contenteditable elements by default. Keep keyboard setup in the input layer with the other browser input hooks. If you need page-specific keyboard behavior, scope or enable the hook from DOM/client React code rather than moving it into R3F scene components.
+Keyboard input ignores typing in inputs, textareas, selects, and contenteditable elements by default. The copyable DOM-control examples also omit Space from keyboard navigation so focused buttons keep their native Space activation behavior. Keep keyboard setup in the input layer with the other browser input hooks. If you need page-specific keyboard behavior, scope or enable the hook from DOM/client React code rather than moving it into R3F scene components.
 
 ## Next.js App Router notes
 
@@ -189,6 +196,8 @@ import {
 const phases = ["intro", "projects", "contact"] as const;
 type Phase = (typeof phases)[number];
 
+const flowTransition = { duration: 900, cooldown: 400 } as const;
+
 const inputIgnore = [
   "button",
   "a",
@@ -201,10 +210,15 @@ const inputIgnore = [
   "[data-flow-ignore]"
 ] as const;
 
+const keyboardKeys = {
+  next: ["ArrowDown", "ArrowRight", "PageDown"],
+  prev: ["ArrowUp", "ArrowLeft", "PageUp"]
+} as const;
+
 function FlowInputLayer() {
   useWheelInput<Phase>({ ignore: inputIgnore });
   useTouchInput<Phase>({ ignore: inputIgnore });
-  useKeyboardInput<Phase>();
+  useKeyboardInput<Phase>({ keys: keyboardKeys });
 
   return null;
 }
@@ -275,7 +289,7 @@ function Scene() {
 
 export function InteractivePage() {
   return (
-    <FlowProvider phases={phases} transition={{ duration: 900, cooldown: 400 }}>
+    <FlowProvider phases={phases} transition={flowTransition}>
       <FlowInputLayer />
       <FlowNav />
 
