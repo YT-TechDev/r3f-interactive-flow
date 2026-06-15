@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import * as publicApi from ".";
 import type {
@@ -24,6 +24,20 @@ const expectedRuntimeExports = [
 describe("public API", () => {
   it("exposes the expected runtime exports", () => {
     expect(Object.keys(publicApi).sort()).toEqual(expectedRuntimeExports);
+  });
+
+  it("does not require browser APIs at module import time", async () => {
+    const originalWindow = globalThis.window;
+
+    vi.resetModules();
+
+    try {
+      delete (globalThis as Partial<typeof globalThis>).window;
+
+      await expect(import(".")).resolves.toHaveProperty("useWheelInput");
+    } finally {
+      Object.assign(globalThis, { window: originalWindow });
+    }
   });
 
   it("exposes flow frame types", () => {

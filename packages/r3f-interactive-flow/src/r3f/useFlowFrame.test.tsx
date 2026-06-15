@@ -287,6 +287,13 @@ describe("useFlowFrame", () => {
     });
 
     expect(onFrame).toHaveBeenCalledTimes(1);
+    expect(Object.keys(onFrame.mock.calls[0]?.[0] ?? {}).sort()).toEqual([
+      "direction",
+      "isTransitioning",
+      "phase",
+      "phaseIndex",
+      "progress"
+    ]);
     expect(onFrame).toHaveBeenLastCalledWith(
       {
         phase: "work",
