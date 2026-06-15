@@ -199,6 +199,19 @@ describe("useKeyboardInput", () => {
     expect(latestControls?.direction).toBe("none");
   });
 
+  it("removes the keydown listener when disabled after being enabled", () => {
+    const removeEventListenerSpy = vi.spyOn(globalThis, "removeEventListener");
+
+    renderFlow(<KeyboardInputProbe />);
+
+    expect(windowTarget.listenerCount("keydown")).toBe(1);
+
+    renderFlow(<KeyboardInputProbe options={{ enabled: false }} />);
+
+    expect(removeEventListenerSpy).toHaveBeenCalledWith("keydown", expect.any(Function));
+    expect(windowTarget.listenerCount("keydown")).toBe(0);
+  });
+
   it("defaults preventDefault to true for mapped keys", () => {
     renderFlow(<KeyboardInputProbe />);
 
@@ -363,6 +376,24 @@ describe("useKeyboardInput", () => {
     renderFlow(
       <>
         <KeyboardInputProbe options={{ target: window }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(windowTarget.listenerCount("keydown")).toBe(1);
+
+    dispatchKeyDown("ArrowDown");
+
+    expect(latestControls?.phase).toBe("work");
+  });
+
+  it("falls back to window when a target ref is empty", () => {
+    const targetRef = { current: null } satisfies RefObject<HTMLElement | null>;
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ target: targetRef }} />
         <ControlsProbe onRender={(controls) => (latestControls = controls)} />
       </>
     );
