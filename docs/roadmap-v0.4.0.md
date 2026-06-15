@@ -150,6 +150,46 @@ README updates should stay focused on:
 
 Avoid marketing-heavy language. Do not promise advanced animation features.
 
+## v0.4.0 release-readiness checklist
+
+Use this checklist after the hardening PRs land and before any explicit release-prep PR changes package versions, changelog entries, release notes, publishing, tags, or automation. This checklist is verification-only; it must not publish, tag, release, or change package versioning by itself.
+
+### Core behavior
+
+- [ ] Accepted `next`, `prev`, and `goTo` navigation is covered and behaves as documented.
+- [ ] Rejected navigation keeps snapshots safe and does not partially mutate transition, lock, or cooldown state.
+- [ ] Active transition guards reject overlapping navigation consistently.
+- [ ] Cooldown behavior is covered for accepted navigation and ignored requests.
+- [ ] Manual `lock()` and `unlock()` behavior is covered and matches the README.
+
+### Input hooks
+
+- [ ] Wheel, touch, and keyboard listener attachment and cleanup are covered.
+- [ ] Enabled and disabled states are covered for each input hook.
+- [ ] Target refs, direct targets, and empty-ref fallback behavior are covered.
+- [ ] Retarget cleanup removes listeners from previous targets.
+- [ ] SSR/import safety is verified, with no browser API access at module import time.
+
+### Public API and types
+
+- [ ] Runtime exports remain intentionally small and centered on the documented hooks and provider.
+- [ ] Public type exports are covered by export/type checks.
+- [ ] No incidental public API expansion was introduced during hardening.
+
+### Documentation
+
+- [ ] The root README and package README describe the same tested behavior.
+- [ ] Behavior docs match implemented navigation guards, cooldowns, locks, and input hook reliability.
+- [ ] Examples stay within the v0.4.0 scope and do not promise visual effects, timelines, router integration, or other non-goals.
+
+### Release verification
+
+- [ ] `pnpm release:check` passes from the repository root.
+- [ ] Package output includes the expected files and preserves the built `"use client"` directive.
+- [ ] The Vite example build passes as part of release verification.
+- [ ] Package dry-run output is reviewed.
+- [ ] Changelog entries and release notes drafts are updated only in a later explicit release-prep PR.
+
 ## Architecture rules to preserve
 
 Keep the existing package structure:
