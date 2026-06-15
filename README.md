@@ -10,7 +10,7 @@ The goal is not to provide visual effects. The goal is to make interactive R3F s
 
 Current package version on `main`: `0.3.0`.
 
-The `v0.3.0` work is complete on `main`, with the package focused on a small, stable set of phase flow primitives for React Three Fiber. The next planned release is `v0.4.0 - Input, transition, and test hardening`; see [docs/roadmap-v0.4.0.md](docs/roadmap-v0.4.0.md) for the stabilization roadmap. For the v0.3.0 design baseline, see [docs/v0.3.0-spec.md](docs/v0.3.0-spec.md). For release notes, see [packages/r3f-interactive-flow/CHANGELOG.md](packages/r3f-interactive-flow/CHANGELOG.md).
+The `v0.3.0` work is complete on `main`, with the package focused on a small, stable set of phase flow primitives for React Three Fiber. The next planned release is `v0.4.0 - Input, transition, and test hardening`; see [docs/roadmap-v0.4.0.md](docs/roadmap-v0.4.0.md) for the stabilization roadmap. For the v0.3.0 design baseline, see [docs/v0.3.0-spec.md](docs/v0.3.0-spec.md). For release notes, see [packages/r3f-interactive-flow/CHANGELOG.md](packages/r3f-interactive-flow/CHANGELOG.md). For real-world DOM UI and Canvas wiring, see [docs/dom-ui-to-canvas-guide.md](docs/dom-ui-to-canvas-guide.md).
 
 ## Why this exists
 
