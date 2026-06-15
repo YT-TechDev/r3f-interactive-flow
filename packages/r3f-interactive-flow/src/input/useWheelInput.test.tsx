@@ -147,6 +147,33 @@ describe("useWheelInput", () => {
     expect(latestControls?.direction).toBe("none");
   });
 
+  it("removes the wheel event listener when enabled changes to false", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ enabled: true }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(windowTarget.listenerCount("wheel")).toBe(1);
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ enabled: false }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(windowTarget.listenerCount("wheel")).toBe(0);
+
+    dispatchWheel(41);
+
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+  });
+
   it("defaults preventDefault to true", () => {
     renderFlow(<WheelInputProbe />);
 
@@ -284,6 +311,25 @@ describe("useWheelInput", () => {
     expect(latestControls?.phase).toBe("work");
   });
 
+  it("falls back to window when a provided target ref is empty", () => {
+    const targetRef = { current: null } satisfies RefObject<HTMLElement | null>;
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ target: targetRef }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(windowTarget.listenerCount("wheel")).toBe(1);
+
+    dispatchWheel(41);
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
   it("uses deltaY for the y axis and deltaX for the x axis", () => {
     const yTarget = document.createElement("div") as unknown as MinimalElement;
     const xTarget = document.createElement("div") as unknown as MinimalElement;
@@ -384,6 +430,7 @@ describe("useWheelInput", () => {
   it("removes the listener from the old target when the target changes", () => {
     const firstTarget = document.createElement("div") as unknown as MinimalElement;
     const secondTarget = document.createElement("div") as unknown as MinimalElement;
+    let latestControls: FlowControls<TestPhase> | undefined;
 
     function RetargetingProbe({ target }: { target: HTMLElement }) {
       useWheelInput<TestPhase>({ target });
@@ -391,14 +438,33 @@ describe("useWheelInput", () => {
       return null;
     }
 
-    renderFlow(<RetargetingProbe target={firstTarget as unknown as HTMLElement} />);
+    renderFlow(
+      <>
+        <RetargetingProbe target={firstTarget as unknown as HTMLElement} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
 
     expect(firstTarget.listenerCount("wheel")).toBe(1);
 
-    renderFlow(<RetargetingProbe target={secondTarget as unknown as HTMLElement} />);
+    renderFlow(
+      <>
+        <RetargetingProbe target={secondTarget as unknown as HTMLElement} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
 
     expect(firstTarget.listenerCount("wheel")).toBe(0);
     expect(secondTarget.listenerCount("wheel")).toBe(1);
+
+    dispatchWheel(41, firstTarget);
+
+    expect(latestControls?.phase).toBe("intro");
+
+    dispatchWheel(41, secondTarget);
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
   });
 
   it("throws a clear error for invalid cooldown values", () => {
