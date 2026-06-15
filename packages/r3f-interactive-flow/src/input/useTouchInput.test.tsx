@@ -119,6 +119,26 @@ describe("useTouchInput", () => {
     }
   });
 
+  it("removes touch listeners when enabled changes from true to false", () => {
+    function ToggleProbe({ enabled }: { enabled: boolean }) {
+      useTouchInput<TestPhase>({ enabled });
+
+      return null;
+    }
+
+    renderFlow(<ToggleProbe enabled />);
+
+    for (const type of touchEventTypes) {
+      expect(windowTarget.listenerCount(type)).toBe(1);
+    }
+
+    renderFlow(<ToggleProbe enabled={false} />);
+
+    for (const type of touchEventTypes) {
+      expect(windowTarget.listenerCount(type)).toBe(0);
+    }
+  });
+
   it("uses window as the default target", () => {
     renderFlow(<TouchInputProbe />);
 
@@ -152,6 +172,27 @@ describe("useTouchInput", () => {
     swipe(100, 49, minimalTarget);
 
     expect(latestControls?.phase).toBe("work");
+  });
+
+  it("falls back to window for an empty target ref and still handles touch navigation", () => {
+    const targetRef = { current: null } satisfies RefObject<HTMLElement | null>;
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ target: targetRef }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    for (const type of touchEventTypes) {
+      expect(windowTarget.listenerCount(type)).toBe(1);
+    }
+
+    swipe(100, 49);
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
   });
 
   it("can attach directly to a provided HTMLElement target", () => {
@@ -550,6 +591,31 @@ describe("useTouchInput", () => {
       expect(firstTarget.listenerCount(type)).toBe(0);
       expect(secondTarget.listenerCount(type)).toBe(1);
     }
+  });
+
+  it("retargets navigation to the new target without leaving active listeners on the old target", () => {
+    const firstTarget = document.createElement("div") as unknown as MinimalElement;
+    const secondTarget = document.createElement("div") as unknown as MinimalElement;
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    function RetargetingProbe({ target }: { target: HTMLElement }) {
+      useTouchInput<TestPhase>({ target });
+
+      return <ControlsProbe onRender={(controls) => (latestControls = controls)} />;
+    }
+
+    renderFlow(<RetargetingProbe target={firstTarget as unknown as HTMLElement} />);
+    renderFlow(<RetargetingProbe target={secondTarget as unknown as HTMLElement} />);
+
+    swipe(100, 49, firstTarget);
+
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+
+    swipe(100, 49, secondTarget);
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
   });
 
   it("throws a clear error for invalid cooldown values", () => {
