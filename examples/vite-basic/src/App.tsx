@@ -24,7 +24,7 @@ const inputIgnore = [
   "select",
   "label",
   "form",
-  "[contenteditable='true']",
+  "[contenteditable]",
   "[data-flow-ignore]"
 ] as const;
 
