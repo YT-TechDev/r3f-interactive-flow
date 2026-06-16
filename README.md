@@ -451,15 +451,19 @@ From the repository root:
 
 ```bash
 pnpm install
-pnpm build
-pnpm package:verify
-pnpm typecheck
-pnpm test
-pnpm lint
-pnpm format
-pnpm --filter vite-basic build
-pnpm pack:dry-run
 ```
+
+### Common validation sets
+
+Choose the smallest validation set that matches the PR. Documentation-only PRs usually do not need release checks.
+
+| PR type                                    | Commands                                                                                                                        |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| Documentation-only PRs                     | `pnpm format`<br>`pnpm lint`                                                                                                    |
+| Example documentation or example usage PRs | `pnpm format`<br>`pnpm lint`<br>`pnpm --filter vite-basic build`                                                                |
+| Library code or type changes               | `pnpm build`<br>`pnpm typecheck`<br>`pnpm test`<br>`pnpm lint`<br>`pnpm format`                                                 |
+| Package output or export-related changes   | `pnpm build`<br>`pnpm package:verify`<br>`pnpm typecheck`<br>`pnpm test`<br>`pnpm lint`<br>`pnpm format`<br>`pnpm pack:dry-run` |
+| Release-prep review                        | `pnpm release:check`                                                                                                            |
 
 ## Release readiness
 
@@ -481,7 +485,7 @@ To publish with Changesets after checks pass:
 pnpm release
 ```
 
-`pnpm release` publishes to npm, so only run it when you intentionally want to publish.
+`pnpm release` publishes to npm, so only maintainers should run it when they intentionally want to publish. Do not run publish, tag, or GitHub Release commands for normal stabilization PRs.
 
 ## Contributing
 
