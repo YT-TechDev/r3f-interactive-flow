@@ -4,7 +4,7 @@
 
 `r3f-interactive-flow@0.4.0` has been published.
 
-v0.5.0 planning is open. This roadmap is documentation-only: it does not publish, tag, release, add runtime behavior, add dependencies, change package versions, or expand the public API by itself.
+v0.5.0 release prep is being prepared after the documentation/example stabilization pass. This roadmap remains documentation-only: it does not publish, tag, release, add runtime behavior, add dependencies, change release automation, or expand the public API by itself.
 
 ## Goal
 
@@ -75,7 +75,7 @@ The documentation/example review pass has completed these stabilization items wi
 - Root README validation matrix by PR type.
 - Package README validation guidance synchronized with the root README.
 
-This does not mean v0.5.0 is ready to release. A separate release-prep review should still verify the final package state before any versioning, publishing, tag, or GitHub Release work.
+This release-prep PR should verify the final package state before any maintainer publishing, tag, or GitHub Release work. Publishing, tag creation, and GitHub Release creation remain separate maintainer actions outside roadmap-only work.
 
 ## Reliability follow-up policy
 
