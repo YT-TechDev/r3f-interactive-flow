@@ -490,12 +490,34 @@ From the repository root:
 
 ```bash
 pnpm install
+```
+
+For documentation-only package README changes:
+
+```bash
+pnpm format
+pnpm lint
+```
+
+For package code or type changes:
+
+```bash
 pnpm build
 pnpm typecheck
 pnpm test
 pnpm lint
 pnpm format
-pnpm --filter vite-basic build
+```
+
+For package output or export-related changes:
+
+```bash
+pnpm build
+pnpm package:verify
+pnpm typecheck
+pnpm test
+pnpm lint
+pnpm format
 pnpm pack:dry-run
 ```
 
@@ -504,6 +526,8 @@ Package-only dry run:
 ```bash
 pnpm --filter r3f-interactive-flow pack:dry-run
 ```
+
+For the full repository validation matrix by PR type, see the root README.
 
 ## License
 
