@@ -1,8 +1,9 @@
-import React, { act } from "react";
+import React, { act, useContext } from "react";
 import type { RefObject } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { FlowControls } from "../core/types";
+import type { FlowControls, FlowMachine } from "../core/types";
+import { FlowContext } from "../react/FlowContext";
 import type { MinimalElement, MinimalEventTarget } from "../test-utils/minimalDom";
 import { installMinimalDom, windowTarget } from "../test-utils/minimalDom";
 import { createControlsProbe, createFlowTestHarness } from "../test-utils/renderFlow";
@@ -40,6 +41,22 @@ const { getRoot, renderFlow } = createFlowTestHarness<TestPhase>({ createRoot, p
 
 function KeyboardInputProbe({ options = {} }: { options?: UseKeyboardInputOptions }) {
   useKeyboardInput<TestPhase>(options);
+
+  return null;
+}
+
+function MachineProbe({
+  onRender
+}: {
+  onRender: (machine: FlowMachine<TestPhase>, syncSnapshot: () => void) => void;
+}) {
+  const context = useContext(FlowContext);
+
+  if (context === null) {
+    throw new Error("MachineProbe must be rendered inside FlowProvider.");
+  }
+
+  onRender(context.machine as FlowMachine<TestPhase>, context.syncSnapshot as () => void);
 
   return null;
 }
@@ -568,6 +585,77 @@ describe("useKeyboardInput", () => {
     dispatchKeyDown("ArrowRight");
 
     expect(latestControls?.phase).toBe("work");
+  });
+
+  it("does not consume hook-local cooldown for locked, repeated, or typing-target key events", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    let latestControls: FlowControls<TestPhase> | undefined;
+    const input = document.createElement("input");
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ cooldown: 500 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    act(() => {
+      latestControls?.lock();
+    });
+    dispatchKeyDown("ArrowDown");
+
+    vi.setSystemTime(100);
+    act(() => {
+      latestControls?.unlock();
+    });
+    dispatchKeyDown("ArrowDown", { repeat: true });
+
+    vi.setSystemTime(250);
+    dispatchKeyDown("ArrowDown", { target: input });
+    dispatchKeyDown("ArrowDown");
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+    vi.useRealTimers();
+  });
+
+  it("does not extend hook-local cooldown for keyboard events ignored while transitioning", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let machine: FlowMachine<TestPhase> | undefined;
+    let syncSnapshot: (() => void) | undefined;
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ cooldown: 500 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe
+          onRender={(renderedMachine, renderedSyncSnapshot) => {
+            machine = renderedMachine;
+            syncSnapshot = renderedSyncSnapshot;
+          }}
+        />
+      </>
+    );
+
+    dispatchKeyDown("ArrowDown");
+
+    vi.setSystemTime(1_400);
+    dispatchKeyDown("ArrowDown");
+
+    act(() => {
+      machine?.update(1_000);
+      syncSnapshot?.();
+    });
+
+    vi.setSystemTime(1_500);
+    dispatchKeyDown("ArrowDown");
+
+    expect(latestControls?.phase).toBe("contact");
+    expect(latestControls?.direction).toBe("next");
+    vi.useRealTimers();
   });
 
   it.each([Number.NaN, Number.POSITIVE_INFINITY, -1])(

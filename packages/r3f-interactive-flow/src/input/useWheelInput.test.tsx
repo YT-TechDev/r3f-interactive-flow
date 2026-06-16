@@ -1,8 +1,9 @@
-import React, { act } from "react";
+import React, { act, useContext } from "react";
 import type { RefObject } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { FlowControls } from "../core/types";
+import type { FlowControls, FlowMachine } from "../core/types";
+import { FlowContext } from "../react/FlowContext";
 import type { MinimalElement, MinimalEventTarget } from "../test-utils/minimalDom";
 import { installMinimalDom, windowTarget } from "../test-utils/minimalDom";
 import { createControlsProbe, createFlowTestHarness } from "../test-utils/renderFlow";
@@ -39,6 +40,22 @@ const { getRoot, renderFlow } = createFlowTestHarness<TestPhase>({ createRoot, p
 
 function WheelInputProbe({ options = {} }: { options?: UseWheelInputOptions }) {
   useWheelInput<TestPhase>(options);
+
+  return null;
+}
+
+function MachineProbe({
+  onRender
+}: {
+  onRender: (machine: FlowMachine<TestPhase>, syncSnapshot: () => void) => void;
+}) {
+  const context = useContext(FlowContext);
+
+  if (context === null) {
+    throw new Error("MachineProbe must be rendered inside FlowProvider.");
+  }
+
+  onRender(context.machine as FlowMachine<TestPhase>, context.syncSnapshot as () => void);
 
   return null;
 }
@@ -440,6 +457,78 @@ describe("useWheelInput", () => {
     dispatchWheel(41);
 
     expect(latestControls?.phase).toBe("work");
+    vi.useRealTimers();
+  });
+
+  it("does not consume hook-local cooldown for locked, threshold, or ignored wheel events", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    let latestControls: FlowControls<TestPhase> | undefined;
+    const ignored = document.createElement("div");
+    ignored.setAttribute("class", "ignore-wheel");
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ cooldown: 500, ignore: [".ignore-wheel"], threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    act(() => {
+      latestControls?.lock();
+    });
+    dispatchWheel(41);
+
+    vi.setSystemTime(100);
+    act(() => {
+      latestControls?.unlock();
+    });
+    dispatchWheel(40);
+
+    vi.setSystemTime(250);
+    dispatchWheel(41, windowTarget, { target: ignored as unknown as EventTarget });
+    dispatchWheel(41);
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+    vi.useRealTimers();
+  });
+
+  it("does not extend hook-local cooldown for wheel events ignored while transitioning", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let machine: FlowMachine<TestPhase> | undefined;
+    let syncSnapshot: (() => void) | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ cooldown: 500 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe
+          onRender={(renderedMachine, renderedSyncSnapshot) => {
+            machine = renderedMachine;
+            syncSnapshot = renderedSyncSnapshot;
+          }}
+        />
+      </>
+    );
+
+    dispatchWheel(41);
+
+    vi.setSystemTime(1_400);
+    dispatchWheel(41);
+
+    act(() => {
+      machine?.update(1_000);
+      syncSnapshot?.();
+    });
+
+    vi.setSystemTime(1_500);
+    dispatchWheel(41);
+
+    expect(latestControls?.phase).toBe("contact");
+    expect(latestControls?.direction).toBe("next");
     vi.useRealTimers();
   });
 
