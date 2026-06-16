@@ -8,13 +8,13 @@ The goal is not to provide visual effects. The goal is to make interactive R3F s
 
 ## Project status
 
-Current package version on `main`: `0.4.0`.
+Current package version on `main`: `0.5.0` after this release-prep PR is merged and maintainer release actions are completed.
 
-`r3f-interactive-flow@0.4.0` has been published. Current planning should move to the narrow v0.5.0 stabilization roadmap in [docs/roadmap-v0.5.0.md](docs/roadmap-v0.5.0.md) and Issue #110, if that issue remains the active planning thread.
+`r3f-interactive-flow@0.4.0` has been published. v0.5.0 release-prep is tracked in [docs/releases/v0.5.0.md](docs/releases/v0.5.0.md) and the narrow stabilization roadmap in [docs/roadmap-v0.5.0.md](docs/roadmap-v0.5.0.md).
 
-Historical v0.4.0 references remain available in [docs/releases/v0.4.0.md](docs/releases/v0.4.0.md) and [docs/roadmap-v0.4.0.md](docs/roadmap-v0.4.0.md). This documentation update does not publish the package, create a git tag, create a GitHub Release, or change release automation.
+Historical v0.4.0 references remain available in [docs/releases/v0.4.0.md](docs/releases/v0.4.0.md) and [docs/roadmap-v0.4.0.md](docs/roadmap-v0.4.0.md). This release-prep update does not publish the package, create a git tag, create a GitHub Release, or change release automation; those remain separate maintainer actions.
 
-Future work after `v0.4.0` should remain narrow and stabilization-focused unless explicitly approved. For the v0.3.0 design baseline, see [docs/v0.3.0-spec.md](docs/v0.3.0-spec.md). For real-world DOM UI and Canvas wiring, see [docs/dom-ui-to-canvas-guide.md](docs/dom-ui-to-canvas-guide.md).
+Future work after `v0.5.0` should remain narrow and stabilization-focused unless explicitly approved. For the v0.3.0 design baseline, see [docs/v0.3.0-spec.md](docs/v0.3.0-spec.md). For real-world DOM UI and Canvas wiring, see [docs/dom-ui-to-canvas-guide.md](docs/dom-ui-to-canvas-guide.md).
 
 ## Why this exists
 

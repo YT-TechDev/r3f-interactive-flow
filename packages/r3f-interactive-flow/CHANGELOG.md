@@ -1,5 +1,26 @@
 # r3f-interactive-flow
 
+## 0.5.0
+
+v0.5.0 is a narrow documentation and example stabilization release. It aligns repository guidance, package-facing validation notes, and example documentation with the existing public API and package behavior.
+
+### Documentation
+
+- Aligned the root README public API and export documentation with the package root exports.
+- Synchronized package README validation guidance with the root README validation matrix.
+- Added README coverage for the Vite basic example.
+- Clarified Next.js Client Component boundaries for provider, hook, and browser input usage.
+- Documented validation command guidance by PR type.
+- Updated roadmap progress for the completed v0.5.0 documentation and example stabilization pass.
+
+### Scope
+
+- No runtime code changes are included in v0.5.0.
+- No public runtime API expansion was introduced.
+- No new runtime dependencies were added.
+- No visual effects, camera presets, shader APIs, animation timelines, router integration, GSAP integration, Framer Motion integration, or large templates were added.
+- No publishing, tag creation, GitHub Release creation, or release automation changes are included in this release-prep PR.
+
 ## 0.4.0
 
 v0.4.0 is an input, transition, and test hardening release for the existing phase flow foundation. It focuses on regression coverage, documented guard behavior, and release-readiness documentation without adding visual-effect APIs, release automation, or runtime dependencies.
