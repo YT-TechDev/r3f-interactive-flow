@@ -131,6 +131,22 @@ describe("useWheelInput", () => {
     expect(latestControls?.direction).toBe("none");
   });
 
+  it("allows a threshold of 0", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ threshold: 0 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchWheel(1);
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
   it("does not navigate when disabled", () => {
     let latestControls: FlowControls<TestPhase> | undefined;
 
@@ -471,5 +487,13 @@ describe("useWheelInput", () => {
     expect(() => renderFlow(<WheelInputProbe options={{ cooldown: -1 }} />)).toThrow(
       "useWheelInput cooldown must be a finite non-negative number."
     );
+  });
+
+  it("throws a clear error for invalid threshold values", () => {
+    for (const threshold of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, -1]) {
+      expect(() => renderFlow(<WheelInputProbe options={{ threshold }} />)).toThrow(
+        "useWheelInput threshold must be a finite non-negative number."
+      );
+    }
   });
 });

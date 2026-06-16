@@ -32,6 +32,12 @@ function validateCooldown(cooldown: number): void {
   }
 }
 
+function validateThreshold(threshold: number): void {
+  if (!Number.isFinite(threshold) || threshold < 0) {
+    throw new Error("useWheelInput threshold must be a finite non-negative number.");
+  }
+}
+
 export function useWheelInput<TPhase extends string>(options: UseWheelInputOptions = {}): void {
   const flow = useFlow<TPhase>();
   const flowRef = useRef<FlowControls<TPhase>>(flow);
@@ -58,6 +64,7 @@ export function useWheelInput<TPhase extends string>(options: UseWheelInputOptio
     const eventTarget = resolveInputTarget(options.target);
 
     validateCooldown(cooldown);
+    validateThreshold(threshold);
 
     const handleWheel: EventListener = (event): void => {
       const wheelEvent = event as WheelEvent;
