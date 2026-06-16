@@ -8,9 +8,11 @@ The goal is not to provide visual effects. The goal is to make interactive R3F s
 
 ## Project status
 
-Current package version on `main`: `0.3.0`.
+Current package version on `main`: `0.4.0`.
 
-The `v0.3.0` work is complete on `main`, with the package focused on a small, stable set of phase flow primitives for React Three Fiber. The next planned release is `v0.4.0 - Input, transition, and test hardening`; see [docs/roadmap-v0.4.0.md](docs/roadmap-v0.4.0.md) for the stabilization roadmap. For the v0.3.0 design baseline, see [docs/v0.3.0-spec.md](docs/v0.3.0-spec.md). For release notes, see [packages/r3f-interactive-flow/CHANGELOG.md](packages/r3f-interactive-flow/CHANGELOG.md). For real-world DOM UI and Canvas wiring, see [docs/dom-ui-to-canvas-guide.md](docs/dom-ui-to-canvas-guide.md).
+The `v0.4.0` release-prep metadata, changelog entry, and release notes are present on `main`; see [docs/roadmap-v0.4.0.md](docs/roadmap-v0.4.0.md) for the stabilization roadmap, [packages/r3f-interactive-flow/CHANGELOG.md](packages/r3f-interactive-flow/CHANGELOG.md) for the package changelog, and [docs/releases/v0.4.0.md](docs/releases/v0.4.0.md) for the release notes. This documentation sync does not publish the package, create a git tag, create a GitHub Release, or change release automation.
+
+Future work after `v0.4.0` should remain narrow and stabilization-focused unless explicitly approved. For the v0.3.0 design baseline, see [docs/v0.3.0-spec.md](docs/v0.3.0-spec.md). For real-world DOM UI and Canvas wiring, see [docs/dom-ui-to-canvas-guide.md](docs/dom-ui-to-canvas-guide.md).
 
 ## Why this exists
 
