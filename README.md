@@ -343,16 +343,17 @@ The input hooks connect browser input to `next` and `prev`.
 
 - `useWheelInput`
   - wheel down -> `next`
-  - wheel up -> `prev`
-  - options: `target`, `threshold`, `enabled`, `preventDefault`
+  - wheel up -> `prev` on the default `y` axis
+  - options: `target`, `threshold`, `axis`, `cooldown`, `enabled`, `preventDefault`, `ignore`
 - `useTouchInput`
   - swipe up -> `next`
-  - swipe down -> `prev`
-  - options: `target`, `threshold`, `enabled`, `preventDefault`
+  - swipe down -> `prev` on the default `y` axis
+  - options: `target`, `threshold`, `axis`, `cooldown`, `enabled`, `preventDefault`, `ignore`
 - `useKeyboardInput`
   - `ArrowDown`, `ArrowRight`, `PageDown`, Space -> `next`
   - `ArrowUp`, `ArrowLeft`, `PageUp` -> `prev`
-  - options: `target`, `enabled`, `preventDefault`, `nextKeys`, `prevKeys`
+  - options: `target`, `enabled`, `preventDefault`, `keys`, `cooldown`, `ignoreWhenTyping`
+  - `keys.next` and `keys.prev` are the current keyboard configuration API. `nextKeys` and `prevKeys` still work as deprecated compatibility aliases.
 
 Input hooks only attach browser event listeners inside React effects and are guarded for non-browser environments. They do not access browser APIs at module import time.
 
@@ -363,6 +364,7 @@ Input hooks only attach browser event listeners inside React effects and are gua
 This package is designed to be usable from Next.js App Router Client Components.
 
 - Use `FlowProvider`, `useFlow`, `useFlowProgress`, `useFlowFrame`, and input hooks from Client Components.
+- The package entry is marked as a client entry for Next.js App Router compatibility.
 - Browser APIs are used inside hooks and effects, not at module import time.
 - `useFlowFrame` still follows React Three Fiber rules and must be used inside a Canvas-bound component.
 - Next.js is not a dependency.
