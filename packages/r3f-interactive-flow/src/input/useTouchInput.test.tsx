@@ -1,8 +1,9 @@
-import React, { act } from "react";
+import React, { act, useContext } from "react";
 import type { RefObject } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { FlowControls } from "../core/types";
+import type { FlowControls, FlowMachine } from "../core/types";
+import { FlowContext } from "../react/FlowContext";
 import type { MinimalElement, MinimalEventTarget } from "../test-utils/minimalDom";
 import { installMinimalDom, windowTarget } from "../test-utils/minimalDom";
 import { createControlsProbe, createFlowTestHarness } from "../test-utils/renderFlow";
@@ -48,6 +49,22 @@ const { getRoot, renderFlow } = createFlowTestHarness<TestPhase>({ createRoot, p
 
 function TouchInputProbe({ options = {} }: { options?: UseTouchInputOptions }) {
   useTouchInput<TestPhase>(options);
+
+  return null;
+}
+
+function MachineProbe({
+  onRender
+}: {
+  onRender: (machine: FlowMachine<TestPhase>, syncSnapshot: () => void) => void;
+}) {
+  const context = useContext(FlowContext);
+
+  if (context === null) {
+    throw new Error("MachineProbe must be rendered inside FlowProvider.");
+  }
+
+  onRender(context.machine as FlowMachine<TestPhase>, context.syncSnapshot as () => void);
 
   return null;
 }
@@ -582,6 +599,79 @@ describe("useTouchInput", () => {
     swipe(100, 49);
 
     expect(latestControls?.phase).toBe("work");
+    vi.useRealTimers();
+  });
+
+  it("does not consume hook-local cooldown for locked, threshold, or ignored touch gestures", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    let latestControls: FlowControls<TestPhase> | undefined;
+    const ignored = document.createElement("div");
+    const minimalIgnored = ignored as unknown as MinimalElement;
+    ignored.setAttribute("class", "ignore-touch");
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ cooldown: 500, ignore: [".ignore-touch"], threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    act(() => {
+      latestControls?.lock();
+    });
+    swipe(100, 59);
+
+    vi.setSystemTime(100);
+    act(() => {
+      latestControls?.unlock();
+    });
+    swipe(100, 60);
+
+    vi.setSystemTime(250);
+    swipe(100, 0, minimalIgnored);
+    swipe(100, 59);
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+    vi.useRealTimers();
+  });
+
+  it("does not extend hook-local cooldown for touch gestures ignored while transitioning", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let machine: FlowMachine<TestPhase> | undefined;
+    let syncSnapshot: (() => void) | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ cooldown: 500, threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe
+          onRender={(renderedMachine, renderedSyncSnapshot) => {
+            machine = renderedMachine;
+            syncSnapshot = renderedSyncSnapshot;
+          }}
+        />
+      </>
+    );
+
+    swipe(100, 59);
+
+    vi.setSystemTime(1_400);
+    swipe(100, 59);
+
+    act(() => {
+      machine?.update(1_000);
+      syncSnapshot?.();
+    });
+
+    vi.setSystemTime(1_500);
+    swipe(100, 59);
+
+    expect(latestControls?.phase).toBe("contact");
+    expect(latestControls?.direction).toBe("next");
     vi.useRealTimers();
   });
 
