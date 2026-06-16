@@ -343,6 +343,22 @@ describe("useTouchInput", () => {
     expect(latestControls?.direction).toBe("none");
   });
 
+  it("allows a threshold of 0", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ threshold: 0 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    swipe(100, 99);
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
   it("touchcancel resets the stored start position so a later touchend does not navigate accidentally", () => {
     let latestControls: FlowControls<TestPhase> | undefined;
 
@@ -626,5 +642,13 @@ describe("useTouchInput", () => {
     expect(() =>
       renderFlow(<TouchInputProbe options={{ cooldown: Number.POSITIVE_INFINITY }} />)
     ).toThrow("useTouchInput cooldown must be a finite non-negative number.");
+  });
+
+  it("throws a clear error for invalid threshold values", () => {
+    for (const threshold of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, -1]) {
+      expect(() => renderFlow(<TouchInputProbe options={{ threshold }} />)).toThrow(
+        "useTouchInput threshold must be a finite non-negative number."
+      );
+    }
   });
 });

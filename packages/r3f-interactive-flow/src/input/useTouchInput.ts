@@ -30,6 +30,12 @@ function validateCooldown(cooldown: number): void {
   }
 }
 
+function validateThreshold(threshold: number): void {
+  if (!Number.isFinite(threshold) || threshold < 0) {
+    throw new Error("useTouchInput threshold must be a finite non-negative number.");
+  }
+}
+
 export function useTouchInput<TPhase extends string>(options: UseTouchInputOptions = {}): void {
   const flow = useFlow<TPhase>();
   const flowRef = useRef<FlowControls<TPhase>>(flow);
@@ -58,6 +64,7 @@ export function useTouchInput<TPhase extends string>(options: UseTouchInputOptio
     const eventTarget = resolveInputTarget(options.target);
 
     validateCooldown(cooldown);
+    validateThreshold(threshold);
 
     const resetTouch = (): void => {
       startPositionRef.current = null;
