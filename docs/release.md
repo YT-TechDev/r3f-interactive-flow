@@ -2,9 +2,9 @@
 
 This document is for maintainers preparing a package release.
 
-## v0.4.0 readiness note
+## Release planning note
 
-Before opening a v0.4.0 release-prep PR, use the focused readiness checklist in `docs/roadmap-v0.4.0.md`. That checklist is verification-only and does not publish, tag, release, change package versions, or modify release automation.
+Before opening a release-prep PR for any version, confirm there is an up-to-date roadmap or issue that defines the intended scope. Release planning checklists are verification-only: they do not publish, tag, create a GitHub Release, change package versions, or modify release automation by themselves.
 
 ## Before release
 
