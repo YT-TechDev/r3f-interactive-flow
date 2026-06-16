@@ -1,5 +1,30 @@
 # r3f-interactive-flow
 
+## 0.6.0
+
+v0.6.0 is a narrow input stabilization and release-prep release. It documents the completed v0.6.0 planning work, validates wheel and touch threshold handling, keeps threshold guidance synchronized, and adds targeted cooldown guard coverage for ignored or blocked wheel, touch, and keyboard input events.
+
+### Improved
+
+- Added v0.6.0 roadmap and planning documentation for the input stabilization pass.
+- Validated wheel input threshold handling around configured boundary values.
+- Validated touch input threshold handling around configured boundary values.
+- Synchronized documentation for wheel and touch threshold validation behavior.
+- Added hook-local cooldown guard tests for ignored or blocked wheel input events.
+- Added hook-local cooldown guard tests for ignored or blocked touch input events.
+- Added hook-local cooldown guard tests for ignored or blocked keyboard input events.
+
+### Scope
+
+- No npm publishing is included in this release-prep PR.
+- No git tag creation is included in this release-prep PR.
+- No GitHub Release creation is included in this release-prep PR.
+- No release automation changes were made.
+- No dependency additions were made.
+- No public API expansion was introduced.
+- No unrelated runtime expansion was introduced.
+- No visual effects, camera presets, shader APIs, animation timelines, router integration, GSAP integration, or Framer Motion integration were added.
+
 ## 0.5.0
 
 v0.5.0 is a narrow documentation and example stabilization release. It aligns repository guidance, package-facing validation notes, and example documentation with the existing public API and package behavior.
