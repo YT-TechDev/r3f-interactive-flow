@@ -82,23 +82,52 @@ yarn add r3f-interactive-flow three @react-three/fiber react react-dom
 
 ## Public API
 
-The main public primitives are intentionally small:
+The current public runtime primitives are intentionally small:
 
 ```ts
-import { FlowProvider, useFlow, useFlowProgress, useFlowFrame } from "r3f-interactive-flow";
-```
-
-Input hooks are also exported as convenience hooks for connecting common browser input to the flow controls:
-
-```ts
-import { useWheelInput, useTouchInput, useKeyboardInput } from "r3f-interactive-flow";
-
-import type {
-  UseWheelInputOptions,
-  UseTouchInputOptions,
-  UseKeyboardInputOptions
+import {
+  FlowProvider,
+  useFlow,
+  useFlowProgress,
+  useFlowFrame,
+  useWheelInput,
+  useTouchInput,
+  useKeyboardInput
 } from "r3f-interactive-flow";
 ```
+
+The package also exports the public types used by the documented provider, frame bridge, transition options, and input hooks:
+
+```ts
+import type {
+  FlowFrameCallback,
+  FlowFrameState,
+  FlowInputTarget,
+  FlowTransitionBaseOptions,
+  FlowTransitionOptions,
+  UseKeyboardInputOptions,
+  UseTouchInputOptions,
+  UseWheelInputOptions
+} from "r3f-interactive-flow";
+```
+
+Current public exports:
+
+- `FlowProvider`
+- `useFlow`
+- `useFlowProgress`
+- `useFlowFrame`
+- `useWheelInput`
+- `useTouchInput`
+- `useKeyboardInput`
+- `FlowFrameState`
+- `FlowFrameCallback`
+- `FlowInputTarget`
+- `FlowTransitionBaseOptions`
+- `FlowTransitionOptions`
+- `UseWheelInputOptions`
+- `UseTouchInputOptions`
+- `UseKeyboardInputOptions`
 
 ## Basic usage
 
