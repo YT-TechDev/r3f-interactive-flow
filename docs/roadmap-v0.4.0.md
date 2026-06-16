@@ -2,9 +2,9 @@
 
 ## Status
 
-This roadmap tracks stabilization work for `r3f-interactive-flow` v0.4.0. It is documentation-only: it does not publish, tag, release, add runtime behavior, add dependencies, or expand the public API by itself.
+This roadmap tracks stabilization work for `r3f-interactive-flow` v0.4.0. It is now historical: `r3f-interactive-flow@0.4.0` has been published.
 
-`v0.3.0` has been released. The v0.4.0 hardening work has landed, and release preparation should stay focused on metadata, changelog, release notes, and verification rather than feature expansion.
+The roadmap remains documentation-only: it does not publish, tag, release, add runtime behavior, add dependencies, or expand the public API by itself. Current planning has moved to [docs/roadmap-v0.5.0.md](roadmap-v0.5.0.md).
 
 ## v0.4.0 - Input, transition, and test hardening
 

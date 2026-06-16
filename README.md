@@ -10,7 +10,9 @@ The goal is not to provide visual effects. The goal is to make interactive R3F s
 
 Current package version on `main`: `0.4.0`.
 
-The `v0.4.0` release-prep metadata, changelog entry, and release notes are present on `main`; see [docs/roadmap-v0.4.0.md](docs/roadmap-v0.4.0.md) for the stabilization roadmap, [packages/r3f-interactive-flow/CHANGELOG.md](packages/r3f-interactive-flow/CHANGELOG.md) for the package changelog, and [docs/releases/v0.4.0.md](docs/releases/v0.4.0.md) for the release notes. This documentation sync does not publish the package, create a git tag, create a GitHub Release, or change release automation.
+`r3f-interactive-flow@0.4.0` has been published. Current planning should move to the narrow v0.5.0 stabilization roadmap in [docs/roadmap-v0.5.0.md](docs/roadmap-v0.5.0.md) and Issue #110, if that issue remains the active planning thread.
+
+Historical v0.4.0 references remain available in [docs/releases/v0.4.0.md](docs/releases/v0.4.0.md) and [docs/roadmap-v0.4.0.md](docs/roadmap-v0.4.0.md). This documentation update does not publish the package, create a git tag, create a GitHub Release, or change release automation.
 
 Future work after `v0.4.0` should remain narrow and stabilization-focused unless explicitly approved. For the v0.3.0 design baseline, see [docs/v0.3.0-spec.md](docs/v0.3.0-spec.md). For real-world DOM UI and Canvas wiring, see [docs/dom-ui-to-canvas-guide.md](docs/dom-ui-to-canvas-guide.md).
 
