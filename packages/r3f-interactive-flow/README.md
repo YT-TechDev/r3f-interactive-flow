@@ -341,7 +341,7 @@ function InputLayer() {
 }
 ```
 
-Wheel down navigates to `next`; wheel up navigates to `prev` on the default `y` axis. Set `axis: "x"` for horizontal wheel gestures.
+Wheel down navigates to `next`; wheel up navigates to `prev` on the default `y` axis. Set `axis: "x"` for horizontal wheel gestures. `threshold` must be finite and non-negative; `threshold: 0` is allowed, while values below `0`, `NaN`, and infinities are invalid.
 
 ### `useTouchInput`
 
@@ -361,7 +361,7 @@ function InputLayer() {
 }
 ```
 
-On the default `y` axis, swipe up navigates to `next` and swipe down navigates to `prev`. Set `axis: "x"` for horizontal swipes.
+On the default `y` axis, swipe up navigates to `next` and swipe down navigates to `prev`. Set `axis: "x"` for horizontal swipes. `threshold` must be finite and non-negative; `threshold: 0` is allowed, while values below `0`, `NaN`, and infinities are invalid.
 
 ### `useKeyboardInput`
 
