@@ -48,26 +48,38 @@ v0.5.0 should not become a feature-expansion release.
 
 ## Documentation alignment checklist
 
-- [ ] Root README points current planning to this v0.5.0 roadmap.
-- [ ] Historical v0.4.0 release notes read as published release notes, not a release-prep draft.
-- [ ] Historical v0.4.0 roadmap clearly points current planning to v0.5.0.
-- [ ] Release checklist remains reusable for future versions.
-- [ ] Documentation avoids implying that planning PRs publish packages, create tags, create GitHub Releases, or change automation.
-- [ ] Public API examples stay centered on the documented provider and hooks.
-- [ ] Peer dependency ranges are documented consistently with the package manifest.
+- [x] Root README points current planning to this v0.5.0 roadmap and Issue #110.
+- [x] Historical v0.4.0 release notes read as published release notes, not a release-prep draft.
+- [x] Historical v0.4.0 roadmap clearly points current planning to v0.5.0.
+- [x] Release checklist remains reusable for future versions.
+- [x] Documentation avoids implying that planning PRs publish packages, create tags, create GitHub Releases, or change automation.
+- [x] Public API examples stay centered on the documented provider and hooks.
+- [x] Peer dependency ranges are documented consistently with the package manifest.
 
 ## Example review checklist
 
-- [ ] Examples use `FlowProvider` with stable phases and configuration.
-- [ ] DOM input hooks remain outside R3F scene logic.
-- [ ] R3F hooks remain inside Canvas-bound components.
-- [ ] Next.js snippets that use hooks or browser input are clearly Client Components.
-- [ ] Examples do not imply visual effects, camera presets, shader APIs, animation timelines, router integration, GSAP integration, or Framer Motion integration.
-- [ ] Example validation commands are documented only when they exist and are expected to pass.
+- [x] Examples use `FlowProvider` with stable phases and configuration.
+- [x] DOM input hooks remain outside R3F scene logic.
+- [x] R3F hooks remain inside Canvas-bound components.
+- [x] Next.js snippets that use hooks or browser input are clearly Client Components.
+- [x] Examples do not imply visual effects, camera presets, shader APIs, animation timelines, router integration, GSAP integration, or Framer Motion integration.
+- [x] Example validation commands are documented only when they exist and are expected to pass.
+
+## Completed v0.5.0 stabilization docs pass
+
+The documentation/example review pass has completed these stabilization items without changing runtime code, example source, package versions, dependencies, release automation, tags, GitHub Releases, or npm publishing:
+
+- Root README public API/export alignment.
+- `examples/vite-basic/README.md` coverage for the basic Vite example.
+- Next.js Client Component boundary clarification.
+- Root README validation matrix by PR type.
+- Package README validation guidance synchronized with the root README.
+
+This does not mean v0.5.0 is ready to release. A separate release-prep review should still verify the final package state before any versioning, publishing, tag, or GitHub Release work.
 
 ## Reliability follow-up policy
 
-Reliability work is allowed only when review finds a real gap in the existing behavior or tests. Keep follow-up PRs small and focused.
+Reliability work is allowed only when review finds a real gap in the existing behavior or tests. Keep follow-up PRs small and focused. No new reliability test task has been identified from the documentation/example review pass yet.
 
 When adding a reliability test:
 
