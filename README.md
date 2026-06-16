@@ -119,10 +119,15 @@ const phases = ["intro", "work", "contact"] as const;
 
 type Phase = (typeof phases)[number];
 
+const keyboardKeys = {
+  next: ["ArrowDown", "ArrowRight", "PageDown"],
+  prev: ["ArrowUp", "ArrowLeft", "PageUp"]
+} as const;
+
 function FlowInputLayer() {
   useWheelInput<Phase>();
   useTouchInput<Phase>();
-  useKeyboardInput<Phase>();
+  useKeyboardInput<Phase>({ keys: keyboardKeys });
 
   return null;
 }
@@ -350,10 +355,12 @@ The input hooks connect browser input to `next` and `prev`.
   - swipe down -> `prev` on the default `y` axis
   - options: `target`, `threshold`, `axis`, `cooldown`, `enabled`, `preventDefault`, `ignore`
 - `useKeyboardInput`
-  - `ArrowDown`, `ArrowRight`, `PageDown`, Space -> `next`
-  - `ArrowUp`, `ArrowLeft`, `PageUp` -> `prev`
+  - `ArrowDown`, `ArrowRight`, `PageDown`, Space -> `next` by default
+  - `ArrowUp`, `ArrowLeft`, `PageUp` -> `prev` by default
   - options: `target`, `enabled`, `preventDefault`, `keys`, `cooldown`, `ignoreWhenTyping`
   - `keys.next` and `keys.prev` are the current keyboard configuration API. `nextKeys` and `prevKeys` still work as deprecated compatibility aliases.
+
+When a page has focused buttons or links, consider passing a `keys` object that omits Space so native Space activation still belongs to the focused control.
 
 Input hooks only attach browser event listeners inside React effects and are guarded for non-browser environments. They do not access browser APIs at module import time.
 

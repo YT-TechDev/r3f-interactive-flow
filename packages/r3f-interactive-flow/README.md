@@ -370,7 +370,7 @@ function InputLayer() {
   useKeyboardInput<Phase>({
     target: undefined,
     keys: {
-      next: ["ArrowDown", "ArrowRight", "PageDown", " "],
+      next: ["ArrowDown", "ArrowRight", "PageDown"],
       prev: ["ArrowUp", "ArrowLeft", "PageUp"]
     },
     cooldown: 500,
@@ -382,7 +382,7 @@ function InputLayer() {
 }
 ```
 
-`keys.next` and `keys.prev` are the current keyboard configuration API. `nextKeys` and `prevKeys` still work as deprecated compatibility aliases. Keyboard input also ignores typing in inputs, textareas, selects, and contenteditable elements by default.
+`keys.next` and `keys.prev` are the current keyboard configuration API. `nextKeys` and `prevKeys` still work as deprecated compatibility aliases. Keyboard input also ignores typing in inputs, textareas, selects, and contenteditable elements by default. The default next keys include Space, but DOM-control examples can omit Space so focused buttons keep native Space activation behavior.
 
 `target` accepts a `FlowInputTarget`: an `HTMLElement`, `Window`, or React ref object pointing to an element. If omitted, or if a ref has not resolved yet, input hooks use `window`.
 
@@ -390,7 +390,8 @@ function InputLayer() {
 
 This package is designed to be usable from Next.js App Router Client Components.
 
-- Use `FlowProvider`, `useFlow`, `useFlowProgress`, `useFlowFrame`, and input hooks from Client Components.
+- Use files marked with `"use client"` when rendering `FlowProvider` or calling `useFlow`, `useFlowProgress`, `useFlowFrame`, or the input hooks.
+- Server Components can pass serializable data into a Client Component wrapper, but they should not render the provider or call these hooks directly.
 - The package entry is marked as a client entry for Next.js App Router compatibility.
 - Browser APIs are used inside hooks/effects, not at module import time.
 - The package does not add Next.js as a dependency.
