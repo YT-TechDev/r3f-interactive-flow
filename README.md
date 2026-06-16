@@ -383,6 +383,9 @@ The input hooks connect browser input to `next` and `prev`.
   - swipe up -> `next`
   - swipe down -> `prev` on the default `y` axis
   - options: `target`, `threshold`, `axis`, `cooldown`, `enabled`, `preventDefault`, `ignore`
+
+Wheel and touch `threshold` values must be finite and non-negative. `threshold: 0` is allowed; values below `0`, `NaN`, and infinities are invalid.
+
 - `useKeyboardInput`
   - `ArrowDown`, `ArrowRight`, `PageDown`, Space -> `next` by default
   - `ArrowUp`, `ArrowLeft`, `PageUp` -> `prev` by default
