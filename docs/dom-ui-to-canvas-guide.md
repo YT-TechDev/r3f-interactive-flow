@@ -175,6 +175,77 @@ For the App Router, keep flow UI in Client Components:
 - Browser input hooks guard against missing `window`, but they still belong in Client Components because they use React effects and browser events.
 - Canvas-bound components that call `useFlowFrame`, `useFrame`, or `useThree` must still be rendered inside `<Canvas>`.
 
+### Server Component to Client Component wrapper
+
+In the App Router, keep `page.tsx` and `layout.tsx` Server Components free of `FlowProvider` and flow hooks. Put `FlowProvider`, browser input hooks, `useFlow`, `useFlowProgress`, `<Canvas>`, and `useFlowFrame` usage inside a Client Component wrapper instead.
+
+Server Components may pass serializable data, such as phase names or labels, into that wrapper. Browser input hooks still attach listeners inside effects, but the component that calls them must be a Client Component. This is not router integration; it is only a safe component boundary pattern.
+
+File: `app/page.tsx`
+
+```tsx
+import { FlowExperienceClient } from "./FlowExperienceClient";
+
+export default function Page() {
+  return <FlowExperienceClient />;
+}
+```
+
+File: `app/FlowExperienceClient.tsx`
+
+```tsx
+"use client";
+
+import { Canvas } from "@react-three/fiber";
+import { FlowProvider, useFlow, useFlowFrame } from "r3f-interactive-flow";
+
+const phases = ["intro", "work", "contact"] as const;
+type Phase = (typeof phases)[number];
+
+function FlowNav() {
+  const flow = useFlow<Phase>();
+
+  return (
+    <nav data-flow-ignore>
+      <p>Phase: {flow.phase}</p>
+      <button type="button" onClick={flow.prev}>
+        Prev
+      </button>
+      <button type="button" onClick={flow.next}>
+        Next
+      </button>
+    </nav>
+  );
+}
+
+function FlowBox() {
+  useFlowFrame<Phase>(({ progress }) => {
+    // Mutate Canvas-local refs here in real scenes.
+    // Keep frame-driven updates inside Canvas-bound components.
+    void progress;
+  });
+
+  return (
+    <mesh>
+      <boxGeometry />
+      <meshStandardMaterial />
+    </mesh>
+  );
+}
+
+export function FlowExperienceClient() {
+  return (
+    <FlowProvider phases={phases}>
+      <FlowNav />
+
+      <Canvas>
+        <FlowBox />
+      </Canvas>
+    </FlowProvider>
+  );
+}
+```
+
 ## Complete copyable example
 
 ```tsx
