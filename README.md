@@ -12,7 +12,7 @@ Current package version on `main`: `0.6.0`.
 
 v0.6.0 release-prep and release-notes work is complete in this repository and documented in [docs/releases/v0.6.0.md](docs/releases/v0.6.0.md). This repository documentation does not claim npm publishing, git tag creation, or GitHub Release creation for v0.6.0.
 
-Future work after `v0.6.0` should remain narrow and stabilization-focused unless explicitly approved. Historical v0.6.0, v0.5.0, and v0.4.0 planning and release references remain available in [docs/roadmap-v0.6.0.md](docs/roadmap-v0.6.0.md), [docs/releases/v0.5.0.md](docs/releases/v0.5.0.md), [docs/roadmap-v0.5.0.md](docs/roadmap-v0.5.0.md), [docs/releases/v0.4.0.md](docs/releases/v0.4.0.md), and [docs/roadmap-v0.4.0.md](docs/roadmap-v0.4.0.md).
+Future v0.7.0 work should use [docs/roadmap-v0.7.0.md](docs/roadmap-v0.7.0.md) as the planning baseline and remain narrow and stabilization-focused unless explicitly approved. Historical v0.6.0, v0.5.0, and v0.4.0 planning and release references remain available in [docs/roadmap-v0.6.0.md](docs/roadmap-v0.6.0.md), [docs/releases/v0.5.0.md](docs/releases/v0.5.0.md), [docs/roadmap-v0.5.0.md](docs/roadmap-v0.5.0.md), [docs/releases/v0.4.0.md](docs/releases/v0.4.0.md), and [docs/roadmap-v0.4.0.md](docs/roadmap-v0.4.0.md).
 
 For the v0.3.0 design baseline, see [docs/v0.3.0-spec.md](docs/v0.3.0-spec.md). For real-world DOM UI and Canvas wiring, see [docs/dom-ui-to-canvas-guide.md](docs/dom-ui-to-canvas-guide.md).
 
