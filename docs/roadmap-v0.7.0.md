@@ -2,7 +2,7 @@
 
 ## Status after v0.6.0
 
-v0.6.0 is complete in this repository as a narrow input stabilization release. The repository documents v0.6.0 planning and release notes without claiming npm publishing, git tag creation, or GitHub Release creation.
+v0.6.0 is complete as a narrow input stabilization release. The repository documents the v0.6.0 planning and release notes, `r3f-interactive-flow@0.6.0` has been published to npm, and the GitHub Release for v0.6.0 has been created.
 
 Completed v0.6.0 work included:
 
@@ -11,7 +11,7 @@ Completed v0.6.0 work included:
 - Documentation sync for threshold validation behavior.
 - Hook-local cooldown guard tests for ignored or blocked wheel, touch, and keyboard input events.
 
-This roadmap is documentation-only. It does not publish, tag, release, add runtime behavior, add dependencies, change release automation, bump package versions, change tests, or expand the public API by itself.
+This roadmap is documentation-only. It does not publish another package version, create tags, create GitHub Releases, add runtime behavior, add dependencies, change release automation, bump package versions, change tests, or expand the public API by itself.
 
 ## Goal
 
@@ -25,7 +25,7 @@ v0.7.0 should not become a feature-expansion release.
 
 1. Post-v0.6.0 documentation alignment.
    - Align root and package README references after completed v0.6.0 work.
-   - Keep status wording conservative and avoid claiming publish, tag, or GitHub Release actions unless already documented as completed.
+   - Keep status wording conservative and distinguish completed v0.6.0 publish/release actions from future release-prep verification.
 2. Package exports / dist output verification hardening.
    - Review package output verification for the current package shape.
    - Prefer small checks that protect existing expected files, exports, and built output behavior.
