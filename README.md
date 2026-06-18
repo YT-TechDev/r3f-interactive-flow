@@ -10,7 +10,7 @@ The goal is not to provide visual effects. The goal is to make interactive R3F s
 
 Current package version on `main`: `0.6.0`.
 
-v0.6.0 release-prep and release-notes work is complete in this repository and documented in [docs/releases/v0.6.0.md](docs/releases/v0.6.0.md). This repository documentation does not claim npm publishing, git tag creation, or GitHub Release creation for v0.6.0.
+v0.6.0 release-prep and release-notes work is complete in this repository and documented in [docs/releases/v0.6.0.md](docs/releases/v0.6.0.md). `r3f-interactive-flow@0.6.0` has been published to npm, and the GitHub Release for v0.6.0 has been created.
 
 Future v0.7.0 work should use [docs/roadmap-v0.7.0.md](docs/roadmap-v0.7.0.md) as the planning baseline and remain narrow and stabilization-focused unless explicitly approved. Historical v0.6.0, v0.5.0, and v0.4.0 planning and release references remain available in [docs/roadmap-v0.6.0.md](docs/roadmap-v0.6.0.md), [docs/releases/v0.5.0.md](docs/releases/v0.5.0.md), [docs/roadmap-v0.5.0.md](docs/roadmap-v0.5.0.md), [docs/releases/v0.4.0.md](docs/releases/v0.4.0.md), and [docs/roadmap-v0.4.0.md](docs/roadmap-v0.4.0.md).
 
