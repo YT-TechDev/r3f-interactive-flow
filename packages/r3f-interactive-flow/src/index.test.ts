@@ -70,35 +70,62 @@ describe("public API", () => {
     expect(nullableRefTarget.current).toBeNull();
   });
 
-  it("exposes input hook option types", () => {
+  it("exposes documented input hook option types", () => {
     const inputTarget: FlowInputTarget = { current: {} as HTMLElement };
 
+    const ignoredSelectors = ["[data-flow-ignore]", "input"] as const;
     const wheelOptions: UseWheelInputOptions = {
       target: inputTarget,
       threshold: 40,
+      axis: "y",
+      cooldown: 250,
       enabled: true,
-      preventDefault: true
+      preventDefault: true,
+      ignore: ignoredSelectors
     };
 
     const touchOptions: UseTouchInputOptions = {
       target: inputTarget,
       threshold: 50,
+      axis: "x",
+      cooldown: 300,
       enabled: true,
-      preventDefault: true
+      preventDefault: true,
+      ignore: ignoredSelectors
     };
 
-    const keyboardOptions: UseKeyboardInputOptions = {
+    const groupedKeyboardOptions: UseKeyboardInputOptions = {
       target: inputTarget,
-      nextKeys: ["ArrowDown"],
-      prevKeys: ["ArrowUp"],
+      keys: {
+        next: ["ArrowDown", "PageDown"],
+        prev: ["ArrowUp", "PageUp"]
+      },
+      cooldown: 400,
+      ignoreWhenTyping: true,
       enabled: true,
       preventDefault: true
     };
 
-    expect(wheelOptions.target).toBe(inputTarget);
-    expect(wheelOptions.threshold).toBe(40);
-    expect(touchOptions.threshold).toBe(50);
-    expect(keyboardOptions.nextKeys).toEqual(["ArrowDown"]);
+    const compatibilityKeyboardOptions: UseKeyboardInputOptions = {
+      target: inputTarget,
+      nextKeys: ["ArrowRight"],
+      prevKeys: ["ArrowLeft"],
+      cooldown: 500,
+      ignoreWhenTyping: false,
+      enabled: true,
+      preventDefault: true
+    };
+
+    expect(wheelOptions.axis).toBe("y");
+    expect(wheelOptions.cooldown).toBe(250);
+    expect(wheelOptions.ignore).toBe(ignoredSelectors);
+    expect(touchOptions.axis).toBe("x");
+    expect(touchOptions.cooldown).toBe(300);
+    expect(touchOptions.ignore).toBe(ignoredSelectors);
+    expect(groupedKeyboardOptions.keys?.next).toEqual(["ArrowDown", "PageDown"]);
+    expect(groupedKeyboardOptions.keys?.prev).toEqual(["ArrowUp", "PageUp"]);
+    expect(compatibilityKeyboardOptions.nextKeys).toEqual(["ArrowRight"]);
+    expect(compatibilityKeyboardOptions.prevKeys).toEqual(["ArrowLeft"]);
   });
 
   it("exposes transition option types", () => {
