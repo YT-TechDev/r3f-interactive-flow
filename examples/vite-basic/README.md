@@ -19,8 +19,9 @@ This example demonstrates the current stable public API for a small Vite and Rea
 - DOM controls using `useFlow`.
 - DOM status and progress using `useFlowProgress`.
 - Canvas-bound mesh updates using `useFlowFrame`.
-- Wheel, touch, and keyboard navigation.
+- Wheel, touch, and keyboard navigation with threshold and cooldown options.
 - Ignore selectors for buttons, forms, links, and interactive UI.
+- Grouped keyboard `keys.next` / `keys.prev` bindings.
 - Keeping R3F frame updates inside Canvas-bound components.
 
 ## What it intentionally does not demonstrate
@@ -54,4 +55,4 @@ pnpm --filter vite-basic build
 
 - `useFlowFrame` must stay inside components rendered within `Canvas`.
 - DOM/UI should use `useFlow` or `useFlowProgress`, not per-frame React state.
-- Input hooks attach browser listeners inside effects and should stay in DOM/client components.
+- Input hooks attach browser listeners inside effects and should stay in DOM/client components, outside Canvas scene logic.
