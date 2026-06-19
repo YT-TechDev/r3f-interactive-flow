@@ -4,7 +4,15 @@ This document is for maintainers preparing a package release.
 
 ## Release planning note
 
-Before opening a release-prep PR for any version, confirm there is an up-to-date roadmap or issue that defines the intended scope. Release planning checklists are verification-only: they do not publish, tag, create a GitHub Release, change package versions, or modify release automation by themselves.
+Before opening a release-prep PR for any version, confirm there is an up-to-date roadmap or issue that defines the intended scope. Planning and documentation PRs are verification-only: they should clarify scope, checklist expectations, and known release state without publishing packages, creating git tags, creating GitHub Releases, changing package versions, or modifying release automation.
+
+Keep these release activities separate:
+
+- **Safe release-prep verification:** run local checks, inspect package output, review docs, and confirm the expected package contents. `pnpm release:check` belongs in this category; it performs verification and package dry-run work only.
+- **Package version/update PR work:** update the package version, changelog, and release notes only when the release-prep task explicitly calls for those changes.
+- **Actual npm publish:** run `pnpm release` only when maintainers are intentionally ready to publish the already-prepared package to npm.
+- **Actual git tag creation:** create release tags only as an explicit maintainer release action, not from planning, checklist, or documentation-only work.
+- **Actual GitHub Release creation:** create the GitHub Release only as an explicit maintainer release action after the release notes are final and the release process calls for it.
 
 ## Before release
 
@@ -25,7 +33,7 @@ pnpm install --frozen-lockfile
 pnpm release:check
 ```
 
-The `release:check` script runs build, package output verification, typecheck, tests, lint, format, Vite example build, and package dry-run.
+The `release:check` script runs build, package output verification, typecheck, tests, lint, format, Vite example build, and package dry-run. It is safe release-prep verification: it does not publish to npm, create git tags, create GitHub Releases, change package versions, or modify release automation.
 
 For an additional direct package dry-run:
 
@@ -52,7 +60,7 @@ The built `dist/index.js` and `dist/index.cjs` outputs should preserve the `"use
 
 ## Do not publish accidentally
 
-Do not run these commands unless you intentionally want to publish:
+Do not run these commands from planning, documentation-only, or verification-only PRs. Run them only when maintainers intentionally want to publish:
 
 ```bash
 pnpm release
@@ -62,18 +70,20 @@ npm publish
 
 ## Publishing
 
-When ready to publish:
+When maintainers are ready to publish:
 
 1. Confirm npm authentication and permissions.
 2. Confirm the npm package name is correct.
 3. Confirm `release:check` passes.
-4. Run:
+4. Confirm the package version, changelog entry, and release notes were already prepared in the intended release-prep PR.
+5. Confirm this is an intentional npm publish action, not a planning or documentation-only task.
+6. Run:
 
 ```bash
 pnpm release
 ```
 
-The release command runs `release:check` before `changeset publish`.
+The `release` command is a publishing command. It runs `release:check` before `changeset publish`, then publishes the package to npm if authentication and package state allow it.
 
 ## After publish
 
@@ -81,7 +91,9 @@ The release command runs `release:check` before `changeset publish`.
 - Confirm the npm README renders correctly.
 - Confirm the published package contents look correct.
 - Confirm the GitHub repository remains clean.
-- Create a GitHub release or tag only if that is part of the release process.
+- Create a git tag only when the release process explicitly calls for the tag.
+- Create a GitHub Release only when the release process explicitly calls for the release record.
+- Keep the tag and GitHub Release steps separate from planning, documentation-only, and verification-only PRs.
 
 ## If something fails
 

@@ -39,6 +39,7 @@ v0.7.0 should not become a feature-expansion release.
    - Keep the example narrow and avoid large template or integration work.
 5. Release checklist clarity around release-prep vs actual publish/tag/GitHub Release actions.
    - Clarify which steps are safe release-prep verification.
+   - Distinguish package version, changelog, and release-notes update PR work from documentation-only planning work.
    - Keep actual publish, tag, and GitHub Release actions clearly separated from planning and verification work.
 
 ## Non-goals
@@ -101,4 +102,4 @@ For Vite basic example validation PRs, add the relevant example build or typeche
 
 For release checklist documentation PRs, keep validation to formatting and linting unless the documentation references a specific script that should be verified.
 
-Do not run publish, tag, or GitHub Release commands from planning, documentation, or verification-only work.
+Do not run publish, tag, or GitHub Release commands from planning, documentation, or verification-only work. Treat `pnpm release:check` as non-publishing release-prep verification, and reserve `pnpm release` for intentional maintainer publishing only.
