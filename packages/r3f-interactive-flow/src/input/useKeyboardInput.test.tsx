@@ -658,6 +658,51 @@ describe("useKeyboardInput", () => {
     vi.useRealTimers();
   });
 
+  it("does not navigate through keyboard input while the flow transition cooldown is active", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let machine: FlowMachine<TestPhase> | undefined;
+    let syncSnapshot: (() => void) | undefined;
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe
+          onRender={(renderedMachine, renderedSyncSnapshot) => {
+            machine = renderedMachine;
+            syncSnapshot = renderedSyncSnapshot;
+          }}
+        />
+      </>,
+      undefined,
+      { transitionDurationMs: 100, cooldownMs: 500 }
+    );
+
+    dispatchKeyDown("ArrowDown");
+
+    act(() => {
+      machine?.update(100);
+      syncSnapshot?.();
+    });
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.isTransitioning).toBe(false);
+
+    dispatchKeyDown("ArrowDown");
+
+    expect(latestControls?.phase).toBe("work");
+
+    act(() => {
+      machine?.update(400);
+      syncSnapshot?.();
+    });
+
+    dispatchKeyDown("ArrowDown");
+
+    expect(latestControls?.phase).toBe("contact");
+    expect(latestControls?.direction).toBe("next");
+  });
+
   it.each([Number.NaN, Number.POSITIVE_INFINITY, -1])(
     "throws a clear error for invalid cooldown %s",
     (cooldown) => {

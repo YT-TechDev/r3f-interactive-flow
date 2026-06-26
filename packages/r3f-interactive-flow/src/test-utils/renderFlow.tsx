@@ -5,6 +5,7 @@ import { afterEach, beforeEach, vi } from "vitest";
 
 import type { FlowControls } from "../core/types";
 import { FlowProvider } from "../react/FlowProvider";
+import type { FlowProviderProps } from "../react/FlowProvider";
 import { useFlow } from "../react/useFlow";
 import { windowTarget } from "./minimalDom";
 
@@ -23,6 +24,11 @@ function ControlsProbeComponent<TPhase extends string>({
 export function createControlsProbe<TPhase extends string>() {
   return ControlsProbeComponent<TPhase>;
 }
+
+type RenderFlowOptions<TPhase extends string> = Pick<
+  FlowProviderProps<TPhase>,
+  "transitionDurationMs" | "cooldownMs" | "easing" | "transition"
+>;
 
 export function createFlowTestHarness<TPhase extends string>({
   createRoot,
@@ -53,10 +59,18 @@ export function createFlowTestHarness<TPhase extends string>({
 
   return {
     getRoot: () => root,
-    renderFlow(children: ReactNode, initialPhase?: TPhase): void {
+    renderFlow(
+      children: ReactNode,
+      initialPhase?: TPhase,
+      options: RenderFlowOptions<TPhase> = {}
+    ): void {
       act(() => {
         root?.render(
-          <FlowProvider phases={phases} {...(initialPhase !== undefined ? { initialPhase } : {})}>
+          <FlowProvider
+            phases={phases}
+            {...(initialPhase !== undefined ? { initialPhase } : {})}
+            {...options}
+          >
             {children}
           </FlowProvider>
         );

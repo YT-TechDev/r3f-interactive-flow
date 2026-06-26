@@ -532,6 +532,51 @@ describe("useWheelInput", () => {
     vi.useRealTimers();
   });
 
+  it("does not navigate through wheel input while the flow transition cooldown is active", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let machine: FlowMachine<TestPhase> | undefined;
+    let syncSnapshot: (() => void) | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe
+          onRender={(renderedMachine, renderedSyncSnapshot) => {
+            machine = renderedMachine;
+            syncSnapshot = renderedSyncSnapshot;
+          }}
+        />
+      </>,
+      undefined,
+      { transitionDurationMs: 100, cooldownMs: 500 }
+    );
+
+    dispatchWheel(41);
+
+    act(() => {
+      machine?.update(100);
+      syncSnapshot?.();
+    });
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.isTransitioning).toBe(false);
+
+    dispatchWheel(41);
+
+    expect(latestControls?.phase).toBe("work");
+
+    act(() => {
+      machine?.update(400);
+      syncSnapshot?.();
+    });
+
+    dispatchWheel(41);
+
+    expect(latestControls?.phase).toBe("contact");
+    expect(latestControls?.direction).toBe("next");
+  });
+
   it("removes the listener from the old target when the target changes", () => {
     const firstTarget = document.createElement("div") as unknown as MinimalElement;
     const secondTarget = document.createElement("div") as unknown as MinimalElement;
