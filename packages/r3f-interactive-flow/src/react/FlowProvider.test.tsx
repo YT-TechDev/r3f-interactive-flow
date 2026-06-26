@@ -393,19 +393,24 @@ describe("FlowProvider and hooks", () => {
 
   it("accepts transition options and passes them to the core machine", () => {
     let context: NonNullable<React.ContextType<typeof FlowContext>> | undefined;
+    let latestControls: FlowControls<TestPhase> | undefined;
 
-    renderFlow(<MachineProbe onRender={(value) => (context = value)} />, undefined, {
-      transition: {
-        duration: 200,
-        byPhase: {
-          intro: { easing: (progress) => progress * progress }
+    renderFlow(
+      <>
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe onRender={(value) => (context = value)} />
+      </>,
+      undefined,
+      {
+        transition: {
+          duration: 200,
+          easing: (progress) => progress * progress
         }
       }
-    });
+    );
 
     act(() => {
-      context?.machine.next();
-      context?.syncSnapshot();
+      latestControls?.next();
     });
 
     act(() => {
@@ -413,7 +418,108 @@ describe("FlowProvider and hooks", () => {
       context?.syncSnapshot();
     });
 
-    expect(context?.machine.progress).toBe(0.25);
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      progress: 0.25,
+      isTransitioning: true
+    });
+  });
+
+  it("passes transition cooldown through the provider", () => {
+    let context: NonNullable<React.ContextType<typeof FlowContext>> | undefined;
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe onRender={(value) => (context = value)} />
+      </>,
+      undefined,
+      {
+        transition: {
+          duration: 100,
+          cooldown: 300
+        }
+      }
+    );
+
+    act(() => {
+      latestControls?.next();
+      context?.machine.update(100);
+      context?.syncSnapshot();
+    });
+
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      isTransitioning: false
+    });
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      isTransitioning: false
+    });
+
+    act(() => {
+      context?.machine.update(199);
+      context?.syncSnapshot();
+      latestControls?.next();
+    });
+
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      isTransitioning: false
+    });
+
+    act(() => {
+      context?.machine.update(1);
+      context?.syncSnapshot();
+      latestControls?.next();
+    });
+
+    expect(latestControls).toMatchObject({
+      phase: "contact",
+      isTransitioning: true
+    });
+  });
+
+  it("uses transition byPhase options from the source phase through the provider", () => {
+    let context: NonNullable<React.ContextType<typeof FlowContext>> | undefined;
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe onRender={(value) => (context = value)} />
+      </>,
+      "work",
+      {
+        transition: {
+          duration: 1000,
+          byPhase: {
+            intro: { duration: 100, easing: () => 0 },
+            work: { duration: 200, easing: (progress) => progress * progress },
+            contact: { duration: 800, easing: () => 1 }
+          }
+        }
+      }
+    );
+
+    act(() => {
+      latestControls?.prev();
+      context?.machine.update(100);
+      context?.syncSnapshot();
+    });
+
+    expect(latestControls).toMatchObject({
+      phase: "intro",
+      progress: 0.25,
+      direction: "prev",
+      isTransitioning: true
+    });
   });
 
   it("keeps legacy timing props working through the provider", () => {
@@ -435,23 +541,70 @@ describe("FlowProvider and hooks", () => {
 
   it("lets transition props take precedence over legacy timing props through the provider", () => {
     let context: NonNullable<React.ContextType<typeof FlowContext>> | undefined;
+    let latestControls: FlowControls<TestPhase> | undefined;
 
-    renderFlow(<MachineProbe onRender={(value) => (context = value)} />, undefined, {
-      transitionDurationMs: 1000,
-      easing: () => 0,
-      transition: {
-        duration: 200,
-        easing: (progress) => progress
+    renderFlow(
+      <>
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe onRender={(value) => (context = value)} />
+      </>,
+      undefined,
+      {
+        transitionDurationMs: 1000,
+        cooldownMs: 1000,
+        easing: () => 0,
+        transition: {
+          duration: 200,
+          cooldown: 300,
+          easing: (progress) => progress
+        }
       }
-    });
+    );
 
     act(() => {
-      context?.machine.next();
+      latestControls?.next();
       context?.machine.update(100);
       context?.syncSnapshot();
     });
 
-    expect(context?.machine.progress).toBe(0.5);
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      progress: 0.5,
+      isTransitioning: true
+    });
+
+    act(() => {
+      context?.machine.update(100);
+      context?.syncSnapshot();
+      latestControls?.next();
+    });
+
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      isTransitioning: false
+    });
+
+    act(() => {
+      context?.machine.update(99);
+      context?.syncSnapshot();
+      latestControls?.next();
+    });
+
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      isTransitioning: false
+    });
+
+    act(() => {
+      context?.machine.update(1);
+      context?.syncSnapshot();
+      latestControls?.next();
+    });
+
+    expect(latestControls).toMatchObject({
+      phase: "contact",
+      isTransitioning: true
+    });
   });
 
   it("throws a clear error when useFlow is rendered outside FlowProvider", () => {
