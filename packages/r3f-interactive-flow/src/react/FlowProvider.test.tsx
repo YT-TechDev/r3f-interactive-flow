@@ -391,6 +391,92 @@ describe("FlowProvider and hooks", () => {
     expect(latestProgress).toBe(latestControls?.progress);
   });
 
+  it("keeps useFlowProgress aligned with useFlow progress during transitions", () => {
+    let context: NonNullable<React.ContextType<typeof FlowContext>> | undefined;
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let latestProgress: number | undefined;
+
+    renderFlow(
+      <>
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <ProgressProbe onRender={(progress) => (latestProgress = progress)} />
+        <MachineProbe onRender={(value) => (context = value)} />
+      </>,
+      undefined,
+      { transition: { duration: 100 } }
+    );
+
+    act(() => {
+      latestControls?.next();
+      context?.machine.update(40);
+      context?.syncSnapshot();
+    });
+
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      progress: 0.4,
+      isTransitioning: true
+    });
+    expect(latestProgress).toBe(latestControls?.progress);
+  });
+
+  it("returns completed transition progress from useFlowProgress", () => {
+    let context: NonNullable<React.ContextType<typeof FlowContext>> | undefined;
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let latestProgress: number | undefined;
+
+    renderFlow(
+      <>
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <ProgressProbe onRender={(progress) => (latestProgress = progress)} />
+        <MachineProbe onRender={(value) => (context = value)} />
+      </>,
+      undefined,
+      { transition: { duration: 100 } }
+    );
+
+    act(() => {
+      latestControls?.next();
+      context?.machine.update(100);
+      context?.syncSnapshot();
+    });
+
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      progress: 1,
+      isTransitioning: false
+    });
+    expect(latestProgress).toBe(1);
+    expect(latestProgress).toBe(latestControls?.progress);
+  });
+
+  it("does not change useFlowProgress for same-phase or boundary no-op navigation", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let latestProgress: number | undefined;
+
+    renderFlow(
+      <>
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <ProgressProbe onRender={(progress) => (latestProgress = progress)} />
+      </>
+    );
+
+    expect(latestProgress).toBe(0);
+
+    act(() => {
+      latestControls?.goTo("intro");
+      latestControls?.prev();
+    });
+
+    expect(latestControls).toMatchObject({
+      phase: "intro",
+      progress: 0,
+      isTransitioning: false
+    });
+    expect(latestProgress).toBe(0);
+    expect(latestProgress).toBe(latestControls?.progress);
+  });
+
   it("accepts transition options and passes them to the core machine", () => {
     let context: NonNullable<React.ContextType<typeof FlowContext>> | undefined;
     let latestControls: FlowControls<TestPhase> | undefined;
