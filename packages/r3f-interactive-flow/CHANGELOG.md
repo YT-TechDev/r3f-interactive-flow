@@ -1,5 +1,42 @@
 # r3f-interactive-flow
 
+## 0.8.0
+
+v0.8.0 is a narrow stabilization release for predictable transition, input, React provider, public export, and example behavior. It strengthens confidence in the current phase/input/progress/frame coordination API before further releases without introducing a new public API or broadening the project into a general animation framework.
+
+### Improved
+
+- Stabilized accepted and rejected navigation behavior with core transition regression coverage.
+- Clarified transition cooldown behavior for accepted navigation and ignored requests.
+- Covered transition option precedence, fallback behavior, and `transition.byPhase` source-phase semantics.
+- Validated `FlowProvider` transition option forwarding and `useFlowProgress` consistency with `useFlow().progress`.
+
+### Tests
+
+- Added regression coverage for input hook cooldown gates.
+- Added regression coverage for manual lock and unlock behavior.
+- Added regression coverage for `enabled: false` input handling and re-enabled input behavior.
+- Added public package export regression coverage to keep exports intentional.
+
+### Documentation
+
+- Synchronized README tested behavior documentation with the stabilized transition, input, provider, progress, and public export behavior.
+
+### Examples
+
+- Validated the Vite basic example and fixed local source resolution for example development.
+
+### Scope
+
+- No package version changes are included in this release-prep entry.
+- No npm publishing is included in this release-prep entry.
+- No git tag creation is included in this release-prep entry.
+- No GitHub Release creation is included in this release-prep entry.
+- No release automation changes were made.
+- No dependency additions were made.
+- No source code changes or public API expansion are introduced by this changelog entry.
+- No visual effects, camera presets, shader APIs, animation timelines, router integration, GSAP integration, Framer Motion integration, or demo templates were added.
+
 ## 0.7.0
 
 ### Minor Changes
