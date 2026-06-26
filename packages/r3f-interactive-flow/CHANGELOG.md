@@ -1,5 +1,11 @@
 # r3f-interactive-flow
 
+## 0.7.0
+
+### Minor Changes
+
+- Prepare the v0.7.0 stabilization release with consumer package confidence improvements, package output verification hardening, public API export checks, README/example consistency updates, and clearer release-prep documentation.
+
 ## 0.6.0
 
 v0.6.0 is a narrow input stabilization and release-prep release. It documents the completed v0.6.0 planning work, validates wheel and touch threshold handling, keeps threshold guidance synchronized, and adds targeted cooldown guard coverage for ignored or blocked wheel, touch, and keyboard input events.
