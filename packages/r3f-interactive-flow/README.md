@@ -295,19 +295,20 @@ Public transition option types are exported as `FlowTransitionBaseOptions` and `
 
 ## Tested navigation guards and cooldown behavior
 
-The v0.4.0 hardening work keeps navigation behavior narrow and predictable:
+Current tested navigation behavior is intentionally narrow and predictable:
 
 - `next()`, `prev()`, and `goTo(phase)` start transitions only when the request is valid.
 - Navigation requested while a transition is already active is ignored. Ignored navigation does not restart, reset, or extend the active transition or its cooldown.
 - `lock()` blocks otherwise valid navigation requests. `unlock()` allows navigation again. Locking does not cancel a transition that has already started.
 - Core transition cooldown starts from accepted navigation only. Boundary no-ops, same-phase `goTo`, locked navigation, and active-transition navigation do not start, reset, or extend that cooldown.
 - Input hook cooldown and core transition cooldown are separate concepts. Hook cooldown throttles repeated browser input before it reaches the flow controls; core cooldown guards accepted phase navigation in the flow machine.
+- Input hooks support `enabled: false` and can be re-enabled later; disabled hooks do not navigate, and re-enabled hooks resume listener behavior.
 
 ## Input hooks
 
 Input hooks connect browser input to `next` and `prev`. They attach browser event listeners inside React effects, are guarded for non-browser environments, and do not access browser APIs at module import time.
 
-`enabled: false` disables listener behavior. `target` accepts a direct `Window` or element target, or a React ref object pointing to an element. If `target` is omitted, or a ref is currently empty, the hooks fall back to `window`. When a target changes, the hooks clean up listeners from the old target before attaching to the new one.
+`enabled: false` disables listener behavior, and changing `enabled` back to `true` re-attaches listener behavior. `target` accepts a direct `Window` or element target, or a React ref object pointing to an element. If `target` is omitted, or a ref is currently empty, the hooks fall back to `window`. When a target changes, the hooks clean up listeners from the old target before attaching to the new one.
 
 Use an ignore selector list to avoid hijacking controls and editable content:
 

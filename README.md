@@ -8,11 +8,11 @@ The goal is not to provide visual effects. The goal is to make interactive R3F s
 
 ## Project status
 
-Current package version on `main`: `0.6.0`.
+`r3f-interactive-flow@0.7.0` has been published.
 
-v0.6.0 release-prep and release-notes work is complete in this repository and documented in [docs/releases/v0.6.0.md](docs/releases/v0.6.0.md). `r3f-interactive-flow@0.6.0` has been published to npm, and the GitHub Release for v0.6.0 has been created.
+The current development focus is v0.8.0 stabilization. v0.8.0 focuses on hardening transition behavior, cooldown behavior, input lock behavior, and browser input hook reliability without expanding the public API.
 
-Future v0.7.0 work should use [docs/roadmap-v0.7.0.md](docs/roadmap-v0.7.0.md) as the planning baseline and remain narrow and stabilization-focused unless explicitly approved. Historical v0.6.0, v0.5.0, and v0.4.0 planning and release references remain available in [docs/roadmap-v0.6.0.md](docs/roadmap-v0.6.0.md), [docs/releases/v0.5.0.md](docs/releases/v0.5.0.md), [docs/roadmap-v0.5.0.md](docs/roadmap-v0.5.0.md), [docs/releases/v0.4.0.md](docs/releases/v0.4.0.md), and [docs/roadmap-v0.4.0.md](docs/roadmap-v0.4.0.md).
+Historical planning and release references remain available in [docs/roadmap-v0.7.0.md](docs/roadmap-v0.7.0.md), [docs/releases/v0.6.0.md](docs/releases/v0.6.0.md), [docs/roadmap-v0.6.0.md](docs/roadmap-v0.6.0.md), [docs/releases/v0.5.0.md](docs/releases/v0.5.0.md), [docs/roadmap-v0.5.0.md](docs/roadmap-v0.5.0.md), [docs/releases/v0.4.0.md](docs/releases/v0.4.0.md), and [docs/roadmap-v0.4.0.md](docs/roadmap-v0.4.0.md).
 
 For the v0.3.0 design baseline, see [docs/v0.3.0-spec.md](docs/v0.3.0-spec.md). For real-world DOM UI and Canvas wiring, see [docs/dom-ui-to-canvas-guide.md](docs/dom-ui-to-canvas-guide.md).
 
@@ -222,13 +222,14 @@ export function App() {
 
 ## Tested navigation guards and cooldown behavior
 
-The v0.4.0 hardening work keeps navigation behavior narrow and predictable:
+Current tested navigation behavior is intentionally narrow and predictable:
 
 - `next()`, `prev()`, and `goTo(phase)` start transitions only when the request is valid.
 - Navigation requested while a transition is already active is ignored. Ignored navigation does not restart, reset, or extend the active transition or its cooldown.
 - `lock()` blocks otherwise valid navigation requests. `unlock()` allows navigation again. Locking does not cancel a transition that has already started.
 - Core transition cooldown starts from accepted navigation only. Boundary no-ops, same-phase `goTo`, locked navigation, and active-transition navigation do not start, reset, or extend that cooldown.
 - Input hook cooldown and core transition cooldown are separate concepts. Hook cooldown throttles repeated browser input before it reaches the flow controls; core cooldown guards accepted phase navigation in the flow machine.
+- Input hooks support `enabled: false` and can be re-enabled later; disabled hooks do not navigate, and re-enabled hooks resume listener behavior.
 
 ## Flow controls
 
