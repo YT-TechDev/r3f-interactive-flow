@@ -253,4 +253,154 @@ describe("createFlowMachine transition regressions", () => {
       isTransitioning: true
     });
   });
+
+  it("lets transition options take precedence over legacy timing props", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 1000,
+      cooldownMs: 1000,
+      easing: () => 0,
+      transition: {
+        duration: 200,
+        cooldown: 300,
+        easing: (progress) => progress
+      }
+    });
+
+    machine.next();
+    machine.update(100);
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "work",
+      progress: 0.5,
+      isTransitioning: true
+    });
+
+    machine.update(100);
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "work",
+      progress: 1,
+      isTransitioning: false
+    });
+
+    machine.next();
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "work",
+      isTransitioning: false
+    });
+
+    machine.update(99);
+    machine.next();
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "work",
+      isTransitioning: false
+    });
+
+    machine.update(1);
+    machine.next();
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "contact",
+      isTransitioning: true
+    });
+  });
+
+  it("uses transition byPhase options from the source phase", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      initialPhase: "work",
+      transition: {
+        duration: 1000,
+        byPhase: {
+          intro: { duration: 100, easing: () => 0 },
+          work: { duration: 200, easing: (progress) => progress * progress },
+          contact: { duration: 800, easing: () => 1 }
+        }
+      }
+    });
+
+    machine.prev();
+    machine.update(100);
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "intro",
+      progress: 0.25,
+      direction: "prev",
+      isTransitioning: true
+    });
+  });
+
+  it("falls back per field when a phase transition override is partial", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 1000,
+      cooldownMs: 1000,
+      easing: () => 0,
+      transition: {
+        cooldown: 300,
+        easing: (progress) => progress,
+        byPhase: {
+          intro: { duration: 200 }
+        }
+      }
+    });
+
+    machine.next();
+    machine.update(100);
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "work",
+      progress: 0.5,
+      isTransitioning: true
+    });
+
+    machine.update(100);
+    machine.update(99);
+    machine.next();
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "work",
+      isTransitioning: false
+    });
+
+    machine.update(1);
+    machine.next();
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "contact",
+      isTransitioning: true
+    });
+  });
+
+  it("starts transition cooldown only after accepted navigation", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transition: {
+        duration: 100,
+        cooldown: 300
+      }
+    });
+
+    machine.prev();
+    machine.goTo("intro");
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "intro",
+      direction: "none",
+      isTransitioning: false
+    });
+
+    machine.next();
+    machine.update(100);
+    machine.update(199);
+    machine.next();
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "work",
+      isTransitioning: false
+    });
+
+    machine.update(1);
+    machine.next();
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "contact",
+      direction: "next",
+      isTransitioning: true
+    });
+  });
 });
