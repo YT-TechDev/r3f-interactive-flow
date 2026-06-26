@@ -1,7 +1,10 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "r3f-interactive-flow": ["../../packages/r3f-interactive-flow/src/index.ts"]
+    }
   },
   "include": ["src", "vite.config.ts"]
 }
