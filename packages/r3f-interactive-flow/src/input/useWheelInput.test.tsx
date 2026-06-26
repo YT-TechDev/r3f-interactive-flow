@@ -180,6 +180,33 @@ describe("useWheelInput", () => {
     expect(latestControls?.direction).toBe("none");
   });
 
+  it("navigates after being re-enabled", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ enabled: false }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchWheel(41);
+
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ enabled: true }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+    dispatchWheel(41);
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
   it("removes the wheel event listener when enabled changes to false", () => {
     let latestControls: FlowControls<TestPhase> | undefined;
 
@@ -240,6 +267,15 @@ describe("useWheelInput", () => {
 
     expect(latestControls?.phase).toBe("intro");
     expect(latestControls?.isLocked).toBe(true);
+
+    act(() => {
+      latestControls?.unlock();
+    });
+    dispatchWheel(41);
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+    expect(latestControls?.isLocked).toBe(false);
   });
 
   it("does not navigate when the flow is transitioning", () => {
