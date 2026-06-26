@@ -216,6 +216,33 @@ describe("useKeyboardInput", () => {
     expect(latestControls?.direction).toBe("none");
   });
 
+  it("navigates after being re-enabled", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ enabled: false }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchKeyDown("ArrowDown");
+
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ enabled: true }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+    dispatchKeyDown("ArrowDown");
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
   it("removes the keydown listener when disabled after being enabled", () => {
     const removeEventListenerSpy = vi.spyOn(globalThis, "removeEventListener");
     let latestControls: FlowControls<TestPhase> | undefined;
@@ -322,6 +349,15 @@ describe("useKeyboardInput", () => {
 
     expect(latestControls?.phase).toBe("intro");
     expect(latestControls?.isLocked).toBe(true);
+
+    act(() => {
+      latestControls?.unlock();
+    });
+    dispatchKeyDown("ArrowDown");
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+    expect(latestControls?.isLocked).toBe(false);
   });
 
   it("does not navigate when the flow is transitioning", () => {

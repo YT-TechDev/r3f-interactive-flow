@@ -136,6 +136,33 @@ describe("useTouchInput", () => {
     }
   });
 
+  it("navigates after being re-enabled", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ enabled: false }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    swipe(100, 49);
+
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ enabled: true }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+    swipe(100, 49);
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
   it("removes touch listeners when enabled changes from true to false", () => {
     function ToggleProbe({ enabled }: { enabled: boolean }) {
       useTouchInput<TestPhase>({ enabled });
@@ -447,6 +474,15 @@ describe("useTouchInput", () => {
 
     expect(latestControls?.phase).toBe("intro");
     expect(latestControls?.isLocked).toBe(true);
+
+    act(() => {
+      latestControls?.unlock();
+    });
+    swipe(100, 49);
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+    expect(latestControls?.isLocked).toBe(false);
   });
 
   it("does not navigate when the flow is already transitioning", () => {
