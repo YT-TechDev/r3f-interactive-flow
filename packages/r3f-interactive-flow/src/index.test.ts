@@ -25,6 +25,10 @@ const expectedRuntimeExports = [
 describe("public API", () => {
   it("exposes the expected runtime exports", () => {
     expect(Object.keys(publicApi).sort()).toEqual(expectedRuntimeExports);
+
+    for (const exportName of expectedRuntimeExports) {
+      expect(publicApi[exportName as keyof typeof publicApi]).toBeTypeOf("function");
+    }
   });
 
   it("does not require browser APIs at module import time", async () => {
