@@ -20,7 +20,16 @@ const expectedRuntimeExports = [
   "useKeyboardInput",
   "useTouchInput",
   "useWheelInput"
-];
+] as const satisfies readonly (keyof typeof publicApi)[];
+
+type ExpectedRuntimeExport = (typeof expectedRuntimeExports)[number];
+type RuntimeExportCoverageIsExact = keyof typeof publicApi extends ExpectedRuntimeExport
+  ? ExpectedRuntimeExport extends keyof typeof publicApi
+    ? true
+    : never
+  : never;
+
+const runtimeExportCoverageIsExact: RuntimeExportCoverageIsExact = true;
 
 describe("public API", () => {
   it("exposes the expected runtime exports", () => {
@@ -29,6 +38,10 @@ describe("public API", () => {
     for (const exportName of expectedRuntimeExports) {
       expect(publicApi[exportName as keyof typeof publicApi]).toBeTypeOf("function");
     }
+  });
+
+  it("keeps the runtime export coverage exact at type-check time", () => {
+    expect(runtimeExportCoverageIsExact).toBe(true);
   });
 
   it("does not require browser APIs at module import time", async () => {
