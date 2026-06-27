@@ -1,5 +1,45 @@
 # r3f-interactive-flow
 
+## 1.0.0
+
+`r3f-interactive-flow@1.0.0` is the final stabilization release for the current focused library direction. It finalizes confidence in the existing phase, input, transition, React provider, package, documentation, example, and R3F frame bridge foundation without expanding the library into a general animation framework.
+
+### Stabilized
+
+- Strengthened public API and runtime export consistency coverage.
+- Aligned root README and package README usage guidance for the final public API.
+- Polished the `vite-basic` example guidance so input hooks remain optional browser helpers and `useFlowFrame` remains Canvas-bound.
+- Added input hook cleanup coverage so wheel, touch, and keyboard listeners stop driving flow navigation after unmount.
+- Added `useFlowFrame` final stability coverage for idle, completed, same-phase navigation, and rejected boundary navigation behavior.
+- Added `FlowProvider` / React hook consistency coverage so `useFlow()` and `useFlowProgress()` remain aligned.
+- Continued to focus on the existing public API and behavior.
+
+### Tests
+
+- Added public export coverage.
+- Added input hook cleanup and unmount regression coverage.
+- Added `useFlowFrame` final stability regression coverage.
+- Added `FlowProvider` final hook consistency regression coverage.
+
+### Documentation
+
+- Added the `v1.0.0` stabilization roadmap.
+- Synchronized post-`v0.9.0` project status.
+- Aligned root README, package README, and `vite-basic` example guidance for the final focused scope.
+
+### Scope
+
+- No package version changes are included in this release-prep entry.
+- No npm publishing is included in this release-prep entry.
+- No git tag creation is included in this release-prep entry.
+- No GitHub Release creation is included in this release-prep entry.
+- No release automation changes were made.
+- No runtime dependencies were added.
+- No package export changes were made.
+- No public API expansion was introduced.
+- No source code or test changes are included in this docs-only release-prep entry.
+- No visual effects, camera presets, shader APIs, animation timelines, router integration, GSAP integration, Framer Motion integration, or demo templates were added.
+
 ## 0.9.0
 
 v0.9.0 is a narrow stabilization release for the existing phase, input, transition, React provider, and R3F frame bridge foundation. It hardens completion, no-op, boundary, and input cooldown behavior without introducing a new public API or broadening the library into visual effects, camera presets, shader APIs, animation timelines, router integration, or animation-framework wrappers.
