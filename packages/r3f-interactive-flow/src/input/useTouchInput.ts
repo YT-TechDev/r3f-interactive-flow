@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import type { FlowControls } from "../core/types";
-import { useFlow } from "../react/useFlow";
+import { useContext, useEffect, useRef } from "react";
+import type { FlowControls, FlowMachine } from "../core/types";
+import { FlowContext } from "../react/FlowContext";
 import { resolveInputTarget, shouldIgnoreInputEvent } from "./inputUtils";
 import type { FlowInputTarget } from "./inputUtils";
+import { navigateAndSyncIfAccepted } from "./navigationAcceptance";
 
 const DEFAULT_THRESHOLD = 50;
 const DEFAULT_AXIS = "y";
@@ -37,15 +38,27 @@ function validateThreshold(threshold: number): void {
 }
 
 export function useTouchInput<TPhase extends string>(options: UseTouchInputOptions = {}): void {
-  const flow = useFlow<TPhase>();
+  const context = useContext(FlowContext);
+
+  if (context === null) {
+    throw new Error("useFlow must be used inside FlowProvider.");
+  }
+
+  const flow = context.controls as unknown as FlowControls<TPhase>;
+  const machine = context.machine as unknown as FlowMachine<TPhase>;
+  const syncSnapshot = context.syncSnapshot;
   const flowRef = useRef<FlowControls<TPhase>>(flow);
+  const machineRef = useRef(machine);
+  const syncSnapshotRef = useRef(syncSnapshot);
   const startPositionRef = useRef<number | null>(null);
   const gestureIgnoredRef = useRef(false);
   const lastNavigationAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     flowRef.current = flow;
-  }, [flow]);
+    machineRef.current = machine;
+    syncSnapshotRef.current = syncSnapshot;
+  }, [flow, machine, syncSnapshot]);
 
   useEffect(() => {
     if (options.enabled === false) {
@@ -138,14 +151,15 @@ export function useTouchInput<TPhase extends string>(options: UseTouchInputOptio
         return;
       }
 
-      lastNavigationAtRef.current = now;
+      const accepted = navigateAndSyncIfAccepted(
+        machineRef.current,
+        syncSnapshotRef.current,
+        delta > threshold ? "next" : "prev"
+      );
 
-      if (delta > threshold) {
-        currentFlow.next();
-        return;
+      if (accepted) {
+        lastNavigationAtRef.current = now;
       }
-
-      currentFlow.prev();
     };
 
     eventTarget.addEventListener("touchstart", handleTouchStart, {

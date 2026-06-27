@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import type { FlowControls } from "../core/types";
-import { useFlow } from "../react/useFlow";
+import { useContext, useEffect, useRef } from "react";
+import type { FlowControls, FlowMachine } from "../core/types";
+import { FlowContext } from "../react/FlowContext";
 import { resolveInputTarget } from "./inputUtils";
 import type { FlowInputTarget } from "./inputUtils";
+import { navigateAndSyncIfAccepted } from "./navigationAcceptance";
 
 const DEFAULT_NEXT_KEYS = ["ArrowDown", "ArrowRight", "PageDown", " "] as const;
 const DEFAULT_PREV_KEYS = ["ArrowUp", "ArrowLeft", "PageUp"] as const;
@@ -61,8 +62,18 @@ function shouldIgnoreKeyboardEventTarget(target: EventTarget | null): boolean {
 export function useKeyboardInput<TPhase extends string>(
   options: UseKeyboardInputOptions = {}
 ): void {
-  const flow = useFlow<TPhase>();
+  const context = useContext(FlowContext);
+
+  if (context === null) {
+    throw new Error("useFlow must be used inside FlowProvider.");
+  }
+
+  const flow = context.controls as unknown as FlowControls<TPhase>;
+  const machine = context.machine as unknown as FlowMachine<TPhase>;
+  const syncSnapshot = context.syncSnapshot;
   const flowRef = useRef<FlowControls<TPhase>>(flow);
+  const machineRef = useRef(machine);
+  const syncSnapshotRef = useRef(syncSnapshot);
   const lastNavigationAtRef = useRef<number>(-Infinity);
 
   const cooldown = options.cooldown ?? 0;
@@ -70,7 +81,9 @@ export function useKeyboardInput<TPhase extends string>(
 
   useEffect(() => {
     flowRef.current = flow;
-  }, [flow]);
+    machineRef.current = machine;
+    syncSnapshotRef.current = syncSnapshot;
+  }, [flow, machine, syncSnapshot]);
 
   useEffect(() => {
     if (options.enabled === false) {
@@ -124,15 +137,14 @@ export function useKeyboardInput<TPhase extends string>(
         return;
       }
 
-      lastNavigationAtRef.current = now;
+      const accepted = navigateAndSyncIfAccepted(
+        machineRef.current,
+        syncSnapshotRef.current,
+        isNextKey ? "next" : "prev"
+      );
 
-      if (isNextKey) {
-        currentFlow.next();
-        return;
-      }
-
-      if (isPrevKey) {
-        currentFlow.prev();
+      if (accepted) {
+        lastNavigationAtRef.current = now;
       }
     };
 
