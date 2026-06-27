@@ -224,6 +224,28 @@ function ProgressProbe({ onRender }: { onRender: (progress: number) => void }) {
   return <output data-testid="progress">{progress}</output>;
 }
 
+function ConsistencyProbe({
+  onRender
+}: {
+  onRender: (snapshot: RenderedSnapshot & { progressHook: number }) => void;
+}) {
+  const controls = useFlow<TestPhase>();
+  const progress = useFlowProgress();
+  const snapshot = {
+    phase: controls.phase,
+    phaseIndex: controls.phaseIndex,
+    progress: controls.progress,
+    progressHook: progress,
+    direction: controls.direction,
+    isTransitioning: controls.isTransitioning,
+    isLocked: controls.isLocked
+  };
+
+  onRender(snapshot);
+
+  return <output data-testid="consistency">{JSON.stringify(snapshot)}</output>;
+}
+
 function MachineProbe({
   onRender
 }: {
@@ -457,6 +479,79 @@ describe("FlowProvider and hooks", () => {
     });
     expect(latestProgress).toBe(1);
     expect(latestProgress).toBe(latestControls?.progress);
+  });
+
+  it("keeps hook snapshots stable after current-phase and boundary no-op navigation", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let latestSnapshot: (RenderedSnapshot & { progressHook: number }) | undefined;
+
+    renderFlow(
+      <>
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <ConsistencyProbe onRender={(snapshot) => (latestSnapshot = snapshot)} />
+      </>
+    );
+
+    const initialSnapshot = latestSnapshot;
+
+    act(() => {
+      latestControls?.goTo("intro");
+      latestControls?.prev();
+    });
+
+    expect(latestSnapshot).toEqual(initialSnapshot);
+    expect(latestSnapshot?.progressHook).toBe(latestSnapshot?.progress);
+    expect(latestSnapshot).toMatchObject({
+      phase: "intro",
+      phaseIndex: 0,
+      progress: 0,
+      progressHook: 0,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+  });
+
+  it("keeps hook progress consistent through manual lock and unlock", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let latestSnapshot: (RenderedSnapshot & { progressHook: number }) | undefined;
+
+    renderFlow(
+      <>
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <ConsistencyProbe onRender={(snapshot) => (latestSnapshot = snapshot)} />
+      </>
+    );
+
+    act(() => {
+      latestControls?.lock();
+    });
+
+    expect(latestSnapshot).toMatchObject({
+      phase: "intro",
+      phaseIndex: 0,
+      progress: 0,
+      progressHook: 0,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: true
+    });
+    expect(latestSnapshot?.progressHook).toBe(latestSnapshot?.progress);
+
+    act(() => {
+      latestControls?.unlock();
+    });
+
+    expect(latestSnapshot).toMatchObject({
+      phase: "intro",
+      phaseIndex: 0,
+      progress: 0,
+      progressHook: 0,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+    expect(latestSnapshot?.progressHook).toBe(latestSnapshot?.progress);
   });
 
   it("does not change useFlowProgress for same-phase or boundary no-op navigation", () => {
