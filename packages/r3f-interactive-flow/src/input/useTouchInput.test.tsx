@@ -616,25 +616,40 @@ describe("useTouchInput", () => {
     vi.useFakeTimers();
     vi.setSystemTime(0);
     let latestControls: FlowControls<TestPhase> | undefined;
+    let machine: FlowMachine<TestPhase> | undefined;
+    let syncSnapshot: (() => void) | undefined;
 
     renderFlow(
       <>
         <TouchInputProbe options={{ cooldown: 500 }} />
         <ControlsProbe onRender={(controls) => (latestControls = controls)} />
-      </>
+        <MachineProbe
+          onRender={(renderedMachine, renderedSyncSnapshot) => {
+            machine = renderedMachine;
+            syncSnapshot = renderedSyncSnapshot;
+          }}
+        />
+      </>,
+      undefined,
+      { transitionDurationMs: 100 }
     );
 
-    swipe(100, 151);
+    swipe(100, 49);
+
+    act(() => {
+      machine?.update(100);
+      syncSnapshot?.();
+    });
 
     vi.setSystemTime(250);
     swipe(100, 49);
 
-    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.phase).toBe("work");
 
     vi.setSystemTime(500);
     swipe(100, 49);
 
-    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.phase).toBe("contact");
     vi.useRealTimers();
   });
 
@@ -670,6 +685,42 @@ describe("useTouchInput", () => {
 
     expect(latestControls?.phase).toBe("work");
     expect(latestControls?.direction).toBe("next");
+    vi.useRealTimers();
+  });
+
+  it("does not consume hook-local cooldown for rejected first-boundary touch input", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ cooldown: 500, threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    swipe(100, 141);
+
+    expect(latestControls).toMatchObject({
+      phase: "intro",
+      phaseIndex: 0,
+      progress: 0,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+
+    vi.setSystemTime(250);
+    swipe(100, 59);
+
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      phaseIndex: 1,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false
+    });
     vi.useRealTimers();
   });
 

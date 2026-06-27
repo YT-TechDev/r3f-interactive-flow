@@ -89,6 +89,10 @@ export function useWheelInput<TPhase extends string>(options: UseWheelInputOptio
         return;
       }
 
+      if (delta < -threshold && currentFlow.phaseIndex === 0) {
+        return;
+      }
+
       const now = Date.now();
 
       if (lastNavigationAtRef.current !== null && now - lastNavigationAtRef.current < cooldown) {
