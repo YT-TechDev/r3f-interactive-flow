@@ -3,6 +3,94 @@ import { describe, expect, it } from "vitest";
 import { createFlowMachine } from "./createFlowMachine";
 
 describe("createFlowMachine transition regressions", () => {
+  it("keeps the full snapshot stable when prev is rejected at the first phase boundary", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 100,
+      cooldownMs: 300
+    });
+
+    const boundarySnapshot = machine.getSnapshot();
+
+    machine.prev();
+
+    expect(machine.getSnapshot()).toEqual(boundarySnapshot);
+
+    machine.next();
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false
+    });
+  });
+
+  it("keeps the full snapshot stable when next is rejected at the last phase boundary", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 100,
+      cooldownMs: 300
+    });
+
+    machine.goTo("contact");
+    machine.update(100);
+    machine.update(300);
+
+    const boundarySnapshot = machine.getSnapshot();
+
+    machine.next();
+
+    expect(machine.getSnapshot()).toEqual(boundarySnapshot);
+
+    machine.prev();
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 0,
+      direction: "prev",
+      isTransitioning: true,
+      isLocked: false
+    });
+  });
+
+  it("keeps the completed snapshot stable when goTo targets the current phase", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 100,
+      cooldownMs: 300
+    });
+
+    machine.next();
+    machine.update(100);
+
+    const completedSnapshot = machine.getSnapshot();
+
+    machine.goTo("work");
+
+    expect(machine.getSnapshot()).toEqual(completedSnapshot);
+
+    machine.update(199);
+    machine.next();
+
+    expect(machine.getSnapshot()).toEqual(completedSnapshot);
+
+    machine.update(1);
+    machine.next();
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "contact",
+      phaseIndex: 2,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false
+    });
+  });
+
   it("keeps first-phase prev and last-phase next as no-ops", () => {
     const firstPhaseMachine = createFlowMachine({
       phases: ["intro", "work"] as const,
