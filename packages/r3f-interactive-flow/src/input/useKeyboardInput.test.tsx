@@ -656,6 +656,42 @@ describe("useKeyboardInput", () => {
     vi.useRealTimers();
   });
 
+  it("does not consume hook-local cooldown for rejected first-boundary keyboard input", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ cooldown: 500 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchKeyDown("ArrowUp");
+
+    expect(latestControls).toMatchObject({
+      phase: "intro",
+      phaseIndex: 0,
+      progress: 0,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+
+    vi.setSystemTime(250);
+    dispatchKeyDown("ArrowDown");
+
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      phaseIndex: 1,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false
+    });
+    vi.useRealTimers();
+  });
+
   it("does not extend hook-local cooldown for keyboard events ignored while transitioning", () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_000);

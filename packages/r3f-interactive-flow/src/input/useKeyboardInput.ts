@@ -114,6 +114,10 @@ export function useKeyboardInput<TPhase extends string>(
         return;
       }
 
+      if (!isNextKey && isPrevKey && currentFlow.phaseIndex === 0) {
+        return;
+      }
+
       const now = Date.now();
 
       if (now - lastNavigationAtRef.current < cooldown) {
