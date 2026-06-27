@@ -8,11 +8,11 @@ The goal is not to provide visual effects. The goal is to make interactive R3F s
 
 ## Project status
 
-`r3f-interactive-flow@0.7.0` has been published.
+`r3f-interactive-flow@0.8.0` has been published.
 
-The current development focus is v0.8.0 stabilization. v0.8.0 focuses on hardening transition behavior, cooldown behavior, input lock behavior, and browser input hook reliability without expanding the public API.
+The current development focus is v0.9.0 stabilization. v0.9.0 continues hardening the existing phase, input, transition, React provider, and R3F frame bridge foundation without expanding the library into visual effects, camera presets, shader APIs, animation timelines, router integration, or animation-framework wrappers.
 
-Historical planning and release references remain available in [docs/roadmap-v0.7.0.md](docs/roadmap-v0.7.0.md), [docs/releases/v0.6.0.md](docs/releases/v0.6.0.md), [docs/roadmap-v0.6.0.md](docs/roadmap-v0.6.0.md), [docs/releases/v0.5.0.md](docs/releases/v0.5.0.md), [docs/roadmap-v0.5.0.md](docs/roadmap-v0.5.0.md), [docs/releases/v0.4.0.md](docs/releases/v0.4.0.md), and [docs/roadmap-v0.4.0.md](docs/roadmap-v0.4.0.md).
+Historical planning and release references remain available in [docs/releases/v0.8.0-readiness.md](docs/releases/v0.8.0-readiness.md), [docs/roadmap-v0.7.0.md](docs/roadmap-v0.7.0.md), [docs/releases/v0.6.0.md](docs/releases/v0.6.0.md), [docs/roadmap-v0.6.0.md](docs/roadmap-v0.6.0.md), [docs/releases/v0.5.0.md](docs/releases/v0.5.0.md), [docs/roadmap-v0.5.0.md](docs/roadmap-v0.5.0.md), [docs/releases/v0.4.0.md](docs/releases/v0.4.0.md), and [docs/roadmap-v0.4.0.md](docs/roadmap-v0.4.0.md).
 
 For the v0.3.0 design baseline, see [docs/v0.3.0-spec.md](docs/v0.3.0-spec.md). For real-world DOM UI and Canvas wiring, see [docs/dom-ui-to-canvas-guide.md](docs/dom-ui-to-canvas-guide.md).
 
