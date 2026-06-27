@@ -34,6 +34,7 @@ const keyboardKeys = {
 } as const;
 
 function FlowInputLayer() {
+  // Optional browser input helpers live outside the Canvas scene.
   useWheelInput<Phase>({ threshold: 40, cooldown: 500, ignore: inputIgnore });
   useTouchInput<Phase>({ threshold: 50, cooldown: 500, ignore: inputIgnore });
   useKeyboardInput<Phase>({ keys: keyboardKeys, cooldown: 500 });
@@ -100,6 +101,7 @@ function FlowControlsPanel() {
 function FlowBox() {
   const meshRef = useRef<THREE.Mesh | null>(null);
 
+  // useFlowFrame follows R3F hook rules and runs only in Canvas-bound components.
   useFlowFrame<Phase>(({ progress }) => {
     if (!meshRef.current) {
       return;
