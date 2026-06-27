@@ -229,6 +229,7 @@ Current tested navigation behavior is intentionally narrow and predictable:
 - `lock()` blocks otherwise valid navigation requests. `unlock()` allows navigation again. Locking does not cancel a transition that has already started.
 - Core transition cooldown starts from accepted navigation only. Boundary no-ops, same-phase `goTo`, locked navigation, and active-transition navigation do not start, reset, or extend that cooldown.
 - Input hook cooldown and core transition cooldown are separate concepts. Hook cooldown throttles repeated browser input before it reaches the flow controls; core cooldown guards accepted phase navigation in the flow machine.
+- Input hook cooldown is recorded only when browser input produces an accepted navigation. Rejected boundary input, disabled input, ignored targets, locked flow, and active-transition input do not consume or extend hook-local cooldown.
 - Input hooks support `enabled: false` and can be re-enabled later; disabled hooks do not navigate, and re-enabled hooks resume listener behavior.
 
 ## Flow controls
