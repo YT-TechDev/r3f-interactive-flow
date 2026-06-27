@@ -398,6 +398,119 @@ describe("useFlowFrame", () => {
     expect(container.textContent).toContain('"isTransitioning":false');
   });
 
+  it("reports the completed target phase when a large frame delta finishes a transition", () => {
+    const onFrame = vi.fn();
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <FrameProbe onFrame={onFrame} />
+      </>,
+      1000
+    );
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    expect(container.textContent).toContain('"phase":"work"');
+    expect(container.textContent).toContain('"phaseIndex":1');
+    expect(container.textContent).toContain('"progress":0');
+    expect(container.textContent).toContain('"direction":"next"');
+    expect(container.textContent).toContain('"isTransitioning":true');
+
+    act(() => {
+      getRegisteredFrame()(undefined, 1.5);
+    });
+
+    expect(onFrame).toHaveBeenCalledTimes(1);
+    expect(onFrame).toHaveBeenLastCalledWith(
+      {
+        phase: "work",
+        phaseIndex: 1,
+        progress: 1,
+        direction: "none",
+        isTransitioning: false
+      },
+      1.5
+    );
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 1,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+    expect(container.textContent).toContain('"phase":"work"');
+    expect(container.textContent).toContain('"phaseIndex":1');
+    expect(container.textContent).toContain('"progress":1');
+    expect(container.textContent).toContain('"direction":"none"');
+    expect(container.textContent).toContain('"isTransitioning":false');
+  });
+
+  it("keeps completed transition state stable on the frame after completion", () => {
+    const onFrame = vi.fn();
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <FrameProbe onFrame={onFrame} />
+      </>,
+      1000
+    );
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    act(() => {
+      getRegisteredFrame()(undefined, 1.5);
+    });
+
+    expect(onFrame).toHaveBeenLastCalledWith(
+      {
+        phase: "work",
+        phaseIndex: 1,
+        progress: 1,
+        direction: "none",
+        isTransitioning: false
+      },
+      1.5
+    );
+
+    act(() => {
+      getRegisteredFrame()(undefined, 0.016);
+    });
+
+    expect(onFrame).toHaveBeenCalledTimes(2);
+    expect(onFrame).toHaveBeenLastCalledWith(
+      {
+        phase: "work",
+        phaseIndex: 1,
+        progress: 1,
+        direction: "none",
+        isTransitioning: false
+      },
+      0.016
+    );
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 1,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+    expect(container.textContent).toContain('"phase":"work"');
+    expect(container.textContent).toContain('"phaseIndex":1');
+    expect(container.textContent).toContain('"progress":1');
+    expect(container.textContent).toContain('"direction":"none"');
+    expect(container.textContent).toContain('"isTransitioning":false');
+  });
+
   it("throws a clear error when rendered outside FlowProvider", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
 
