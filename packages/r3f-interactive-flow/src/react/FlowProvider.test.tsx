@@ -177,6 +177,11 @@ const phases = ["intro", "work", "contact"] as const;
 let container: HTMLDivElement;
 let root: Root | undefined;
 
+type RenderedSnapshot = Pick<
+  FlowControls<TestPhase>,
+  "phase" | "phaseIndex" | "progress" | "direction" | "isTransitioning" | "isLocked"
+>;
+
 beforeEach(() => {
   container = document.createElement("div");
   document.body.append(container);
@@ -249,6 +254,10 @@ function renderFlow(
 
     root?.render(<FlowProvider {...providerProps}>{children}</FlowProvider>);
   });
+}
+
+function getRenderedSnapshot(): RenderedSnapshot {
+  return JSON.parse(container.textContent) as RenderedSnapshot;
 }
 
 class ErrorBoundary extends React.Component<{ children: ReactNode }, { message: string | null }> {
@@ -475,6 +484,105 @@ describe("FlowProvider and hooks", () => {
     });
     expect(latestProgress).toBe(0);
     expect(latestProgress).toBe(latestControls?.progress);
+  });
+
+  it("keeps the React snapshot stable when prev is called at the first phase", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(<ControlsProbe onRender={(controls) => (latestControls = controls)} />);
+
+    const initialSnapshot = getRenderedSnapshot();
+
+    act(() => {
+      latestControls?.prev();
+    });
+
+    expect(getRenderedSnapshot()).toEqual(initialSnapshot);
+    expect(latestControls).toMatchObject(initialSnapshot);
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    expect(getRenderedSnapshot()).toEqual({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false
+    });
+  });
+
+  it("keeps the React snapshot stable when next is called at the last phase", () => {
+    let context: NonNullable<React.ContextType<typeof FlowContext>> | undefined;
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe onRender={(value) => (context = value)} />
+      </>,
+      undefined,
+      { transition: { duration: 100 } }
+    );
+
+    act(() => {
+      latestControls?.goTo("contact");
+      context?.machine.update(100);
+      context?.syncSnapshot();
+    });
+
+    const completedSnapshot = getRenderedSnapshot();
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    expect(getRenderedSnapshot()).toEqual(completedSnapshot);
+    expect(latestControls).toMatchObject(completedSnapshot);
+
+    act(() => {
+      latestControls?.prev();
+    });
+
+    expect(getRenderedSnapshot()).toEqual({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 0,
+      direction: "prev",
+      isTransitioning: true,
+      isLocked: false
+    });
+  });
+
+  it("keeps the completed React snapshot stable when goTo targets the current phase", () => {
+    let context: NonNullable<React.ContextType<typeof FlowContext>> | undefined;
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe onRender={(value) => (context = value)} />
+      </>,
+      undefined,
+      { transition: { duration: 100 } }
+    );
+
+    act(() => {
+      latestControls?.next();
+      context?.machine.update(100);
+      context?.syncSnapshot();
+    });
+
+    const completedSnapshot = getRenderedSnapshot();
+
+    act(() => {
+      latestControls?.goTo("work");
+    });
+
+    expect(getRenderedSnapshot()).toEqual(completedSnapshot);
+    expect(latestControls).toMatchObject(completedSnapshot);
   });
 
   it("accepts transition options and passes them to the core machine", () => {
