@@ -1,5 +1,41 @@
 # r3f-interactive-flow
 
+## 0.9.0
+
+v0.9.0 is a narrow stabilization release for the existing phase, input, transition, React provider, and R3F frame bridge foundation. It hardens completion, no-op, boundary, and input cooldown behavior without introducing a new public API or broadening the library into visual effects, camera presets, shader APIs, animation timelines, router integration, or animation-framework wrappers.
+
+### Improved
+
+- Hardened `useFlowFrame` transition completion behavior for large frame deltas and post-completion stability.
+- Strengthened core flow machine no-op and boundary stability behavior for rejected `prev()`, rejected `next()`, and same-phase `goTo(currentPhase)`.
+- Strengthened React `FlowProvider` no-op and boundary stability behavior through React-facing hooks and snapshots.
+- Fixed browser input hook cooldown behavior so hook-local cooldown is recorded only when input navigation is accepted.
+- Generalized rejected boundary input handling so rejected input does not consume hook-local cooldown before a valid opposite-direction navigation.
+
+### Tests
+
+- Added regression coverage for `useFlowFrame` completion edge behavior.
+- Added core machine regression coverage for no-op and boundary snapshot stability.
+- Added React provider regression coverage for no-op and boundary snapshot stability.
+- Added wheel, touch, and keyboard input regression coverage for rejected boundary input and accepted-navigation-only cooldown behavior.
+
+### Documentation
+
+- Synchronized README behavior documentation for accepted-navigation-only input hook cooldown behavior.
+- Synchronized post-`0.8.0` project status documentation for the `v0.9.0` stabilization cycle.
+
+### Scope
+
+- No package version changes are included in this release-prep entry.
+- No npm publishing is included in this release-prep entry.
+- No git tag creation is included in this release-prep entry.
+- No GitHub Release creation is included in this release-prep entry.
+- No release automation changes were made.
+- No dependency additions were made.
+- No public API expansion was introduced.
+- No source code or test changes are included in this docs-only release-prep entry.
+- No visual effects, camera presets, shader APIs, animation timelines, router integration, GSAP integration, Framer Motion integration, or demo templates were added.
+
 ## 0.8.0
 
 v0.8.0 is a narrow stabilization release for predictable transition, input, React provider, public export, and example behavior. It strengthens confidence in the current phase/input/progress/frame coordination API before further releases without introducing a new public API or broadening the project into a general animation framework.
