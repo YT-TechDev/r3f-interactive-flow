@@ -310,6 +310,31 @@ describe("useWheelInput", () => {
     expect(windowTarget.listenerCount("wheel")).toBe(0);
   });
 
+  it("does not navigate from wheel events after the input hook unmounts", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchWheel(41);
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+
+    renderFlow(<ControlsProbe onRender={(controls) => (latestControls = controls)} />);
+
+    expect(windowTarget.listenerCount("wheel")).toBe(0);
+
+    dispatchWheel(41);
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
   it("does not require browser APIs at module import time", async () => {
     const originalWindow = globalThis.window;
 

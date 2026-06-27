@@ -428,6 +428,31 @@ describe("useKeyboardInput", () => {
     expect(windowTarget.listenerCount("keydown")).toBe(0);
   });
 
+  it("does not navigate from keydown events after the input hook unmounts", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchKeyDown("ArrowDown");
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+
+    renderFlow(<ControlsProbe onRender={(controls) => (latestControls = controls)} />);
+
+    expect(windowTarget.listenerCount("keydown")).toBe(0);
+
+    dispatchKeyDown("ArrowDown");
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
   it("does not require browser APIs at module import time", async () => {
     const originalWindow = globalThis.window;
 

@@ -299,6 +299,33 @@ describe("useTouchInput", () => {
     }
   });
 
+  it("does not navigate from touch events after the input hook unmounts", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    swipe(100, 59);
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+
+    renderFlow(<ControlsProbe onRender={(controls) => (latestControls = controls)} />);
+
+    for (const type of touchEventTypes) {
+      expect(windowTarget.listenerCount(type)).toBe(0);
+    }
+
+    swipe(100, 59);
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
   it("defaults preventDefault to true for touchmove", () => {
     renderFlow(<TouchInputProbe />);
 
