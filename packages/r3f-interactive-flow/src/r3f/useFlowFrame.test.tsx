@@ -308,6 +308,44 @@ describe("useFlowFrame", () => {
     expect(container.textContent).toContain('"isTransitioning":true');
   });
 
+  it("reports a stable idle snapshot before any transition starts", () => {
+    const onFrame = vi.fn();
+
+    renderFlow(<FrameProbe onFrame={onFrame} />);
+
+    act(() => {
+      getRegisteredFrame()(undefined, 0.016);
+    });
+
+    expect(onFrame).toHaveBeenCalledTimes(1);
+    expect(onFrame).toHaveBeenLastCalledWith(
+      {
+        phase: "intro",
+        phaseIndex: 0,
+        progress: 0,
+        direction: "none",
+        isTransitioning: false
+      },
+      0.016
+    );
+
+    act(() => {
+      getRegisteredFrame()(undefined, 0.016);
+    });
+
+    expect(onFrame).toHaveBeenCalledTimes(2);
+    expect(onFrame).toHaveBeenLastCalledWith(
+      {
+        phase: "intro",
+        phaseIndex: 0,
+        progress: 0,
+        direction: "none",
+        isTransitioning: false
+      },
+      0.016
+    );
+  });
+
   it("uses the latest callback ref after rerender without calling a stale callback", () => {
     const initialCallback = vi.fn();
     const latestCallback = vi.fn();
@@ -509,6 +547,86 @@ describe("useFlowFrame", () => {
     expect(container.textContent).toContain('"progress":1');
     expect(container.textContent).toContain('"direction":"none"');
     expect(container.textContent).toContain('"isTransitioning":false');
+  });
+
+  it("keeps the frame snapshot stable after same-phase navigation", () => {
+    const onFrame = vi.fn();
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <FrameProbe onFrame={onFrame} />
+      </>
+    );
+
+    act(() => {
+      latestControls?.goTo("intro");
+    });
+
+    act(() => {
+      getRegisteredFrame()(undefined, 0.016);
+    });
+
+    expect(onFrame).toHaveBeenCalledTimes(1);
+    expect(onFrame).toHaveBeenLastCalledWith(
+      {
+        phase: "intro",
+        phaseIndex: 0,
+        progress: 0,
+        direction: "none",
+        isTransitioning: false
+      },
+      0.016
+    );
+    expect(latestControls).toMatchObject({
+      phase: "intro",
+      phaseIndex: 0,
+      progress: 0,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+  });
+
+  it("keeps the frame snapshot stable after rejected boundary navigation", () => {
+    const onFrame = vi.fn();
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <FrameProbe onFrame={onFrame} />
+      </>
+    );
+
+    act(() => {
+      latestControls?.prev();
+    });
+
+    act(() => {
+      getRegisteredFrame()(undefined, 0.016);
+    });
+
+    expect(onFrame).toHaveBeenCalledTimes(1);
+    expect(onFrame).toHaveBeenLastCalledWith(
+      {
+        phase: "intro",
+        phaseIndex: 0,
+        progress: 0,
+        direction: "none",
+        isTransitioning: false
+      },
+      0.016
+    );
+    expect(latestControls).toMatchObject({
+      phase: "intro",
+      phaseIndex: 0,
+      progress: 0,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
   });
 
   it("throws a clear error when rendered outside FlowProvider", () => {
