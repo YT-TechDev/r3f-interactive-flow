@@ -692,6 +692,56 @@ describe("useKeyboardInput", () => {
     vi.useRealTimers();
   });
 
+  it("does not consume hook-local cooldown for rejected last-boundary keyboard input", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let machine: FlowMachine<TestPhase> | undefined;
+    let syncSnapshot: (() => void) | undefined;
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ cooldown: 500 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe
+          onRender={(renderedMachine, renderedSyncSnapshot) => {
+            machine = renderedMachine;
+            syncSnapshot = renderedSyncSnapshot;
+          }}
+        />
+      </>,
+      undefined,
+      { transitionDurationMs: 100, cooldownMs: 0 }
+    );
+
+    act(() => {
+      machine?.goTo("contact");
+      machine?.update(100);
+      syncSnapshot?.();
+    });
+
+    dispatchKeyDown("ArrowDown");
+
+    expect(latestControls).toMatchObject({
+      phase: "contact",
+      phaseIndex: 2,
+      progress: 1,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+    vi.setSystemTime(250);
+    dispatchKeyDown("ArrowUp");
+
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      phaseIndex: 1,
+      direction: "prev",
+      isTransitioning: true,
+      isLocked: false
+    });
+    vi.useRealTimers();
+  });
   it("does not extend hook-local cooldown for keyboard events ignored while transitioning", () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_000);
