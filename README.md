@@ -2,9 +2,9 @@
 
 `r3f-interactive-flow` is a small React Three Fiber utility for building phase-based interactive 3D websites.
 
-It connects user input, scene phases, transition progress, React state, and React Three Fiber frame updates through a predictable control layer.
+It connects user input, scene phases, transition progress, React state, and React Three Fiber frame updates through a predictable control layer. React manages application and UI state, React Three Fiber manages frame-based visual updates, and this library bridges them through predictable phase transitions.
 
-The goal is not to provide visual effects. The goal is to make interactive R3F scenes easier to control, test, and maintain.
+The goal is not to provide visual effects, camera presets, shader APIs, animation timelines, router integration, or GSAP / Framer Motion wrappers. The goal is to make interactive R3F scenes easier to control, test, and maintain.
 
 ## Project status
 
@@ -25,7 +25,7 @@ Interactive 3D websites often need the same control flow in several places:
 - React Three Fiber updates visual objects every frame
 - scene transitions need progress values that remain predictable
 
-React is good at application state. React Three Fiber is good at frame-based scene updates. `r3f-interactive-flow` provides a small bridge between those two responsibilities.
+React manages application and UI state. React Three Fiber manages frame-based scene updates. `r3f-interactive-flow` provides a small bridge between those two responsibilities through predictable phase transitions.
 
 ## What it provides
 
@@ -50,9 +50,10 @@ This library intentionally keeps a narrow scope. It is not:
 - a camera preset library
 - a shader effect library
 - a portfolio template
+- an animation timeline system
 - a full animation framework
 - a GSAP or Framer Motion wrapper
-- a Next.js router integration package
+- a router integration package
 
 ## Installation
 
@@ -136,56 +137,34 @@ Define phases as a const tuple, pass them to `FlowProvider`, and use hooks insid
 ```tsx
 "use client";
 
-import {
-  FlowProvider,
-  useFlow,
-  useKeyboardInput,
-  useTouchInput,
-  useWheelInput
-} from "r3f-interactive-flow";
+import { FlowProvider, useFlow } from "r3f-interactive-flow";
 
 const phases = ["intro", "work", "contact"] as const;
-
 type Phase = (typeof phases)[number];
 
-const keyboardKeys = {
-  next: ["ArrowDown", "ArrowRight", "PageDown"],
-  prev: ["ArrowUp", "ArrowLeft", "PageUp"]
-} as const;
-
-function FlowInputLayer() {
-  useWheelInput<Phase>();
-  useTouchInput<Phase>();
-  useKeyboardInput<Phase>({ keys: keyboardKeys });
-
-  return null;
-}
-
 function FlowControlsPanel() {
-  const flow = useFlow<Phase>();
+  const { phase, next, prev, goTo } = useFlow<Phase>();
 
   return (
     <div>
-      <p>Current phase: {flow.phase}</p>
-      <p>Progress: {flow.progress}</p>
-      <button onClick={flow.prev}>Prev</button>
-      <button onClick={flow.next}>Next</button>
-      <button onClick={() => flow.goTo("contact")}>Go to Contact</button>
+      <p>Current phase: {phase}</p>
+      <button onClick={prev}>Prev</button>
+      <button onClick={next}>Next</button>
+      <button onClick={() => goTo("contact")}>Go to Contact</button>
     </div>
   );
 }
 
 export function App() {
   return (
-    <FlowProvider phases={phases} transition={{ cooldown: 600 }}>
-      <FlowInputLayer />
+    <FlowProvider phases={phases}>
       <FlowControlsPanel />
     </FlowProvider>
   );
 }
 ```
 
-`FlowProvider` should receive stable `phases` and configuration props. Define phase tuples outside components or memoize derived configuration.
+`FlowProvider` should receive stable `phases` and configuration props. Define phase tuples outside components or memoize derived configuration. Input hooks are optional browser input helpers; add them only where wheel, touch, or keyboard navigation should drive the flow.
 
 ## FlowProvider transition options
 

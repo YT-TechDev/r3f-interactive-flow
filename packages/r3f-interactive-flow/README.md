@@ -4,19 +4,22 @@
 
 `r3f-interactive-flow` is a small React Three Fiber utility for predictable phase, input, transition, and frame control in interactive R3F websites.
 
-It gives your app a typed phase machine, DOM-friendly controls, browser input hooks, transition progress, and a Canvas-bound `useFlowFrame` bridge. React owns normal application and UI state. React Three Fiber owns frame-driven scene updates.
+It gives your app a typed phase machine, DOM-friendly controls, optional browser input hooks, transition progress, and a Canvas-bound `useFlowFrame` bridge. React manages application and UI state. React Three Fiber manages frame-based visual updates. This library bridges them through predictable phase transitions.
 
 ## What this library is not
 
 This library intentionally keeps a narrow scope. It does not provide:
 
-- visual effects, shaders, camera presets, or animation timelines
+- visual effects collections
+- camera presets
+- shader APIs
+- animation timelines
 - scene templates, portfolio templates, or demo kits
 - router integration
-- GSAP or Framer Motion integration
+- GSAP or Framer Motion wrappers
 - replacements for `@react-three/fiber`, `three`, or `@react-three/drei`
 
-Users own animation, effects, camera, and scene logic. `r3f-interactive-flow` only coordinates predictable phase/input/frame state.
+Users own animation, effects, camera, shader, router, and scene logic. `r3f-interactive-flow` only coordinates predictable phase/input/frame state.
 
 ## Install
 
@@ -46,7 +49,7 @@ yarn add r3f-interactive-flow three @react-three/fiber react react-dom
 
 ## Minimal setup
 
-Define phases as a const tuple, pass them to `FlowProvider`, and render flow hooks inside the provider.
+Define phases as a const tuple, pass them to `FlowProvider`, and use hooks inside the provider.
 
 ```tsx
 "use client";
@@ -78,7 +81,7 @@ export function App() {
 }
 ```
 
-`FlowProvider` props should stay stable between renders. Define phase tuples outside components, or memoize derived configuration.
+`FlowProvider` props should stay stable between renders. Define phase tuples outside components, or memoize derived configuration. Input hooks are optional browser input helpers; add them only where wheel, touch, or keyboard navigation should drive the flow.
 
 ## Flow controls with `useFlow`
 
