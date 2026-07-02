@@ -163,7 +163,7 @@ Architecture rules:
 
 ## 6. Implementation milestones
 
-### Milestone 1: Audit current behavior — complete
+### Milestone 1: Audit current behavior - complete
 
 The current behavior audit and intended v0.2.0 rules are documented in [docs/behavior-v0.2.0.md](behavior-v0.2.0.md).
 
@@ -173,7 +173,7 @@ The current behavior audit and intended v0.2.0 rules are documented in [docs/beh
 - Confirm no implementation work starts until the expected behavior is written down.
 - Current status: documented in the behavior audit.
 
-### Milestone 2: Define transition rules — complete
+### Milestone 2: Define transition rules - complete
 
 - Specify transition lifecycle states and their allowed transitions.
 - Decide how navigation calls behave during active transitions.
@@ -181,7 +181,7 @@ The current behavior audit and intended v0.2.0 rules are documented in [docs/beh
 - Document default non-looping boundary behavior.
 - Current status: transition lifecycle rules are documented for the v0.2.0 scope.
 
-### Milestone 3: Strengthen core tests — complete
+### Milestone 3: Strengthen core tests - complete
 
 - Add or update tests for React-independent transition behavior first.
 - Cover initialization, ordered navigation, invalid targets, non-looping boundaries, progress completion, locks, and cooldown.
@@ -189,7 +189,7 @@ The current behavior audit and intended v0.2.0 rules are documented in [docs/beh
 - Keep tests focused on stable behavior rather than implementation details.
 - Current status: core lifecycle and gating behavior has direct regression coverage.
 
-### Milestone 4: Stabilize lock and cooldown behavior — complete
+### Milestone 4: Stabilize lock and cooldown behavior - complete
 
 - Implement the specified cooldown timing model without adding queues, restarts, interrupts, retargeting, or loop behavior.
 - Keep cooldown gating centralized in the core machine so direct navigation and input-driven navigation remain consistent.
@@ -198,7 +198,7 @@ The current behavior audit and intended v0.2.0 rules are documented in [docs/beh
 - Verify direct navigation and input-driven navigation use the same gating behavior where required.
 - Current status: lock and cooldown behavior is covered in core tests, with hook tests covering lock and transition gates at input boundaries.
 
-### Milestone 5: Improve input reliability — covered by current hook tests
+### Milestone 5: Improve input reliability - covered by current hook tests
 
 - Review wheel handling for noisy deltas, trackpad bursts, thresholds, and cooldown interactions.
 - Review touch handling for swipe thresholds, direction, cancellation, and listener cleanup.
@@ -206,7 +206,7 @@ The current behavior audit and intended v0.2.0 rules are documented in [docs/beh
 - Ensure input hooks access browser APIs only after mount and clean up listeners on unmount or target changes.
 - Current status: wheel, touch, and keyboard hook tests cover listener lifecycle, targets, thresholds/keys, prevention behavior, disabled state, lock/transition gating, and import-time browser guards.
 
-### Milestone 6: Improve examples and README — docs clarified
+### Milestone 6: Improve examples and README - docs clarified
 
 - Update README examples to match the v0.2.0 public API direction where appropriate.
 - Add concise `useFlowFrame` examples that mutate R3F objects through refs.
@@ -214,7 +214,7 @@ The current behavior audit and intended v0.2.0 rules are documented in [docs/beh
 - Avoid presenting non-goal features as built-in capabilities.
 - Current status: DOM progress versus frame progress expectations are clarified in README and lifecycle documentation; keep future examples aligned with that distinction.
 
-### Milestone 7: Prepare release checklist — remaining release pass
+### Milestone 7: Prepare release checklist - remaining release pass
 
 - Confirm behavior requirements are reflected in tests.
 - Run all available checks.
