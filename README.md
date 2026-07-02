@@ -1,14 +1,16 @@
 # r3f-interactive-flow
 
-`r3f-interactive-flow` is a small React Three Fiber utility for building phase-based interactive 3D websites.
+`r3f-interactive-flow` is a small, predictable control layer for phase-based interactive React Three Fiber websites.
 
-It connects user input, scene phases, transition progress, React state, and React Three Fiber frame updates through a predictable control layer. React manages application and UI state, React Three Fiber manages frame-based visual updates, and this library bridges them through predictable phase transitions.
+It helps you describe an experience as a known list of phases, move between those phases with `next`, `prev`, and `goTo`, read transition progress in React UI, and bridge the same flow into Canvas-bound frame updates. React remains responsible for application and UI state, React Three Fiber remains responsible for frame-based scene updates, and this library keeps the phase transition contract between them explicit.
 
-The goal is not to provide visual effects, camera presets, shader APIs, animation timelines, router integration, or GSAP / Framer Motion wrappers. The goal is to make interactive R3F scenes easier to control, test, and maintain.
+Use it when your R3F site behaves like a sequence of sections, scenes, or story beats and you want navigation, transition state, progress, locking, and cooldown behavior to stay predictable. Do not use it as a general animation system, asset library, router layer, effects package, portfolio template, or replacement for scene-specific Three.js / R3F code.
 
 ## Project status
 
 Current forward-looking planning is tracked in [docs/roadmap-v1.2.5-to-v2.0.0.md](docs/roadmap-v1.2.5-to-v2.0.0.md). It treats v1.2.5 through v1.5.0 as preparation, documentation, tests, examples, and behavior hardening, and treats v2.0.0 as stabilization and cleanup rather than a rewrite.
+
+The roadmap describes an AI-friendly and agent-readable direction: clearer docs, smaller examples, predictable behavior, stronger TypeScript guidance, and an easier-to-navigate project structure. That direction is about making the existing library easier for humans and coding agents to understand; it does not mean adding AI-specific product features, code generation workflows, chat features, or new public APIs.
 
 Historical planning and release references remain available in [docs/roadmap-v1.0.0.md](docs/roadmap-v1.0.0.md), [docs/releases/v1.0.0-readiness.md](docs/releases/v1.0.0-readiness.md), [docs/releases/v0.9.0-readiness.md](docs/releases/v0.9.0-readiness.md), [docs/releases/v0.8.0-readiness.md](docs/releases/v0.8.0-readiness.md), [docs/roadmap-v0.7.0.md](docs/roadmap-v0.7.0.md), [docs/releases/v0.6.0.md](docs/releases/v0.6.0.md), [docs/roadmap-v0.6.0.md](docs/roadmap-v0.6.0.md), [docs/releases/v0.5.0.md](docs/releases/v0.5.0.md), [docs/roadmap-v0.5.0.md](docs/roadmap-v0.5.0.md), [docs/releases/v0.4.0.md](docs/releases/v0.4.0.md), and [docs/roadmap-v0.4.0.md](docs/roadmap-v0.4.0.md).
 
@@ -38,20 +40,38 @@ React manages application and UI state. React Three Fiber manages frame-based sc
 - an R3F frame bridge through `useFlowFrame`
 - a small public API designed to stay predictable
 
+## When to use it
+
+Use `r3f-interactive-flow` when your experience has a small, named set of phases and you need a shared control layer for DOM UI, input handlers, and R3F scene updates. It is a good fit for:
+
+- scrollytelling or presentation-style R3F sites
+- portfolio, product, or landing pages with explicit scene phases
+- DOM overlays that need to stay in sync with Canvas transitions
+- input-driven movement between known sections
+- codebases where predictable transition state is more important than a large feature surface
+
+## When not to use it
+
+Do not use this package when you mainly need a rendering abstraction, a design system, a route manager, a full animation engine, or a collection of ready-made visual effects. For frame-perfect object animation, write scene-specific R3F / Three.js code and use `useFlowFrame` only as the bridge to the current flow state. For routing, templates, shaders, particles, camera rigs, or effects, use focused tools built for those jobs.
+
 ## What it intentionally does not provide
 
 This library intentionally keeps a narrow scope. It is not:
 
-- a visual effects collection
-- a replacement for `@react-three/drei`
-- a particle library
-- a camera preset library
-- a shader effect library
-- a portfolio template
 - an animation timeline system
-- a full animation framework
-- a GSAP or Framer Motion wrapper
-- a router integration package
+- a camera preset API
+- a shader or effect collection
+- a particle system API
+- a GSAP wrapper
+- a Framer Motion wrapper
+- a Next.js router integration
+- an AI codegen CLI
+- a portfolio template
+- a large demo template
+- a heavy runtime dependency package
+- an `@react-three/drei`-style utility collection
+
+The library's value is that it stays small, predictable, and focused on phase flow rather than becoming a broad R3F toolkit.
 
 ## Installation
 
