@@ -267,6 +267,81 @@ export function App() {
 }
 ```
 
+## DOM input and R3F scene separation
+
+Keep browser input, React UI state, and frame-based scene updates in separate layers. This keeps DOM event listeners easy to clean up, keeps React responsible for coarse application state, and keeps React Three Fiber responsible for visual work that changes every frame.
+
+Recommended responsibility split:
+
+- DOM/client React components own buttons, navigation UI, labels, status display, and browser input helpers.
+- DOM/client React components can call `next`, `prev`, and `goTo` from `useFlow`.
+- DOM/client React components can read coarse UI state with `useFlow` and `useFlowProgress`.
+- Browser input helpers such as `useWheelInput`, `useTouchInput`, and `useKeyboardInput` should live in React/client components rendered inside `FlowProvider`, not inside scene objects.
+- Canvas-bound components own `useFlowFrame`, `useFrame`, `useThree`, and frame-by-frame mesh, material, camera, or scene updates.
+- Frame-driven visual values should usually live in refs or mutable Three.js object state, not React state.
+
+Avoid placing DOM input logic directly inside R3F scene components. If a scene component has a very intentional reason to register a DOM listener, keep the listener narrowly scoped and clean it up correctly; most flow navigation should stay in normal React/client components next to the rest of the UI.
+
+```tsx
+"use client";
+
+import { Canvas } from "@react-three/fiber";
+import { useRef } from "react";
+import type * as THREE from "three";
+import { FlowProvider, useFlow, useFlowFrame } from "r3f-interactive-flow";
+
+const phases = ["intro", "work", "contact"] as const;
+type Phase = (typeof phases)[number];
+
+function DomControls() {
+  const { phase, next, prev, goTo } = useFlow<Phase>();
+
+  return (
+    <nav>
+      <p>Current phase: {phase}</p>
+      <button onClick={prev}>Prev</button>
+      <button onClick={next}>Next</button>
+      <button onClick={() => goTo("contact")}>Contact</button>
+    </nav>
+  );
+}
+
+function SceneBox() {
+  const meshRef = useRef<THREE.Mesh | null>(null);
+
+  useFlowFrame<Phase>(({ phase, progress }, delta) => {
+    if (!meshRef.current) {
+      return;
+    }
+
+    meshRef.current.rotation.y += delta;
+    meshRef.current.position.x = phase === "work" ? progress * 2 : 0;
+  });
+
+  return (
+    <mesh ref={meshRef}>
+      <boxGeometry />
+      <meshStandardMaterial />
+    </mesh>
+  );
+}
+
+export function Experience() {
+  return (
+    <FlowProvider phases={phases}>
+      <DomControls />
+
+      <Canvas>
+        <ambientLight />
+        <SceneBox />
+      </Canvas>
+    </FlowProvider>
+  );
+}
+```
+
+`DomControls` is a normal React UI component that calls flow controls. `SceneBox` is Canvas-bound and reacts to flow state through `useFlowFrame`. `useFrame`, `useThree`, and `useFlowFrame` should not be used in DOM/UI components outside `<Canvas>`.
+
 ## DOM UI to Canvas pattern
 
 Recommended architecture:
