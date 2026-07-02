@@ -151,21 +151,26 @@ Common provider-level mistakes to avoid:
 
 ## Flow controls with `useFlow`
 
-`useFlow` returns the current snapshot plus imperative controls:
+`useFlow` is the React-side hook for reading the current flow snapshot and calling flow controls. It must be called from a React component rendered under `FlowProvider`.
 
-- `phase`
-- `phaseIndex`
-- `progress`
-- `direction`
-- `isTransitioning`
-- `isLocked`
-- `next()`
-- `prev()`
-- `goTo(phase)`
-- `lock()`
-- `unlock()`
+It returns the current snapshot values:
 
-Use `useFlow` for DOM UI such as navigation buttons, labels, debug panels, or accessibility-friendly controls.
+- `phase`: the active phase value from the `phases` tuple.
+- `phaseIndex`: the zero-based index of `phase` in the `phases` tuple.
+- `progress`: the current transition progress from `0` to `1`.
+- `direction`: `"next"`, `"prev"`, or `"none"` for the active or most recent transition direction.
+- `isTransitioning`: whether a transition is currently active.
+- `isLocked`: whether navigation is currently locked.
+
+It also returns controls:
+
+- `next()`: request navigation to the next phase.
+- `prev()`: request navigation to the previous phase.
+- `goTo(phase)`: request navigation to a specific phase.
+- `lock()`: block new navigation requests.
+- `unlock()`: allow navigation requests again.
+
+Use `useFlow` when a component needs flow controls or more than just transition progress. Common uses include DOM navigation, buttons, labels, debug panels, accessibility-friendly controls, and input-driven controls that call `next`, `prev`, `goTo`, `lock`, or `unlock`.
 
 ```tsx
 function FlowNav() {
@@ -186,6 +191,78 @@ function FlowNav() {
         Go to Contact
       </button>
     </nav>
+  );
+}
+```
+
+`isLocked` is useful for temporarily blocking navigation from UI or input layers:
+
+```tsx
+function LockToggle() {
+  const { isLocked, lock, unlock } = useFlow<Phase>();
+
+  return (
+    <button onClick={isLocked ? unlock : lock}>
+      {isLocked ? "Unlock navigation" : "Lock navigation"}
+    </button>
+  );
+}
+```
+
+`useFlow` is not a frame-perfect animation API. Reading `progress` from `useFlow` is fine for React UI, labels, disabled states, and coarse status displays. For per-frame Canvas animation, use `useFlowFrame` inside a component rendered within `<Canvas>`.
+
+## Transition progress with `useFlowProgress`
+
+`useFlowProgress` is the React-side hook for reading only the current transition progress. It must be called from a React component rendered under `FlowProvider`.
+
+It returns a single number:
+
+- `0` at the start of a transition or when the current phase is settled.
+- Values between `0` and `1` while a transition is active.
+- `1` when a transition reaches the target phase before the provider snapshot settles back to idle progress.
+
+Use `useFlowProgress` when a component only needs progress and does not need the full flow snapshot or controls. It is a good fit for DOM progress text, coarse progress bars, loading-style indicators, and small status UI.
+
+```tsx
+function ProgressLabel() {
+  const progress = useFlowProgress();
+
+  return <p>Transition progress: {Math.round(progress * 100)}%</p>;
+}
+```
+
+```tsx
+function ProgressBar() {
+  const progress = useFlowProgress();
+
+  return (
+    <div
+      aria-label="Transition progress"
+      aria-valuemax={100}
+      aria-valuemin={0}
+      aria-valuenow={Math.round(progress * 100)}
+      role="progressbar"
+    >
+      <div style={{ transform: `scaleX(${progress})`, transformOrigin: "left" }} />
+    </div>
+  );
+}
+```
+
+Choose between the hooks by what the component needs:
+
+- Use `useFlow` to read phase state and call controls.
+- Use `useFlowProgress` when progress is the only value needed.
+- Both hooks read React-side provider state and should live under the same `FlowProvider` as the components they coordinate.
+- Neither hook should be treated as a frame-perfect animation API; use `useFlowFrame` for per-frame R3F scene updates.
+
+```tsx
+export function App() {
+  return (
+    <FlowProvider phases={phases}>
+      <FlowNav />
+      <ProgressLabel />
+    </FlowProvider>
   );
 }
 ```
