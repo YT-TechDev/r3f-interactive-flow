@@ -59,7 +59,7 @@ import { FlowProvider, useFlow } from "r3f-interactive-flow";
 const phases = ["intro", "work", "contact"] as const;
 type Phase = (typeof phases)[number];
 
-function FlowControlsPanel() {
+function FlowControls() {
   const { phase, next, prev, goTo } = useFlow<Phase>();
 
   return (
@@ -67,7 +67,7 @@ function FlowControlsPanel() {
       <p>Current phase: {phase}</p>
       <button onClick={prev}>Prev</button>
       <button onClick={next}>Next</button>
-      <button onClick={() => goTo("contact")}>Go to Contact</button>
+      <button onClick={() => goTo("contact")}>Contact</button>
     </div>
   );
 }
@@ -75,13 +75,13 @@ function FlowControlsPanel() {
 export function App() {
   return (
     <FlowProvider phases={phases}>
-      <FlowControlsPanel />
+      <FlowControls />
     </FlowProvider>
   );
 }
 ```
 
-`FlowProvider` props should stay stable between renders. Define phase tuples outside components, or memoize derived configuration. Input hooks are optional browser input helpers; add them only where wheel, touch, or keyboard navigation should drive the flow.
+`FlowProvider` props should stay stable between renders. Define phase tuples outside components, or memoize derived configuration. This is the smallest starting point; the sections below cover provider options, progress, browser input, and R3F frame updates when you need them.
 
 ## FlowProvider usage
 
