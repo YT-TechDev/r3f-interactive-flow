@@ -372,10 +372,27 @@ export function App() {
 
 ## Frame updates with `useFlowFrame`
 
-Use `useFlowFrame` for frame-driven Canvas updates. It uses React Three Fiber's `useFrame` internally, so it follows the same rule: call it only from components rendered within `<Canvas>`.
+`useFlowFrame` is the Canvas-bound bridge between flow state and React Three Fiber frame updates. It reads the current flow snapshot, advances transition timing on each R3F frame, and passes phase data to scene code that updates meshes, materials, cameras, or other mutable Three.js objects.
+
+Call `useFlowFrame` only from components rendered inside `<Canvas>`. The hook uses React Three Fiber's `useFrame` internally, and R3F hooks such as `useFrame` and `useThree` must run in Canvas-bound components. A component rendered in normal DOM/UI React should use `useFlow` or `useFlowProgress` instead.
+
+Recommended split:
+
+- React DOM/UI components use `useFlow` for controls and flow state.
+- React DOM/UI components use `useFlowProgress` for coarse status UI.
+- Canvas-bound R3F components use `useFlowFrame` for per-frame visual updates.
+- Frame-driven values usually live in refs or mutable scene object state, not React state.
 
 ```tsx
-function RotatingPhaseMesh() {
+import { Canvas } from "@react-three/fiber";
+import { useRef } from "react";
+import type * as THREE from "three";
+import { FlowProvider, useFlowFrame } from "r3f-interactive-flow";
+
+const phases = ["intro", "work"] as const;
+type Phase = (typeof phases)[number];
+
+function PhaseMesh() {
   const meshRef = useRef<THREE.Mesh | null>(null);
 
   useFlowFrame<Phase>(({ phase, progress, isTransitioning }, delta) => {
@@ -388,7 +405,23 @@ function RotatingPhaseMesh() {
     meshRef.current.visible = isTransitioning || progress > 0;
   });
 
-  return <mesh ref={meshRef} />;
+  return (
+    <mesh ref={meshRef}>
+      <boxGeometry />
+      <meshStandardMaterial />
+    </mesh>
+  );
+}
+
+export function App() {
+  return (
+    <FlowProvider phases={phases}>
+      <Canvas>
+        <ambientLight />
+        <PhaseMesh />
+      </Canvas>
+    </FlowProvider>
+  );
 }
 ```
 
@@ -400,7 +433,23 @@ The frame state includes:
 - `direction`
 - `isTransitioning`
 
-DOM-facing `useFlowProgress()` and `flow.progress` are useful for stateful UI, but they are not intended as frame-perfect animated values.
+Avoid pushing frame-driven values through React state on every frame. React state is appropriate for application state, controls, labels, and stable UI snapshots. R3F frame code is a better fit for high-frequency scene updates.
+
+```tsx
+function GoodSceneBridge() {
+  const meshRef = useRef<THREE.Mesh | null>(null);
+
+  useFlowFrame<Phase>(({ progress }) => {
+    if (meshRef.current) {
+      meshRef.current.scale.setScalar(1 + progress);
+    }
+  });
+
+  return <mesh ref={meshRef} />;
+}
+```
+
+Do not call `useFlowFrame` from DOM components, route components that are not rendered under `<Canvas>`, or provider setup code. Keep DOM input and UI on the React side, and keep per-frame visual mutation inside Canvas-bound scene components.
 
 ## Transition options
 
