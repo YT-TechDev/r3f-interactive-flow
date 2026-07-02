@@ -8,9 +8,7 @@ The goal is not to provide visual effects, camera presets, shader APIs, animatio
 
 ## Project status
 
-`r3f-interactive-flow@0.9.0` has been published.
-
-The current development focus is v1.0.0 stabilization. v1.0.0 should finalize confidence in the existing phase, input, transition, React provider, package, documentation, and R3F frame bridge foundation without expanding the library into visual effects, camera presets, shader APIs, animation timelines, router integration, or animation-framework wrappers.
+Current forward-looking planning is tracked in [docs/roadmap-v1.2.5-to-v2.0.0.md](docs/roadmap-v1.2.5-to-v2.0.0.md). It treats v1.2.5 through v1.5.0 as preparation, documentation, tests, examples, and behavior hardening, and treats v2.0.0 as stabilization and cleanup rather than a rewrite.
 
 Historical planning and release references remain available in [docs/roadmap-v1.0.0.md](docs/roadmap-v1.0.0.md), [docs/releases/v1.0.0-readiness.md](docs/releases/v1.0.0-readiness.md), [docs/releases/v0.9.0-readiness.md](docs/releases/v0.9.0-readiness.md), [docs/releases/v0.8.0-readiness.md](docs/releases/v0.8.0-readiness.md), [docs/roadmap-v0.7.0.md](docs/roadmap-v0.7.0.md), [docs/releases/v0.6.0.md](docs/releases/v0.6.0.md), [docs/roadmap-v0.6.0.md](docs/roadmap-v0.6.0.md), [docs/releases/v0.5.0.md](docs/releases/v0.5.0.md), [docs/roadmap-v0.5.0.md](docs/roadmap-v0.5.0.md), [docs/releases/v0.4.0.md](docs/releases/v0.4.0.md), and [docs/roadmap-v0.4.0.md](docs/roadmap-v0.4.0.md).
 
