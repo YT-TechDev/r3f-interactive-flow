@@ -6,7 +6,7 @@ This is the current forward-looking roadmap for `r3f-interactive-flow` after the
 
 `r3f-interactive-flow` should remain a focused utility for phase-based interactive React Three Fiber websites.
 
-“A small, predictable control layer for phase-based interactive React Three Fiber websites, designed to stay readable for humans and AI coding agents.”
+"A small, predictable control layer for phase-based interactive React Three Fiber websites, designed to stay readable for humans and AI coding agents."
 
 The AI-friendly direction means the project should improve documentation clarity, small examples, test coverage, predictable behavior, TypeScript safety, public API clarity, maintainability, and an agent-readable project structure. It does not mean adding AI-specific product features or expanding the public API aggressively.
 
@@ -14,7 +14,7 @@ Treat `v1.2.5` through `v1.5.0` as preparation, documentation, tests, examples, 
 
 ## Non-goals
 
-The project should not add these just to feel “AI-era”:
+The project should not add these just to feel "AI-era":
 
 - animation timeline system
 - camera preset API
@@ -29,7 +29,7 @@ The project should not add these just to feel “AI-era”:
 - heavy runtime dependencies
 - `@react-three/drei`-style utility collection
 
-The library’s value is that it stays small, predictable, and focused.
+The library's value is that it stays small, predictable, and focused.
 
 ## Public API policy
 
@@ -53,7 +53,7 @@ Before suggesting any breaking change for `v2.0.0`, create a dedicated issue exp
 
 ## Version plan
 
-### v1.2.5 — AI-readable documentation foundation
+### v1.2.5 - AI-readable documentation foundation
 
 **Goal:** Make the library understandable from docs alone for both human developers and AI coding agents.
 
@@ -85,7 +85,7 @@ Before suggesting any breaking change for `v2.0.0`, create a dedicated issue exp
 
 **Release readiness:** Docs should explain the current library shape without implying features that do not exist.
 
-### v1.3.0 — Core behavior test baseline
+### v1.3.0 - Core behavior test baseline
 
 **Goal:** Lock expected phase transition behavior with tests.
 
@@ -113,7 +113,7 @@ Before suggesting any breaking change for `v2.0.0`, create a dedicated issue exp
 
 **Release readiness:** Tests should document behavior that maintainers expect to preserve.
 
-### v1.3.x — Input behavior hardening
+### v1.3.x - Input behavior hardening
 
 **Goal:** Make wheel, touch, and keyboard input behavior predictable.
 
@@ -144,7 +144,7 @@ Before suggesting any breaking change for `v2.0.0`, create a dedicated issue exp
 
 **Release readiness:** Input behavior should be predictable across normal browser usage and safe to import in SSR environments.
 
-### v1.4.0 — TypeScript hardening
+### v1.4.0 - TypeScript hardening
 
 **Goal:** Improve typed phase usage and make the library safer to use in TypeScript projects.
 
@@ -171,7 +171,7 @@ If any type change may break user code, mark it as a v2 candidate instead of sil
 
 **Release readiness:** Type guidance should help users avoid accidental loose phase strings without forcing a breaking change.
 
-### v1.5.0 — Recipes and v2 preparation
+### v1.5.0 - Recipes and v2 preparation
 
 **Goal:** Provide small copy-paste-friendly recipes and prepare v2 cleanup.
 
@@ -203,7 +203,7 @@ If any type change may break user code, mark it as a v2 candidate instead of sil
 
 **Release readiness:** Recipes should stay copy-paste-friendly and avoid turning the project into a template or demo collection.
 
-### v2.0.0 — Stabilized library surface
+### v2.0.0 - Stabilized library surface
 
 **Goal:** Finalize the small public API surface, docs, examples, tests, and package exports.
 
@@ -237,12 +237,12 @@ Any breaking change requires a dedicated issue explaining the current behavior, 
 
 Do not create milestones as part of this documentation update. When maintainers are ready, use this roadmap to create small milestones matching the version plan:
 
-- `v1.2.5 — AI-readable documentation foundation`
-- `v1.3.0 — Core behavior test baseline`
-- `v1.3.x — Input behavior hardening`
-- `v1.4.0 — TypeScript hardening`
-- `v1.5.0 — Recipes and v2 preparation`
-- `v2.0.0 — Stabilized library surface`
+- `v1.2.5 - AI-readable documentation foundation`
+- `v1.3.0 - Core behavior test baseline`
+- `v1.3.x - Input behavior hardening`
+- `v1.4.0 - TypeScript hardening`
+- `v1.5.0 - Recipes and v2 preparation`
+- `v2.0.0 - Stabilized library surface`
 
 Each milestone should be split into small PR-sized issues across docs, tests, examples, implementation/fix work, TypeScript/type work, and chore/release-prep work.
 
