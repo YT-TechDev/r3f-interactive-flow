@@ -217,9 +217,9 @@ function LockToggle() {
 
 It returns a single number:
 
-- `0` at the start of a transition or when the current phase is settled.
+- `0` before any transition starts and at the start of a new transition.
 - Values between `0` and `1` while a transition is active.
-- `1` when a transition reaches the target phase before the provider snapshot settles back to idle progress.
+- `1` after a transition reaches the target phase; the current implementation keeps that completed progress value while the phase is settled.
 
 Use `useFlowProgress` when a component only needs progress and does not need the full flow snapshot or controls. It is a good fit for DOM progress text, coarse progress bars, loading-style indicators, and small status UI.
 
