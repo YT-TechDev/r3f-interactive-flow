@@ -141,13 +141,57 @@ Child components consume flow state through the existing hooks:
 - `useFlowProgress` reads provider progress for DOM status, labels, and coarse UI.
 - `useFlowFrame` is the Canvas-bound bridge for frame updates in R3F components.
 
-Common provider-level mistakes to avoid:
+## Common mistakes and anti-patterns
 
-- Do not call `useFlow`, `useFlowProgress`, or `useFlowFrame` outside `FlowProvider`.
-- Do not recreate `phases` or transition objects on every render unless you intentionally want a new provider machine.
-- Do not mount separate providers for UI and Canvas if they should share one flow state.
-- Do not treat `FlowProvider` as an animation timeline, router, visual effect system, camera preset system, or global app framework.
-- Do not put DOM input logic into R3F scene components; keep browser input hooks in React/client components inside the provider.
+Use this section as a quick checklist when wiring a flow. Most issues come from mixing provider scope, Canvas scope, browser input, and per-frame animation responsibilities.
+
+### Calling hooks outside `FlowProvider`
+
+- **Mistake:** Calling `useFlow`, `useFlowProgress`, or `useFlowFrame` from a component that is not rendered under `FlowProvider`.
+- **Why it is a problem:** These hooks read the shared flow context. Without the provider, the component has no flow machine, snapshot, controls, or transition state to read.
+- **Recommended approach:** Put one `FlowProvider` above the DOM UI, input helpers, and `<Canvas>` subtree that should share the same flow state.
+
+### Splitting shared state across multiple providers
+
+- **Mistake:** Mounting one `FlowProvider` around DOM controls and another around the Canvas when both areas are expected to stay in sync.
+- **Why it is a problem:** Each provider owns its own flow machine. Navigation in one provider does not update the other provider.
+- **Recommended approach:** Use a single shared provider for one shared interactive experience. Only mount multiple providers when you intentionally want independent flow states.
+
+### Recreating `phases` or transition config every render
+
+- **Mistake:** Creating `phases`, `transition`, or `transition.byPhase` inline on every render.
+- **Why it is a problem:** Unstable provider props can recreate flow configuration unnecessarily and make transition behavior harder to reason about.
+- **Recommended approach:** Define static phase tuples and transition objects outside components, or memoize values that must be derived from props or data.
+
+### Calling Canvas-bound hooks from DOM components
+
+- **Mistake:** Calling `useFlowFrame`, `useFrame`, or `useThree` in DOM UI, route, layout, or provider setup components.
+- **Why it is a problem:** These hooks are Canvas-bound. `useFlowFrame` uses React Three Fiber frame behavior and must run from a component rendered inside `<Canvas>`.
+- **Recommended approach:** Use `useFlow` and `useFlowProgress` for DOM UI. Use `useFlowFrame` only in R3F scene components rendered inside `<Canvas>`.
+
+### Pushing frame-perfect visual values through React state
+
+- **Mistake:** Calling React state setters every frame for mesh positions, material values, camera movement, or other high-frequency visual updates.
+- **Why it is a problem:** React state is for application state and stable UI snapshots, not frame-by-frame scene mutation. Per-frame state updates can cause unnecessary React renders and jittery scene code.
+- **Recommended approach:** Keep frame-driven values in refs or mutable Three.js object state inside Canvas-bound components. Use React state for controls, labels, status UI, and other coarse snapshots.
+
+### Mixing DOM input logic into scene objects
+
+- **Mistake:** Registering wheel, touch, or keyboard DOM event handling directly inside R3F mesh or scene components by default.
+- **Why it is a problem:** Scene components become responsible for browser listener setup, cleanup, ignore selectors, cooldowns, and flow controls, which blurs DOM input and R3F rendering responsibilities.
+- **Recommended approach:** Put browser input helpers in React/client components inside `FlowProvider`. Let Canvas-bound scene code react to the resulting flow state with `useFlowFrame`.
+
+### Treating React-side progress as frame-perfect animation data
+
+- **Mistake:** Using `useFlowProgress` or `useFlow().progress` as the source for frame-perfect Canvas animation.
+- **Why it is a problem:** React-side progress is useful for DOM status, labels, disabled states, and coarse UI. Canvas animation should be driven on the R3F frame loop.
+- **Recommended approach:** Use `useFlowFrame` for per-frame mesh, material, camera, and scene updates. Use `useFlowProgress` for DOM progress indicators and other UI that does not need frame-perfect updates.
+
+### Expanding examples beyond the library scope
+
+- **Mistake:** Presenting examples as animation timelines, routers, visual effects collections, camera preset systems, shader systems, portfolio templates, `@react-three/drei` replacements, or GSAP / Framer Motion wrappers.
+- **Why it is a problem:** The library is a focused phase/input/frame coordination utility. Broad examples imply features and maintenance responsibilities that are outside the public API.
+- **Recommended approach:** Keep examples small, dependency-light, and copy-paste-friendly. Show one concept at a time with React, React Three Fiber, Three.js, and the existing public hooks.
 
 ## Flow controls with `useFlow`
 
