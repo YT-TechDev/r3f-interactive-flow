@@ -1,5 +1,31 @@
 # r3f-interactive-flow
 
+## 1.2.5
+
+`r3f-interactive-flow@1.2.5` is a documentation and example-focused release that establishes clearer AI-readable usage guidance for the existing library surface. It does not change runtime behavior or expand the package API.
+
+### Documentation
+
+- Clarified README positioning, intended scope, and non-goals.
+- Documented practical `FlowProvider` setup and usage expectations.
+- Documented `useFlow()` and `useFlowProgress()` usage for phase navigation and progress reads.
+- Documented `useFlowFrame()` as a Canvas-bound R3F hook that must stay inside Canvas-rendered components.
+- Documented the separation between DOM input hooks and R3F scene logic.
+- Added common mistakes and anti-patterns guidance.
+- Simplified minimal usage examples for faster adoption.
+- Added v1.2.5 closeout and release-readiness documentation.
+
+### Scope
+
+- No source or runtime behavior changed.
+- No public API changed.
+- No dependencies changed.
+- No package exports changed.
+- No release automation changed.
+- No npm publish is included in this PR.
+- No git tag is included in this PR.
+- No GitHub Release is included in this PR.
+
 ## 1.0.0
 
 `r3f-interactive-flow@1.0.0` is the final stabilization release for the current focused library direction. It finalizes confidence in the existing phase, input, transition, React provider, package, documentation, example, and R3F frame bridge foundation without expanding the library into a general animation framework.
