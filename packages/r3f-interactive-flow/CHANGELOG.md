@@ -1,5 +1,35 @@
 # r3f-interactive-flow
 
+## 1.4.0
+
+`r3f-interactive-flow@1.4.0` is an input behavior baseline release. It stabilizes tested wheel, keyboard, and touch input behavior without expanding the public API or broadening the package scope.
+
+### Changed
+
+- Stabilized the input behavior baseline for wheel, keyboard, and touch input hooks.
+- Audited input lock and cooldown behavior for accepted navigation, rejected navigation, transitions, and locked states.
+- Aligned disabled input behavior so disabled hooks avoid listener setup and option validation where applicable.
+- Documented tested input behavior for thresholds, key mappings, touch gestures, locks, transitions, cooldowns, listener cleanup, and browser API safety.
+
+### Tests
+
+- Added or expanded baseline coverage for wheel input behavior.
+- Added or expanded baseline coverage for keyboard input behavior.
+- Added or expanded baseline coverage for touch input behavior.
+
+### Scope
+
+- No public API expansion is included in this PR.
+- No new runtime dependencies are included in this PR.
+- No runtime behavior changes are included in this release-prep PR.
+- No test changes are included in this release-prep PR.
+- No examples changed in this release-prep PR.
+- No visual effects, router integration, camera presets, shader APIs, or animation timeline features are included.
+- No release automation changes are included in this PR.
+- No npm publish is included in this PR.
+- No git tag is included in this PR.
+- No GitHub Release is included in this PR.
+
 ## 1.3.0
 
 `r3f-interactive-flow@1.3.0` is a core behavior baseline release. It focuses on stabilizing and documenting existing core behavior without expanding the public API or broadening the package scope.
