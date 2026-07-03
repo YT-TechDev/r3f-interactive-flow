@@ -49,53 +49,84 @@ yarn add r3f-interactive-flow three @react-three/fiber react react-dom
 
 ## Minimal setup
 
-Define phases as a const tuple, pass them to `FlowProvider`, and use hooks inside the provider.
+Define phases as a const tuple, wrap the shared subtree with `FlowProvider`, and keep DOM controls separate from Canvas-bound scene logic.
 
 ```tsx
 "use client";
 
-import { FlowProvider, useFlow } from "r3f-interactive-flow";
+import { Canvas } from "@react-three/fiber";
+import { useRef } from "react";
+import type * as THREE from "three";
+import { FlowProvider, useFlow, useFlowFrame, useFlowProgress } from "r3f-interactive-flow";
 
 const phases = ["intro", "work", "contact"] as const;
 type Phase = (typeof phases)[number];
 
-function FlowControls() {
+function OverlayControls() {
   const { phase, next, prev, goTo } = useFlow<Phase>();
 
   return (
     <div>
       <p>Current phase: {phase}</p>
-      <button onClick={prev}>Prev</button>
+      <button onClick={prev}>Previous</button>
       <button onClick={next}>Next</button>
       <button onClick={() => goTo("contact")}>Contact</button>
     </div>
   );
 }
 
+function ProgressLabel() {
+  const progress = useFlowProgress();
+
+  return <span>{Math.round(progress * 100)}%</span>;
+}
+
+function SceneObject() {
+  const meshRef = useRef<THREE.Mesh | null>(null);
+
+  useFlowFrame<Phase>(({ phase, progress }) => {
+    if (!meshRef.current) {
+      return;
+    }
+
+    meshRef.current.rotation.y = progress * Math.PI;
+    meshRef.current.visible = phase !== "contact";
+  });
+
+  return (
+    <mesh ref={meshRef}>
+      <boxGeometry />
+      <meshStandardMaterial />
+    </mesh>
+  );
+}
+
 export function App() {
   return (
     <FlowProvider phases={phases}>
-      <FlowControls />
+      <OverlayControls />
+      <ProgressLabel />
+
+      <Canvas>
+        <ambientLight />
+        <SceneObject />
+      </Canvas>
     </FlowProvider>
   );
 }
 ```
 
-`FlowProvider` props should stay stable between renders. Define phase tuples outside components, or memoize derived configuration. This is the smallest starting point; the sections below cover provider options, progress, browser input, and R3F frame updates when you need them.
+`FlowProvider` should wrap every component that shares one flow state: DOM controls, DOM status labels, optional input helpers, and the `<Canvas>` subtree. `useFlow` and `useFlowProgress` are regular React hooks for DOM UI under the provider. `useFlowFrame` is for components rendered inside `<Canvas>` because it uses React Three Fiber frame behavior.
+
+Keep provider inputs stable between renders. Define static phase tuples outside components, or memoize derived phase lists and transition configuration.
 
 ## FlowProvider usage
 
 `FlowProvider` is the main React-side entry point for phase-based flow state. It creates the flow machine for a known list of phases, keeps a React snapshot of the current phase state, and provides controls and transition state to hooks rendered below it.
 
-Place `FlowProvider` above every React component that needs the same flow state. For a typical R3F page, that means wrapping the shared client-side subtree that contains DOM controls, status UI, browser input components, and the `<Canvas>` area. Keep scene-specific animation inside Canvas components; use the provider only to share phase state and controls.
-
-Provide phases as a stable readonly list. Define the tuple outside the component when the phases are static, or memoize it when it is derived from props or data. The current public configuration is passed directly to `FlowProvider` with props such as `phases`, optional `initialPhase`, and optional `transition` timing.
+Place one `FlowProvider` above the React subtree that should share the same phase state. For a typical R3F page, that shared subtree contains DOM navigation, status UI, optional browser input components, and the `<Canvas>` area.
 
 ```tsx
-"use client";
-
-import { FlowProvider, useFlow, useFlowProgress } from "r3f-interactive-flow";
-
 const phases = ["intro", "details", "contact"] as const;
 type Phase = (typeof phases)[number];
 
@@ -137,9 +168,11 @@ export function ExperienceShell() {
 
 Child components consume flow state through the existing hooks:
 
-- `useFlow` reads the current snapshot and calls controls such as `next`, `prev`, `goTo`, `lock`, and `unlock`.
+- `useFlow` reads the current snapshot and calls controls such as `next`, `prev`, and `goTo` from DOM/client UI.
 - `useFlowProgress` reads provider progress for DOM status, labels, and coarse UI.
 - `useFlowFrame` is the Canvas-bound bridge for frame updates in R3F components.
+
+Do not use R3F hooks such as `useFrame`, `useThree`, or `useFlowFrame` in provider setup, route/layout components, or ordinary DOM controls. Keep browser input and DOM listener logic in React/client components under `FlowProvider`, and let Canvas scene objects react to the resulting flow state.
 
 ## Input behavior baseline
 
@@ -526,36 +559,17 @@ Recommended architecture:
 - `useFlowFrame` must run inside a component rendered within `<Canvas>`.
 
 ```tsx
-import { Canvas } from "@react-three/fiber";
-import { useRef } from "react";
-import type * as THREE from "three";
-import { FlowProvider, useFlow, useFlowFrame, useFlowProgress } from "r3f-interactive-flow";
-
-const phases = ["intro", "skills", "projects", "contact"] as const;
-type Phase = (typeof phases)[number];
-
 function FlowNav() {
-  const { phase, phaseIndex, next, prev, goTo, isTransitioning } = useFlow<Phase>();
+  const { phase, next, prev, goTo } = useFlow<Phase>();
   const progress = useFlowProgress();
 
   return (
     <nav>
-      <p>
-        Current phase: {phase} / {phaseIndex}
-      </p>
-      <p>DOM progress: {progress.toFixed(2)}</p>
-
-      <button onClick={prev} disabled={isTransitioning}>
-        Prev
-      </button>
-
-      <button onClick={next} disabled={isTransitioning}>
-        Next
-      </button>
-
-      <button onClick={() => goTo("projects")} disabled={isTransitioning}>
-        Go to Projects
-      </button>
+      <p>{phase}</p>
+      <p>{Math.round(progress * 100)}%</p>
+      <button onClick={prev}>Previous</button>
+      <button onClick={next}>Next</button>
+      <button onClick={() => goTo("contact")}>Contact</button>
     </nav>
   );
 }
@@ -563,55 +577,15 @@ function FlowNav() {
 function FlowBox() {
   const meshRef = useRef<THREE.Mesh | null>(null);
 
-  useFlowFrame<Phase>(({ phase, progress, direction }, delta) => {
+  useFlowFrame<Phase>(({ phase, progress }) => {
     if (!meshRef.current) {
       return;
     }
 
-    if (phase === "intro") {
-      meshRef.current.position.z = -4 + progress * 4;
-    }
-
-    if (phase === "skills") {
-      meshRef.current.rotation.y += delta;
-    }
-
-    if (phase === "projects") {
-      const sign = direction === "prev" ? -1 : 1;
-      meshRef.current.position.x = progress * sign * 2;
-    }
+    meshRef.current.position.x = phase === "work" ? progress * 2 : 0;
   });
 
-  return (
-    <mesh ref={meshRef}>
-      <boxGeometry />
-      <meshStandardMaterial />
-    </mesh>
-  );
-}
-
-export function App() {
-  return (
-    <FlowProvider
-      phases={phases}
-      transition={{
-        duration: 1000,
-        cooldown: 500,
-        byPhase: {
-          intro: {
-            duration: 1600
-          }
-        }
-      }}
-    >
-      <FlowNav />
-
-      <Canvas>
-        <ambientLight />
-        <FlowBox />
-      </Canvas>
-    </FlowProvider>
-  );
+  return <mesh ref={meshRef} />;
 }
 ```
 
