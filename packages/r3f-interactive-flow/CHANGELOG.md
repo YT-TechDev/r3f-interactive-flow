@@ -1,5 +1,28 @@
 # r3f-interactive-flow
 
+## 1.3.0
+
+`r3f-interactive-flow@1.3.0` is a core behavior baseline release. It focuses on stabilizing and documenting existing core behavior without expanding the public API or broadening the package scope.
+
+### Stabilized
+
+- Added core transition lifecycle baseline tests.
+- Added navigation boundary and no-op baseline tests.
+- Added lock and cooldown baseline tests.
+- Added transition re-entry and ignored navigation baseline tests.
+- Added core behavior baseline documentation.
+
+### Scope
+
+- No public API expansion is included in this PR.
+- No new runtime dependencies are included in this PR.
+- No package exports changed.
+- No visual effects, router integration, camera presets, shader APIs, or animation timeline features are included.
+- No release automation changes are included in this PR.
+- No npm publish is included in this PR.
+- No git tag is included in this PR.
+- No GitHub Release is included in this PR.
+
 ## 1.2.5
 
 `r3f-interactive-flow@1.2.5` is a documentation and example-focused release that establishes clearer AI-readable usage guidance for the existing library surface. It does not change runtime behavior or expand the package API.
