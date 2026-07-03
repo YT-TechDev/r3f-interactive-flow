@@ -547,26 +547,64 @@ export function Experience() {
 
 `DomControls` is a normal React UI component that calls flow controls. `SceneBox` is Canvas-bound and reacts to flow state through `useFlowFrame`. `useFrame`, `useThree`, and `useFlowFrame` should not be used in DOM/UI components outside `<Canvas>`.
 
-## DOM UI to Canvas pattern
+## DOM to Canvas wiring
 
-Recommended architecture:
+Use one `FlowProvider` for the client-side subtree that shares a flow state. Put DOM controls, status UI, optional input helpers, and the `<Canvas>` under that provider so they read the same phase machine instead of synchronizing separate state by hand.
 
-- DOM React UI controls the current phase with `useFlow`.
-- DOM/stateful UI can read coarse progress with `useFlowProgress` or `useFlow`.
-- R3F Canvas components read phase/progress/frame state with `useFlowFrame`.
-- Values that change every frame should not be pushed through React state.
-- Frame-driven visual updates should live in Canvas-bound components.
-- `useFlowFrame` must run inside a component rendered within `<Canvas>`.
+### Recommended tree
 
 ```tsx
-function FlowNav() {
+<FlowProvider phases={phases} transition={transition}>
+  <OverlayControls />
+  <ProgressLabel />
+  <WheelInputBridge />
+
+  <Canvas>
+    <SceneObject />
+  </Canvas>
+</FlowProvider>
+```
+
+Keep `phases` and transition configuration stable between renders. Define static tuples and objects outside components, or memoize values that must be derived from props or data.
+
+### DOM responsibilities
+
+DOM/client components should own UI and browser input wiring:
+
+- render buttons, labels, progress bars, and status UI
+- call `next`, `prev`, and `goTo` from `useFlow`
+- read coarse state with `useFlow`
+- read DOM progress/status with `useFlowProgress`
+- optionally mount `useWheelInput`, `useTouchInput`, or `useKeyboardInput` under `FlowProvider`
+
+Input helper components do not require Canvas. They should stay with the rest of the DOM/client layer because they own browser event listener setup and cleanup, ignore selectors, typing-target behavior, locks, and cooldown checks.
+
+### Canvas responsibilities
+
+Canvas-bound R3F components should own frame-based scene updates:
+
+- render inside `<Canvas>`
+- call `useFlowFrame` to react to phase and progress on the R3F frame loop
+- call R3F hooks such as `useFrame` and `useThree` only from Canvas-bound components
+- update refs, transforms, visibility, materials, cameras, or other mutable scene state
+
+Scene objects should react to the flow state. They should not own global wheel, touch, or keyboard listener wiring by default.
+
+### Avoid mixing responsibilities
+
+Do not move browser input listeners into mesh or scene object components just because the input affects the scene. That makes scene code responsible for DOM listener cleanup, ignored targets, typing behavior, cooldowns, and global navigation rules. Keep browser input in DOM/client components, then let `useFlowFrame` bridge the resulting phase state into Canvas updates.
+
+`useFlow`, `useFlowProgress`, and the input hooks are React/client-side hooks for the DOM layer under `FlowProvider`. `useFlowFrame`, `useFrame`, and `useThree` are Canvas-bound hooks for components rendered inside `<Canvas>`.
+
+### Small wiring example
+
+```tsx
+function OverlayControls() {
   const { phase, next, prev, goTo } = useFlow<Phase>();
-  const progress = useFlowProgress();
 
   return (
     <nav>
-      <p>{phase}</p>
-      <p>{Math.round(progress * 100)}%</p>
+      <p>Current phase: {phase}</p>
       <button onClick={prev}>Previous</button>
       <button onClick={next}>Next</button>
       <button onClick={() => goTo("contact")}>Contact</button>
@@ -574,14 +612,27 @@ function FlowNav() {
   );
 }
 
-function FlowBox() {
+function ProgressLabel() {
+  const progress = useFlowProgress();
+
+  return <p>{Math.round(progress * 100)}%</p>;
+}
+
+function WheelInputBridge() {
+  useWheelInput<Phase>({ threshold: 40 });
+
+  return null;
+}
+
+function SceneObject() {
   const meshRef = useRef<THREE.Mesh | null>(null);
 
-  useFlowFrame<Phase>(({ phase, progress }) => {
+  useFlowFrame<Phase>(({ phase, progress }, delta) => {
     if (!meshRef.current) {
       return;
     }
 
+    meshRef.current.rotation.y += delta;
     meshRef.current.position.x = phase === "work" ? progress * 2 : 0;
   });
 
@@ -589,7 +640,7 @@ function FlowBox() {
 }
 ```
 
-`FlowNav` is normal DOM React UI. `FlowBox` is rendered inside the R3F Canvas and may call `useFlowFrame`. The library does not provide visual effects or animation presets; the scene update logic is yours.
+`OverlayControls`, `ProgressLabel`, and `WheelInputBridge` are DOM/client components rendered under `FlowProvider`. `SceneObject` is rendered inside `<Canvas>` and only reacts to the shared flow state. The library does not provide visual effects, scene presets, router integration, animation timelines, or GSAP / Framer Motion wrappers; scene update logic stays in your application.
 
 ## Frame updates with `useFlowFrame`
 
