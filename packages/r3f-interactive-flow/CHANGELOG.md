@@ -1,5 +1,32 @@
 # r3f-interactive-flow
 
+## 1.5.0
+
+`r3f-interactive-flow@1.5.0` is a usage-readiness and package-stability release. It builds on the `1.3.0` core behavior baseline and the `1.4.0` input behavior baseline without treating this release as a major feature release.
+
+### Documentation
+
+- Tightened minimal usage examples for the focused phase, progress, and frame bridge workflow.
+- Documented DOM-to-Canvas wiring patterns so browser input, React state, and Canvas-bound frame updates stay separated.
+- Added an agent-readable usage checklist for predictable integration guidance.
+- Clarified package metadata and peer dependency documentation for consumer readiness.
+- Documented the v1.5.0 usage readiness baseline.
+
+### Tests
+
+- Added package entrypoint export coverage to keep the published surface intentional.
+
+### Scope
+
+- No public API expansion is included in this PR.
+- No new runtime dependencies are included in this PR.
+- No runtime behavior changes are included in this release-prep PR.
+- No router integration, visual effect systems, camera presets, shader APIs, or animation timeline behavior are included.
+- No release automation changes are included in this PR.
+- No npm publish is included in this PR.
+- No git tag is included in this PR.
+- No GitHub Release is included in this PR.
+
 ## 1.4.0
 
 `r3f-interactive-flow@1.4.0` is an input behavior baseline release. It stabilizes tested wheel, keyboard, and touch input behavior without expanding the public API or broadening the package scope.
