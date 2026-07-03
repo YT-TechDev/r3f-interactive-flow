@@ -294,6 +294,28 @@ Use this checklist before adding or editing examples, docs, or app code that use
 - Do not present the package as a `@react-three/drei` replacement, scene template, portfolio template, or visual effects collection.
 - Keep examples small, dependency-light, and focused on phase control, DOM-to-Canvas wiring, and predictable frame updates.
 
+## v1.5.0 usage readiness baseline
+
+The v1.5.0 usage readiness baseline documents the current stable usage model. It is a documentation closeout for clearer examples, DOM-to-Canvas wiring, checklist guidance, entrypoint export coverage, and peer dependency expectations. It does not add runtime behavior or broaden the public API.
+
+### Expected usage model
+
+- Define stable phase tuples and wrap the shared DOM and Canvas subtree with one `FlowProvider`.
+- Use `useFlow` for DOM/client controls and `useFlowProgress` for DOM/client progress or status UI.
+- Mount `useWheelInput`, `useTouchInput`, and `useKeyboardInput` from DOM/client components under `FlowProvider` when browser input helpers are needed.
+- Use `useFlowFrame` from Canvas-bound R3F components for per-frame phase and progress data.
+- Keep R3F hooks inside Canvas-bound components, and keep every-frame visual values in refs or mutable Three.js object state instead of React state.
+
+### Package expectations
+
+- Keep package usage focused on phase control, transition progress, DOM controls, optional browser input helpers, and Canvas-bound frame updates.
+- Treat the package entrypoint export tests as the guard for the current runtime export surface.
+- Provide `react`, `react-dom`, `three`, and `@react-three/fiber` from the consuming app as peer dependencies.
+
+### Not covered by this baseline
+
+This baseline does not promise public API expansion, runtime dependency additions, router or Next.js-specific router integration, animation timelines, visual effect systems, camera presets, shader APIs, particle or effect collection APIs, GSAP or Framer Motion wrappers, large demos, portfolio templates, CLI or code generation, AI-specific runtime behavior, release automation, package version changes, npm publishing, git tags, or changelog release entries.
+
 ## Common mistakes and anti-patterns
 
 Use this section as a quick checklist when wiring a flow. Most issues come from mixing provider scope, Canvas scope, browser input, and per-frame animation responsibilities.
