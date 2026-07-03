@@ -299,6 +299,50 @@ describe("useTouchInput", () => {
     }
   });
 
+  it("moves touch listeners when the configured target changes", () => {
+    const firstTarget = document.createElement("div");
+    const secondTarget = document.createElement("div");
+    const firstMinimalTarget = firstTarget as unknown as MinimalElement;
+    const secondMinimalTarget = secondTarget as unknown as MinimalElement;
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ target: firstTarget }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    for (const type of touchEventTypes) {
+      expect(firstMinimalTarget.listenerCount(type)).toBe(1);
+      expect(secondMinimalTarget.listenerCount(type)).toBe(0);
+      expect(windowTarget.listenerCount(type)).toBe(0);
+    }
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ target: secondTarget }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    for (const type of touchEventTypes) {
+      expect(firstMinimalTarget.listenerCount(type)).toBe(0);
+      expect(secondMinimalTarget.listenerCount(type)).toBe(1);
+      expect(windowTarget.listenerCount(type)).toBe(0);
+    }
+
+    swipe(100, 49, firstMinimalTarget);
+
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+
+    swipe(100, 49, secondMinimalTarget);
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
   it("does not navigate from touch events after the input hook unmounts", () => {
     let latestControls: FlowControls<TestPhase> | undefined;
 
@@ -442,6 +486,40 @@ describe("useTouchInput", () => {
 
     dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] });
     dispatchTouch("touchcancel");
+    dispatchTouch("touchend", { changedTouches: [{ clientX: 0, clientY: 0 }] });
+
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+  });
+
+  it("touchend without a stored touchstart position is ignored", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchTouch("touchend", { changedTouches: [{ clientX: 0, clientY: 0 }] });
+
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+  });
+
+  it("uses the latest touchstart position for the next touchend", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] });
+    dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 40 }] });
     dispatchTouch("touchend", { changedTouches: [{ clientX: 0, clientY: 0 }] });
 
     expect(latestControls?.phase).toBe("intro");
