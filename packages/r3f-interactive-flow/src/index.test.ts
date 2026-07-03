@@ -12,14 +12,22 @@ import type {
   UseWheelInputOptions
 } from ".";
 
-const expectedRuntimeExports = [
+const expectedCoreRuntimeExports = [
   "FlowProvider",
   "useFlow",
   "useFlowFrame",
-  "useFlowProgress",
+  "useFlowProgress"
+] as const satisfies readonly (keyof typeof publicApi)[];
+
+const expectedInputRuntimeExports = [
   "useKeyboardInput",
   "useTouchInput",
   "useWheelInput"
+] as const satisfies readonly (keyof typeof publicApi)[];
+
+const expectedRuntimeExports = [
+  ...expectedCoreRuntimeExports,
+  ...expectedInputRuntimeExports
 ] as const satisfies readonly (keyof typeof publicApi)[];
 
 type ExpectedRuntimeExport = (typeof expectedRuntimeExports)[number];
@@ -32,7 +40,19 @@ type RuntimeExportCoverageIsExact = keyof typeof publicApi extends ExpectedRunti
 const runtimeExportCoverageIsExact: RuntimeExportCoverageIsExact = true;
 
 describe("public API", () => {
-  it("exposes the expected runtime exports", () => {
+  it("exposes the expected core package entrypoint exports", () => {
+    for (const exportName of expectedCoreRuntimeExports) {
+      expect(publicApi[exportName]).toBeTypeOf("function");
+    }
+  });
+
+  it("exposes the existing input hook entrypoint exports", () => {
+    for (const exportName of expectedInputRuntimeExports) {
+      expect(publicApi[exportName]).toBeTypeOf("function");
+    }
+  });
+
+  it("keeps the runtime entrypoint export surface exact", () => {
     expect(Object.keys(publicApi).sort()).toEqual(expectedRuntimeExports);
 
     for (const exportName of expectedRuntimeExports) {
