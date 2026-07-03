@@ -216,6 +216,21 @@ describe("useKeyboardInput", () => {
     expect(latestControls?.direction).toBe("none");
   });
 
+  it("does not validate keyboard navigation options or attach listeners while disabled", () => {
+    expect(() =>
+      renderFlow(
+        <KeyboardInputProbe
+          options={{
+            enabled: false,
+            cooldown: -1
+          }}
+        />
+      )
+    ).not.toThrow();
+
+    expect(windowTarget.listenerCount("keydown")).toBe(0);
+  });
+
   it("navigates after being re-enabled", () => {
     let latestControls: FlowControls<TestPhase> | undefined;
 
