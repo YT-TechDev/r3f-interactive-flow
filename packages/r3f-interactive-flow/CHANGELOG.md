@@ -1,5 +1,28 @@
 # r3f-interactive-flow
 
+## 1.6.0
+
+`r3f-interactive-flow@1.6.0` is a transition behavior hardening release. It stabilizes existing core transition behavior through deterministic coverage and documentation without expanding the library scope.
+
+### Hardened
+
+- Added phase boundary navigation coverage for first-phase and final-phase no-op behavior.
+- Added `goTo()` edge-case coverage for same-phase, invalid target, multi-phase jump, and active-transition behavior.
+- Added lock and unlock transition behavior coverage.
+- Hardened cooldown consistency around ignored navigation during cooldown, lock, active transitions, same-phase requests, and phase boundaries.
+- Ensured transition progress, direction, and state remain predictable at boundaries and after completion.
+- Documented the v1.6.0 transition behavior baseline.
+
+### Scope
+
+- No public API expansion is included in this PR.
+- No new runtime dependencies are included in this PR.
+- No visual effects, animation timelines, camera presets, router integration, template systems, or third-party animation wrappers are included.
+- No release automation changes are included in this PR.
+- No npm publish is included in this PR.
+- No git tag is included in this PR.
+- No GitHub Release is included in this PR.
+
 ## 1.5.0
 
 `r3f-interactive-flow@1.5.0` is a usage-readiness and package-stability release. It builds on the `1.3.0` core behavior baseline and the `1.4.0` input behavior baseline without treating this release as a major feature release.

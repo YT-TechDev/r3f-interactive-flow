@@ -294,6 +294,12 @@ Use this checklist before adding or editing examples, docs, or app code that use
 - Do not present the package as a `@react-three/drei` replacement, scene template, portfolio template, or visual effects collection.
 - Keep examples small, dependency-light, and focused on phase control, DOM-to-Canvas wiring, and predictable frame updates.
 
+## v1.6.0 transition behavior baseline
+
+The v1.6.0 transition behavior baseline documents hardened core transition behavior for boundary navigation, `goTo()` edge cases, lock and unlock behavior, ignored navigation during cooldown or active transitions, and predictable progress, direction, and transition state at boundaries. It does not add runtime features, broaden the public API, or add runtime dependencies.
+
+For the full baseline, see [docs/transition-behavior-v1.6.0.md](../../docs/transition-behavior-v1.6.0.md).
+
 ## v1.5.0 usage readiness baseline
 
 The v1.5.0 usage readiness baseline documents the current stable usage model. It is a documentation closeout for clearer examples, DOM-to-Canvas wiring, checklist guidance, entrypoint export coverage, and peer dependency expectations. It does not add runtime behavior or broaden the public API.
