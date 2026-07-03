@@ -180,6 +180,22 @@ describe("useWheelInput", () => {
     expect(latestControls?.direction).toBe("none");
   });
 
+  it("does not validate wheel navigation options or attach listeners while disabled", () => {
+    expect(() =>
+      renderFlow(
+        <WheelInputProbe
+          options={{
+            enabled: false,
+            cooldown: -1,
+            threshold: Number.NaN
+          }}
+        />
+      )
+    ).not.toThrow();
+
+    expect(windowTarget.listenerCount("wheel")).toBe(0);
+  });
+
   it("navigates after being re-enabled", () => {
     let latestControls: FlowControls<TestPhase> | undefined;
 
