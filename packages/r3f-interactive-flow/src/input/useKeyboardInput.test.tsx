@@ -455,13 +455,17 @@ describe("useKeyboardInput", () => {
 
   it("does not require browser APIs at module import time", async () => {
     const originalWindow = globalThis.window;
+    const originalHTMLElement = globalThis.HTMLElement;
 
     vi.resetModules();
     delete (globalThis as Partial<typeof globalThis>).window;
+    delete (globalThis as Partial<typeof globalThis>).HTMLElement;
 
-    await expect(import("./useKeyboardInput")).resolves.toHaveProperty("useKeyboardInput");
-
-    Object.assign(globalThis, { window: originalWindow });
+    try {
+      await expect(import("./useKeyboardInput")).resolves.toHaveProperty("useKeyboardInput");
+    } finally {
+      Object.assign(globalThis, { window: originalWindow, HTMLElement: originalHTMLElement });
+    }
   });
 
   it("can attach directly to a target element", () => {
