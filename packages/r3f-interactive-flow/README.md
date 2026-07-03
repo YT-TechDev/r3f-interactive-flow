@@ -251,6 +251,49 @@ Keep DOM input hooks in React/client components under `FlowProvider`, not inside
 
 The input modules are safe to import when `window` or related browser globals are unavailable. Browser targets are resolved from effects after render, and listeners attach only when enabled and browser APIs exist. This keeps package imports compatible with server-rendered module loading, while actual input handling remains client-side behavior.
 
+## Usage checklist
+
+Use this checklist before adding or editing examples, docs, or app code that uses `r3f-interactive-flow`. The package is a small predictable control layer for shared phase state, browser input, transition progress, and Canvas-bound frame updates. It is not a visual effects framework.
+
+### Provider
+
+- Define `phases` as a stable readonly tuple when possible, such as `const phases = ["intro", "work", "contact"] as const`.
+- Place one `FlowProvider` above the DOM UI, optional input helpers, status labels, and `<Canvas>` subtree that should share one flow state.
+- Do not split DOM controls and Canvas scene objects across separate providers unless the flows are intentionally isolated.
+- Keep transition configuration stable between renders by defining static objects outside components or memoizing derived values.
+
+### DOM UI
+
+- Use `useFlow` in DOM/client components for `phase`, `phaseIndex`, and controls such as `next`, `prev`, and `goTo`.
+- Use `useFlowProgress` for coarse DOM progress labels, status UI, or simple progress bars.
+- Do not call R3F hooks such as `useFrame`, `useThree`, or `useFlowFrame` from DOM UI, route, layout, or provider setup components.
+
+### Browser input
+
+- Mount `useWheelInput`, `useTouchInput`, or `useKeyboardInput` from DOM/client components rendered under `FlowProvider`.
+- Keep browser event listener wiring out of mesh and scene object components by default.
+- Remember that input helpers do not require `<Canvas>`; they drive the existing flow controls from the DOM/client layer.
+- Use ignore selectors and typing-target behavior intentionally so input does not hijack form controls or links.
+
+### Canvas scene
+
+- Render R3F scene objects inside `<Canvas>`.
+- Use `useFlowFrame` only from Canvas-bound components that need per-frame phase or progress data.
+- Use R3F hooks such as `useFrame` and `useThree` only inside Canvas-bound components.
+- Update refs, transforms, visibility, materials, cameras, or other mutable Three.js scene state from frame-based logic.
+
+### Frame updates
+
+- Do not push every-frame mesh, material, camera, or transform values through React state.
+- Keep high-frequency visual values in refs or mutable Three.js object state.
+- Use React state and React-side flow snapshots for controls, labels, accessibility state, and other stable UI.
+
+### Scope boundaries
+
+- Do not add animation timelines, camera preset APIs, shader effect APIs, particle systems, router integration, or GSAP / Framer Motion wrapper language to examples.
+- Do not present the package as a `@react-three/drei` replacement, scene template, portfolio template, or visual effects collection.
+- Keep examples small, dependency-light, and focused on phase control, DOM-to-Canvas wiring, and predictable frame updates.
+
 ## Common mistakes and anti-patterns
 
 Use this section as a quick checklist when wiring a flow. Most issues come from mixing provider scope, Canvas scope, browser input, and per-frame animation responsibilities.
