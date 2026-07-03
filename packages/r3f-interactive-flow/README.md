@@ -255,6 +255,57 @@ function LockToggle() {
 
 `useFlow` is not a frame-perfect animation API. Reading `progress` from `useFlow` is fine for React UI, labels, disabled states, and coarse status displays. For per-frame Canvas animation, use `useFlowFrame` inside a component rendered within `<Canvas>`.
 
+## Core behavior baseline
+
+The core flow machine is intentionally small and deterministic. The v1.3.0 baseline tests define the behavior below for phase snapshots, navigation requests, transition timing, locks, and cooldowns. This section describes the core machine behavior, not R3F visual effects, input-hook semantics, router behavior, or animation presets.
+
+### Snapshot fields
+
+A flow snapshot contains the current phase state and transition flags:
+
+- `phase`: the current target phase. A valid transition updates this value immediately when navigation starts.
+- `phaseIndex`: the zero-based index for `phase`.
+- `progress`: transition progress. The initial snapshot starts at `0`. A valid transition starts at `0`, advances only when time is passed through explicit updates, reaches `1` when the transition completes, and remains `1` while settled after a completed transition.
+- `direction`: `"next"`, `"prev"`, or `"none"`. Forward moves use `"next"`; backward moves use `"prev"`; completed and idle snapshots use `"none"`.
+- `isTransitioning`: `true` during an active transition and `false` before a transition starts or after it completes.
+- `isLocked`: `true` after manual `lock()` and `false` after `unlock()`.
+
+The initial settled snapshot uses the initial phase, its phase index, `progress: 0`, `direction: "none"`, `isTransitioning: false`, and `isLocked: false`. After the first completed transition, the settled progress is `1`.
+
+### Navigation controls
+
+`next()`, `prev()`, and `goTo(phase)` request transitions between known phases:
+
+- `next()` starts a transition to the next phase when there is one.
+- `prev()` starts a transition to the previous phase when there is one.
+- `goTo(phase)` starts a transition when the requested phase is known and different from the current phase.
+- `goTo(phase)` uses `direction: "next"` when moving to a later phase and `direction: "prev"` when moving to an earlier phase.
+- Starting any valid transition sets the target `phase` and `phaseIndex` immediately, sets `progress` to `0`, sets `isTransitioning` to `true`, and records the transition `direction`.
+
+Boundary and no-op requests are ignored and leave the snapshot stable:
+
+- `next()` at the last phase is ignored.
+- `prev()` at the first phase is ignored.
+- `goTo()` targeting the current phase is ignored.
+
+### Transition lifecycle
+
+Transition timing is driven by explicit updates from the host layer. During a transition, `progress` advances from `0` toward `1` as update time accumulates. When enough time has been provided for the configured duration, the transition completes with `progress: 1`, `direction: "none"`, and `isTransitioning: false`. Additional updates after completion keep the settled snapshot stable unless they advance cooldown timing.
+
+Navigation requested while a transition is active is ignored. Ignored requests do not restart the active transition, reverse its direction, change its target phase, extend its timing, or extend cooldown gates. This applies to repeated `next()` / `prev()` calls, `goTo()` calls for other phases, `goTo()` calls for the already-targeted phase, and boundary-style requests made while another transition is active.
+
+### Locks and cooldowns
+
+Manual locking blocks new navigation requests:
+
+- `lock()` sets `isLocked` to `true`.
+- Navigation while locked is ignored and leaves the snapshot stable.
+- Locking during an active transition does not stop that transition; explicit updates continue advancing it.
+- A completed transition can remain locked with `isLocked: true`; navigation remains ignored until `unlock()` is called.
+- `unlock()` sets `isLocked` to `false` and allows later valid navigation requests again.
+
+When `cooldownMs` is configured, cooldown behavior is time-driven by explicit updates. After a transition completes, navigation remains ignored until enough update time has advanced through the cooldown window. Ignored navigation during cooldown does not extend the cooldown. This describes the core machine behavior only; browser input hooks may add their own event handling concerns and should not be treated as the source of truth for core cooldown timing.
+
 ## Transition progress with `useFlowProgress`
 
 `useFlowProgress` is the React-side hook for reading only the current transition progress. It must be called from a React component rendered under `FlowProvider`.
