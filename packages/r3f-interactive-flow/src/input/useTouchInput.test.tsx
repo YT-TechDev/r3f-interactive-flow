@@ -136,6 +136,24 @@ describe("useTouchInput", () => {
     }
   });
 
+  it("does not validate touch navigation options or attach listeners while disabled", () => {
+    expect(() =>
+      renderFlow(
+        <TouchInputProbe
+          options={{
+            enabled: false,
+            cooldown: -1,
+            threshold: Number.NaN
+          }}
+        />
+      )
+    ).not.toThrow();
+
+    for (const type of touchEventTypes) {
+      expect(windowTarget.listenerCount(type)).toBe(0);
+    }
+  });
+
   it("navigates after being re-enabled", () => {
     let latestControls: FlowControls<TestPhase> | undefined;
 

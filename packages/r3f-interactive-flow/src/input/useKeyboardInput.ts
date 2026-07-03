@@ -76,9 +76,6 @@ export function useKeyboardInput<TPhase extends string>(
   const syncSnapshotRef = useRef(syncSnapshot);
   const lastNavigationAtRef = useRef<number>(-Infinity);
 
-  const cooldown = options.cooldown ?? 0;
-  validateCooldown(cooldown);
-
   useEffect(() => {
     flowRef.current = flow;
     machineRef.current = machine;
@@ -94,8 +91,11 @@ export function useKeyboardInput<TPhase extends string>(
       return;
     }
 
+    const cooldown = options.cooldown ?? 0;
     const preventDefault = options.preventDefault ?? true;
     const ignoreWhenTyping = options.ignoreWhenTyping ?? true;
+
+    validateCooldown(cooldown);
     const { nextKeys, prevKeys } = resolveKeyboardKeys(options);
     const eventTarget = resolveInputTarget(options.target);
 
@@ -154,7 +154,7 @@ export function useKeyboardInput<TPhase extends string>(
       eventTarget.removeEventListener("keydown", handleKeyDown);
     };
   }, [
-    cooldown,
+    options.cooldown,
     options.enabled,
     options.ignoreWhenTyping,
     options.keys,
