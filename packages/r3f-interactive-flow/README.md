@@ -141,6 +141,83 @@ Child components consume flow state through the existing hooks:
 - `useFlowProgress` reads provider progress for DOM status, labels, and coarse UI.
 - `useFlowFrame` is the Canvas-bound bridge for frame updates in R3F components.
 
+## Input behavior baseline
+
+The input hooks are optional DOM/client-side utilities for driving the existing flow controls. They are documented here as the v1.4.0 input behavior baseline: practical navigation helpers, not R3F visual effects, router behavior, animation timelines, or scene systems.
+
+Render input hooks from React components under `FlowProvider`, outside Canvas scene objects. They attach browser event listeners from effects, so browser APIs are not accessed at module import time. When browser APIs are unavailable, or when `enabled: false`, the hooks do not attach listeners. Disabled hooks also skip option validation, so temporarily disabled input can carry incomplete or invalid navigation options without throwing until re-enabled.
+
+By default, input hooks listen on `window`. Where `target` is supported, pass `window`, an `HTMLElement`, or a ref to an `HTMLElement`; an empty ref falls back to `window`. Listeners are removed on unmount, when input is disabled, and when the target changes.
+
+### Wheel input
+
+`useWheelInput` listens for `wheel` events and maps movement on one axis to `next` or `prev` navigation.
+
+- Default target: `window`.
+- Supported targets: `window`, an `HTMLElement`, or an element ref.
+- Default axis: `"y"`; `axis: "x"` uses `deltaX` instead of `deltaY`.
+- Default threshold: `40`.
+- Default cooldown: `0`.
+- Default `preventDefault`: `true` for non-ignored wheel events.
+- Positive movement beyond the selected-axis threshold requests `next`.
+- Negative movement beyond the selected-axis threshold requests `prev`.
+- Movement at or inside the threshold is ignored. For example, with `threshold: 40`, `40` and `-40` do not navigate, while `41` and `-41` can.
+- `threshold: 0` is allowed; invalid finite-negative or non-finite thresholds throw only while enabled.
+- `ignore` selectors skip matching events without calling `preventDefault` or consuming hook-local cooldown.
+
+### Keyboard input
+
+`useKeyboardInput` listens for `keydown` events and maps configured keys to `next` or `prev` navigation.
+
+- Default target: `window`.
+- Supported targets: `window`, an `HTMLElement`, or an element ref.
+- Default next keys: `ArrowDown`, `ArrowRight`, `PageDown`, and Space.
+- Default previous keys: `ArrowUp`, `ArrowLeft`, and `PageUp`.
+- Default cooldown: `0`.
+- Default `preventDefault`: `true` only for mapped, non-ignored key events.
+- Unmapped keys are ignored and are not prevented.
+- Repeated `keydown` events (`event.repeat`) are ignored.
+- Typing targets are ignored by default: `input`, `textarea`, `select`, and `contenteditable` elements. Set `ignoreWhenTyping: false` to allow mapped keys from those targets.
+- Prefer `keys: { next, prev }` for custom mappings. The legacy `nextKeys` and `prevKeys` aliases are still recognized, but `keys` takes precedence when both are provided.
+- If the same key is mapped to both directions, `next` wins.
+
+### Touch input
+
+`useTouchInput` listens for touch gestures and maps one completed touch start/end gesture to `next` or `prev` navigation.
+
+- Default target: `window`.
+- Supported targets: `window`, an `HTMLElement`, or an element ref.
+- Default axis: `"y"`; `axis: "x"` compares horizontal positions instead.
+- Default threshold: `50`.
+- Default cooldown: `0`.
+- Default `preventDefault`: `true` for non-ignored `touchmove` events.
+- On the `y` axis, swipe up beyond the threshold requests `next`; swipe down beyond the threshold requests `prev`.
+- On the `x` axis, swipe left beyond the threshold requests `next`; swipe right beyond the threshold requests `prev`.
+- Movement at or inside the threshold is ignored. For example, with `threshold: 40`, a 40px gesture does not navigate, while a 41px gesture can.
+- `threshold: 0` is allowed; invalid finite-negative or non-finite thresholds throw only while enabled.
+- Missing `touches[0]` on `touchstart`, missing `changedTouches[0]` on `touchend`, or `touchend` without a stored `touchstart` is ignored without throwing.
+- `touchcancel` resets the stored gesture start so a later `touchend` does not navigate accidentally.
+- `ignore` selectors skip matching gestures without preventing default touch movement or consuming hook-local cooldown.
+
+### Locks, transitions, and cooldowns
+
+Input hooks request the existing flow controls; they do not bypass core navigation rules.
+
+- Supported input navigation directions are `next` and `prev`.
+- Input while `isLocked` is ignored.
+- Input while `isTransitioning` is ignored.
+- Previous navigation at the first phase is ignored. Next navigation at the last phase is rejected by the core flow machine.
+- Hook-local `cooldown` starts only after an accepted input-driven navigation. Ignored or rejected input does not consume or extend it.
+- Hook-local cooldown is separate from the core transition cooldown configured on `FlowProvider`. Even when a hook-local cooldown allows an event, the core transition cooldown can still reject navigation until the flow machine is ready.
+
+### DOM and R3F separation
+
+Keep DOM input hooks in React/client components under `FlowProvider`, not inside R3F scene objects by default. DOM input logic owns browser listener setup, cleanup, ignore selectors, typing-target behavior, locks, and cooldown checks. Canvas-bound scene components should react to flow state with `useFlowFrame` and R3F hooks, not own global browser input wiring.
+
+### Browser API safety
+
+The input modules are safe to import when `window` or related browser globals are unavailable. Browser targets are resolved from effects after render, and listeners attach only when enabled and browser APIs exist. This keeps package imports compatible with server-rendered module loading, while actual input handling remains client-side behavior.
+
 ## Common mistakes and anti-patterns
 
 Use this section as a quick checklist when wiring a flow. Most issues come from mixing provider scope, Canvas scope, browser input, and per-frame animation responsibilities.
