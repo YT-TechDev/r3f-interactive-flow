@@ -36,7 +36,7 @@ yarn add r3f-interactive-flow three @react-three/fiber react react-dom
 
 ## Peer dependencies
 
-`react`, `react-dom`, `three`, and `@react-three/fiber` are peer dependencies. Install them in your application.
+`react`, `react-dom`, `three`, and `@react-three/fiber` are peer dependencies. Install them in your application alongside `r3f-interactive-flow`. The library does not bundle React, React DOM, Three.js, or React Three Fiber, and it does not require `@react-three/drei`, GSAP, Framer Motion, or other visual or animation libraries.
 
 ```json
 {
