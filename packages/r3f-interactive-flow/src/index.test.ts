@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import * as publicApi from ".";
+import type * as PublicEntrypointModule from ".";
 import indexSource from "./index.ts?raw";
 import keyboardInputSource from "./input/useKeyboardInput.ts?raw";
 import touchInputSource from "./input/useTouchInput.ts?raw";
@@ -20,6 +21,8 @@ import type {
   UseWheelInputOptions
 } from ".";
 
+type PublicEntrypoint = typeof PublicEntrypointModule;
+
 const expectedCoreRuntimeExports = [
   "FlowProvider",
   "useFlow",
@@ -38,6 +41,17 @@ const expectedRuntimeExports = [
   ...expectedInputRuntimeExports
 ] as const satisfies readonly (keyof typeof publicApi)[];
 
+const expectedTypeExports = [
+  "FlowFrameCallback",
+  "FlowFrameState",
+  "FlowInputTarget",
+  "FlowTransitionBaseOptions",
+  "FlowTransitionOptions",
+  "UseKeyboardInputOptions",
+  "UseTouchInputOptions",
+  "UseWheelInputOptions"
+] as const;
+
 type ExpectedRuntimeExport = (typeof expectedRuntimeExports)[number];
 type RuntimeExportCoverageIsExact = keyof typeof publicApi extends ExpectedRuntimeExport
   ? ExpectedRuntimeExport extends keyof typeof publicApi
@@ -46,6 +60,17 @@ type RuntimeExportCoverageIsExact = keyof typeof publicApi extends ExpectedRunti
   : never;
 
 const runtimeExportCoverageIsExact: RuntimeExportCoverageIsExact = true;
+
+type ExpectedPublicEntrypoint = {
+  [Key in ExpectedRuntimeExport]: PublicEntrypoint[Key];
+};
+type PublicEntrypointCoverageIsExact = PublicEntrypoint extends ExpectedPublicEntrypoint
+  ? ExpectedPublicEntrypoint extends PublicEntrypoint
+    ? true
+    : never
+  : never;
+
+const publicEntrypointCoverageIsExact: PublicEntrypointCoverageIsExact = true;
 
 const clientEntryFiles = [
   "index.ts",
@@ -92,6 +117,32 @@ describe("public API", () => {
 
   it("keeps the runtime export coverage exact at type-check time", () => {
     expect(runtimeExportCoverageIsExact).toBe(true);
+  });
+
+  it("keeps the full entrypoint value export surface exact at type-check time", () => {
+    expect(publicEntrypointCoverageIsExact).toBe(true);
+  });
+
+  it("keeps the package entrypoint type exports explicit", () => {
+    const typeExportNames = Array.from(indexSource.matchAll(/export type \{([^}]+)\}/g)).flatMap(
+      ([, exportList]) =>
+        (exportList ?? "")
+          .split(",")
+          .map((exportName) => exportName.trim())
+          .filter(Boolean)
+    );
+
+    expect(typeExportNames.sort()).toEqual(expectedTypeExports);
+  });
+
+  it("does not expose internal modules or subpath exports from package metadata", async () => {
+    const packageJson = (await import("../package.json")) as {
+      default: {
+        exports: Record<string, unknown>;
+      };
+    };
+
+    expect(Object.keys(packageJson.default.exports)).toEqual(["."]);
   });
 
   it("does not require browser APIs at module import time", async () => {
@@ -141,6 +192,38 @@ describe("public API", () => {
     expect(windowTarget).toBeTypeOf("object");
     expect(refTarget.current).toBe(element);
     expect(nullableRefTarget.current).toBeNull();
+  });
+
+  it("supports phase-generic flow controls through the public useFlow hook", () => {
+    type Phase = "intro" | "work";
+    type PublicFlowControls = ReturnType<typeof publicApi.useFlow<Phase>>;
+
+    const controls = {
+      phase: "intro",
+      phaseIndex: 0,
+      progress: 0.25,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false,
+      next: vi.fn(),
+      prev: vi.fn(),
+      goTo: vi.fn<(phase: Phase) => void>(),
+      lock: vi.fn(),
+      unlock: vi.fn()
+    } satisfies PublicFlowControls;
+
+    controls.goTo("work");
+
+    expect(controls.phase).toBe("intro");
+    expect(controls.progress).toBe(0.25);
+    expect(controls.goTo).toHaveBeenCalledWith("work");
+  });
+
+  it("exposes useFlowProgress as a numeric progress hook", () => {
+    type PublicProgress = ReturnType<typeof publicApi.useFlowProgress>;
+    const progress = 0.5 satisfies PublicProgress;
+
+    expect(progress).toBe(0.5);
   });
 
   it("exposes documented input hook option types", () => {
