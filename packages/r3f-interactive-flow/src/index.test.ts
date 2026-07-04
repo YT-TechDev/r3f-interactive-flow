@@ -145,6 +145,45 @@ describe("public API", () => {
     expect(Object.keys(packageJson.default.exports)).toEqual(["."]);
   });
 
+  it("keeps package metadata aligned with generated root entrypoint artifacts", async () => {
+    const packageJson = (await import("../package.json")) as {
+      default: {
+        main: string;
+        module: string;
+        types: string;
+        exports: {
+          ".": {
+            types: string;
+            import: string;
+            require: string;
+          };
+        };
+        files: string[];
+        sideEffects: boolean;
+        peerDependencies: Record<string, string>;
+        dependencies?: Record<string, string>;
+      };
+    };
+
+    expect(packageJson.default.main).toBe("./dist/index.cjs");
+    expect(packageJson.default.module).toBe("./dist/index.js");
+    expect(packageJson.default.types).toBe("./dist/index.d.ts");
+    expect(packageJson.default.exports["."]).toEqual({
+      types: "./dist/index.d.ts",
+      import: "./dist/index.js",
+      require: "./dist/index.cjs"
+    });
+    expect(packageJson.default.files).toEqual(["dist", "README.md", "LICENSE", "CHANGELOG.md"]);
+    expect(packageJson.default.sideEffects).toBe(false);
+    expect(packageJson.default.dependencies).toBeUndefined();
+    expect(Object.keys(packageJson.default.peerDependencies).sort()).toEqual([
+      "@react-three/fiber",
+      "react",
+      "react-dom",
+      "three"
+    ]);
+  });
+
   it("does not require browser APIs at module import time", async () => {
     const originalWindow = globalThis.window;
 
