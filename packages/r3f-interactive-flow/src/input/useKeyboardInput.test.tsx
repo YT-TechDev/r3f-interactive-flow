@@ -258,6 +258,53 @@ describe("useKeyboardInput", () => {
     expect(latestControls?.direction).toBe("next");
   });
 
+  it("does not replay disabled keyboard input or duplicate listeners after re-enable", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ enabled: false }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchKeyDown("ArrowDown");
+    dispatchKeyDown("ArrowDown");
+
+    expect(latestControls?.phase).toBe("intro");
+    expect(windowTarget.listenerCount("keydown")).toBe(0);
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ enabled: true }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(latestControls?.phase).toBe("intro");
+    expect(windowTarget.listenerCount("keydown")).toBe(1);
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ enabled: false }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ enabled: true }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(windowTarget.listenerCount("keydown")).toBe(1);
+
+    dispatchKeyDown("ArrowDown");
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
   it("removes the keydown listener when disabled after being enabled", () => {
     const removeEventListenerSpy = vi.spyOn(globalThis, "removeEventListener");
     let latestControls: FlowControls<TestPhase> | undefined;
