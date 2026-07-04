@@ -1,5 +1,28 @@
 # r3f-interactive-flow
 
+## 1.7.0
+
+`r3f-interactive-flow@1.7.0` is an input integration hardening release. It stabilizes combined input behavior and lifecycle handling without expanding the public API or adding runtime dependencies.
+
+### Hardened
+
+- Added cross-input lock and cooldown coverage.
+- Added combined wheel and keyboard input scenario coverage.
+- Added combined touch and wheel input scenario coverage.
+- Aligned disabled and re-enabled lifecycle behavior across input hooks.
+- Hardened custom input target retargeting behavior.
+- Documented the v1.7.0 input integration baseline.
+
+### Scope
+
+- No public API expansion is included in this PR.
+- No new runtime dependencies are included in this PR.
+- No visual effects, animation timelines, camera presets, router integration, Next.js-specific integration, templates, or third-party animation wrappers are included.
+- No release automation changes are included in this PR.
+- No npm publish is included in this PR.
+- No git tag is included in this PR.
+- No GitHub Release is included in this PR.
+
 ## 1.6.0
 
 `r3f-interactive-flow@1.6.0` is a transition behavior hardening release. It stabilizes existing core transition behavior through deterministic coverage and documentation without expanding the library scope.
