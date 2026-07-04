@@ -308,6 +308,64 @@ describe("useFlowFrame", () => {
     expect(container.textContent).toContain('"isTransitioning":true');
   });
 
+  it("reads the latest machine snapshot as progress advances across frame updates", () => {
+    const onFrame = vi.fn();
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <FrameProbe onFrame={onFrame} />
+      </>,
+      1000
+    );
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    const frame = getRegisteredFrame();
+
+    act(() => {
+      frame({ frame: "first" }, 0.2);
+    });
+
+    expect(onFrame).toHaveBeenCalledTimes(1);
+    expect(onFrame).toHaveBeenLastCalledWith(
+      {
+        phase: "work",
+        phaseIndex: 1,
+        progress: 0.2,
+        direction: "next",
+        isTransitioning: true
+      },
+      0.2
+    );
+
+    act(() => {
+      frame({ frame: "second" }, 0.3);
+    });
+
+    expect(onFrame).toHaveBeenCalledTimes(2);
+    expect(onFrame).toHaveBeenLastCalledWith(
+      {
+        phase: "work",
+        phaseIndex: 1,
+        progress: 0.5,
+        direction: "next",
+        isTransitioning: true
+      },
+      0.3
+    );
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true
+    });
+  });
+
   it("reports a stable idle snapshot before any transition starts", () => {
     const onFrame = vi.fn();
 
