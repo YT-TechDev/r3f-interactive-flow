@@ -1,5 +1,28 @@
 # r3f-interactive-flow
 
+## 1.8.0
+
+`r3f-interactive-flow@1.8.0` is a React and R3F bridge hardening release. It stabilizes provider, progress, frame bridge, and client-facing entry compatibility coverage without expanding the public API or adding runtime dependencies.
+
+### Hardened
+
+- Added `FlowProvider` behavior coverage.
+- Added `useFlowProgress` behavior coverage.
+- Added `useFlowFrame` bridge coverage.
+- Added client-facing entry compatibility coverage for Next.js Client Component usage.
+- Clarified Canvas-bound hook usage guidance.
+- Documented the v1.8.0 React and R3F bridge baseline.
+
+### Scope
+
+- No public API expansion is included in this PR.
+- No new runtime dependencies are included in this PR.
+- No Next.js dependency or router integration is included in this PR.
+- No visual effects, animation timelines, camera presets, templates, or third-party animation wrappers are included.
+- No npm publish is included in this PR.
+- No git tag is included in this PR.
+- No GitHub Release is included in this PR.
+
 ## 1.7.0
 
 `r3f-interactive-flow@1.7.0` is an input integration hardening release. It stabilizes combined input behavior and lifecycle handling without expanding the public API or adding runtime dependencies.
