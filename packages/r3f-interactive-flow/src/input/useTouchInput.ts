@@ -176,6 +176,7 @@ export function useTouchInput<TPhase extends string>(options: UseTouchInputOptio
       eventTarget.removeEventListener("touchmove", handleTouchMove);
       eventTarget.removeEventListener("touchend", handleTouchEnd);
       eventTarget.removeEventListener("touchcancel", resetTouch);
+      resetTouch();
     };
   }, [
     options.axis,

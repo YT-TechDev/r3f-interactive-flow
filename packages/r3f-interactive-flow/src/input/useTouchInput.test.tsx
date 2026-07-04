@@ -181,6 +181,98 @@ describe("useTouchInput", () => {
     expect(latestControls?.direction).toBe("next");
   });
 
+  it("does not replay an active touch gesture after disable and re-enable", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ enabled: true, threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] });
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ enabled: false, threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchTouch("touchend", { changedTouches: [{ clientX: 0, clientY: 49 }] });
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ enabled: true, threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+
+    dispatchTouch("touchend", { changedTouches: [{ clientX: 0, clientY: 49 }] });
+
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+
+    swipe(100, 59);
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
+  it("does not replay disabled touch input or duplicate listeners after re-enable", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ enabled: false, threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    swipe(100, 59);
+
+    expect(latestControls?.phase).toBe("intro");
+
+    for (const type of touchEventTypes) {
+      expect(windowTarget.listenerCount(type)).toBe(0);
+    }
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ enabled: true, threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(latestControls?.phase).toBe("intro");
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ enabled: false, threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ enabled: true, threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    for (const type of touchEventTypes) {
+      expect(windowTarget.listenerCount(type)).toBe(1);
+    }
+
+    swipe(100, 59);
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
   it("removes touch listeners when enabled changes from true to false", () => {
     function ToggleProbe({ enabled }: { enabled: boolean }) {
       useTouchInput<TestPhase>({ enabled });

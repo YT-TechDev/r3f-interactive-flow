@@ -223,6 +223,53 @@ describe("useWheelInput", () => {
     expect(latestControls?.direction).toBe("next");
   });
 
+  it("does not replay disabled wheel input or duplicate listeners after re-enable", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ enabled: false, threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchWheel(41);
+    dispatchWheel(41);
+
+    expect(latestControls?.phase).toBe("intro");
+    expect(windowTarget.listenerCount("wheel")).toBe(0);
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ enabled: true, threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(latestControls?.phase).toBe("intro");
+    expect(windowTarget.listenerCount("wheel")).toBe(1);
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ enabled: false, threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ enabled: true, threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(windowTarget.listenerCount("wheel")).toBe(1);
+
+    dispatchWheel(41);
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
   it("removes the wheel event listener when enabled changes to false", () => {
     let latestControls: FlowControls<TestPhase> | undefined;
 
