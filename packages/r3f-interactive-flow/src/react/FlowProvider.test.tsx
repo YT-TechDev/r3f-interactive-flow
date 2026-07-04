@@ -315,6 +315,22 @@ describe("FlowProvider and hooks", () => {
     expect(container.textContent).toContain('"phase":"intro"');
   });
 
+  it("resolves the initial snapshot from the configured initial phase", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(<ControlsProbe onRender={(controls) => (latestControls = controls)} />, "work");
+
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 0,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+    expect(container.textContent).toContain('"phase":"work"');
+  });
+
   it("returns the expected controls shape from useFlow", () => {
     let latestControls: FlowControls<TestPhase> | undefined;
 
@@ -398,6 +414,49 @@ describe("FlowProvider and hooks", () => {
 
     expect(latestControls?.isLocked).toBe(false);
     expect(container.textContent).toContain('"isLocked":false');
+  });
+
+  it("does not navigate while locked and resumes navigation after unlock", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(<ControlsProbe onRender={(controls) => (latestControls = controls)} />);
+
+    act(() => {
+      latestControls?.lock();
+      latestControls?.next();
+      latestControls?.goTo("contact");
+    });
+
+    expect(latestControls).toMatchObject({
+      phase: "intro",
+      phaseIndex: 0,
+      progress: 0,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: true
+    });
+    expect(getRenderedSnapshot()).toEqual({
+      phase: "intro",
+      phaseIndex: 0,
+      progress: 0,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: true
+    });
+
+    act(() => {
+      latestControls?.unlock();
+      latestControls?.next();
+    });
+
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false
+    });
   });
 
   it("returns the current provider progress from useFlowProgress", () => {
@@ -894,6 +953,36 @@ describe("FlowProvider and hooks", () => {
       phase: "contact",
       isTransitioning: true
     });
+  });
+
+  it("renders children without a Canvas wrapper", () => {
+    renderFlow(<output data-testid="child">plain child</output>);
+
+    expect(container.textContent).toBe("plain child");
+  });
+
+  it("does not require browser globals at module import time", async () => {
+    const windowDescriptor = Object.getOwnPropertyDescriptor(globalThis, "window");
+    const documentDescriptor = Object.getOwnPropertyDescriptor(globalThis, "document");
+
+    vi.resetModules();
+
+    try {
+      Reflect.deleteProperty(globalThis, "window");
+      Reflect.deleteProperty(globalThis, "document");
+
+      await expect(import("./FlowProvider")).resolves.toHaveProperty("FlowProvider");
+    } finally {
+      if (windowDescriptor !== undefined) {
+        Object.defineProperty(globalThis, "window", windowDescriptor);
+      }
+
+      if (documentDescriptor !== undefined) {
+        Object.defineProperty(globalThis, "document", documentDescriptor);
+      }
+
+      vi.resetModules();
+    }
   });
 
   it("throws a clear error when useFlow is rendered outside FlowProvider", () => {
