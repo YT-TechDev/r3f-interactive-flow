@@ -47,6 +47,12 @@ yarn add r3f-interactive-flow three @react-three/fiber react react-dom
 }
 ```
 
+## v2.0.0 readiness note
+
+The documented public API is intentionally limited to the package entrypoint exports: `FlowProvider`, `useFlow`, `useFlowProgress`, `useFlowFrame`, `useWheelInput`, `useTouchInput`, `useKeyboardInput`, and their documented public types. The examples below use the package entrypoint rather than internal paths, keep DOM/client hooks under `FlowProvider`, and keep `useFlowFrame` inside components rendered within `<Canvas>`.
+
+The package remains framework-agnostic client-side React/R3F code. Next.js App Router projects should use these hooks from Client Components and may pass serializable data from Server Components into a Client Component wrapper, but the package does not add Next.js as a dependency and does not provide router integration.
+
 ## Minimal setup
 
 Define phases as a const tuple, wrap the shared subtree with `FlowProvider`, and keep DOM controls separate from Canvas-bound scene logic.
