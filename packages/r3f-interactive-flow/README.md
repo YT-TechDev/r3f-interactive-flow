@@ -174,6 +174,71 @@ Child components consume flow state through the existing hooks:
 
 Do not use R3F hooks such as `useFrame`, `useThree`, or `useFlowFrame` in provider setup, route/layout components, or ordinary DOM controls. Keep browser input and DOM listener logic in React/client components under `FlowProvider`, and let Canvas scene objects react to the resulting flow state.
 
+## Hook usage boundaries
+
+The public hooks are split by where they run. Keep those boundaries explicit so DOM UI, browser input, and R3F scene updates do not take on each other's responsibilities.
+
+| Hook or component                                    | Where it belongs                                                         | Use it for                                                                                               | Avoid                                                                                     |
+| ---------------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `FlowProvider`                                       | Client-side React tree around the UI and Canvas integration area         | One shared phase machine for DOM controls, status UI, optional input helpers, and the `<Canvas>` subtree | Mounting separate providers for DOM and Canvas that should stay in sync                   |
+| `useFlow`                                            | Client-side React components rendered under `FlowProvider`               | Phase state, buttons, labels, navigation controls, lock/unlock controls, input-layer control wiring      | Per-frame mesh, material, camera, or transform updates                                    |
+| `useFlowProgress`                                    | Client-side React components rendered under `FlowProvider`               | Coarse DOM progress labels, status text, progress bars, and UI snapshots                                 | Frame-perfect Canvas animation data                                                       |
+| `useFlowFrame`                                       | R3F scene components rendered inside `<Canvas>` and under `FlowProvider` | Bridging flow state into the R3F frame loop for refs and Canvas-local objects                            | Normal DOM components, route/layout components, provider setup, or browser listener setup |
+| `useWheelInput`, `useTouchInput`, `useKeyboardInput` | Client-side React input layer components rendered under `FlowProvider`   | Browser wheel, touch, and keyboard listeners that drive existing flow controls                           | Complex gesture systems or DOM listener wiring inside scene objects by default            |
+
+`useFlowFrame` is Canvas-bound. It uses React Three Fiber frame behavior, so the usual `useFrame` and `useThree` rule still applies: call it only from components rendered inside `<Canvas>`. It is not a replacement for `useFrame`; use it when a scene component needs the current flow snapshot during the frame loop, and keep scene-specific animation and object mutation in your own R3F code.
+
+Keep high-frequency visual values in refs, mutable Three.js objects, or other Canvas-local frame state when possible. Do not push every-frame mesh positions, material values, camera movement, or transition interpolation through React state unless you are intentionally synchronizing a stable React snapshot for UI.
+
+Input hooks are DOM/browser helpers. Mount them from small client-side React components under `FlowProvider`, outside the R3F scene tree by default. They attach browser listeners from effects and drive the existing `next` and `prev` flow controls; they do not add a full gesture system or belong in mesh components unless a page has a specific reason to couple scene ownership and listener setup.
+
+In Next.js App Router projects, use these public React, input, and R3F hooks from Client Components. Server Components can pass serializable data into a Client Component wrapper, but they should not render `FlowProvider` or call flow hooks directly. Do not access `window`, `document`, or browser event APIs at module import time; resolve browser targets inside effects or client-only code. This package does not provide Next.js router integration and does not require Next.js as a dependency.
+
+```tsx
+"use client";
+
+import { Canvas } from "@react-three/fiber";
+import { FlowProvider, useFlow, useFlowFrame, useWheelInput } from "r3f-interactive-flow";
+
+const phases = ["intro", "work", "contact"] as const;
+type Phase = (typeof phases)[number];
+
+function InputLayer() {
+  useWheelInput<Phase>();
+  return null;
+}
+
+function Controls() {
+  const flow = useFlow<Phase>();
+
+  return <button onClick={flow.next}>Next</button>;
+}
+
+function SceneBridge() {
+  useFlowFrame<Phase>(({ progress }, delta) => {
+    // Read flow progress in the R3F frame loop.
+    // Update refs or R3F objects here instead of React state.
+    void progress;
+    void delta;
+  });
+
+  return null;
+}
+
+export function Example() {
+  return (
+    <FlowProvider phases={phases}>
+      <InputLayer />
+      <Controls />
+
+      <Canvas>
+        <SceneBridge />
+      </Canvas>
+    </FlowProvider>
+  );
+}
+```
+
 ## Input behavior baseline
 
 The input hooks are optional DOM/client-side utilities for driving the existing flow controls. They are documented here as the v1.4.0 input behavior baseline: practical navigation helpers, not R3F visual effects, router behavior, animation timelines, or scene systems.
