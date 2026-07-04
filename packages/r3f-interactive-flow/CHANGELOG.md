@@ -1,5 +1,27 @@
 # r3f-interactive-flow
 
+## 1.9.0
+
+`r3f-interactive-flow@1.9.0` is a release-candidate hardening release. It prepares package metadata and changelog documentation for manual publish, tag, and release steps without expanding the public API, adding runtime dependencies, or changing source behavior.
+
+### Hardened
+
+- Audited package entrypoint runtime exports.
+- Audited public type exports.
+- Audited package metadata and generated root entrypoint artifacts.
+- Clarified README and example documentation for v2.0.0 readiness.
+- Recorded package dry-run validation for publish contents.
+- Documented release-candidate bug triage and baseline status.
+
+### Scope
+
+- No public API expansion is included in this PR.
+- No new runtime dependencies are included in this PR.
+- No source behavior changes are included in this PR.
+- No npm publish is included in this PR.
+- No git tag is included in this PR.
+- No GitHub Release is included in this PR.
+
 ## 1.8.0
 
 `r3f-interactive-flow@1.8.0` is a React and R3F bridge hardening release. It stabilizes provider, progress, frame bridge, and client-facing entry compatibility coverage without expanding the public API or adding runtime dependencies.
