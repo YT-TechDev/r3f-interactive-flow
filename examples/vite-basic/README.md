@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This example uses the current stable public API in a small Vite and React Three Fiber app:
+This example uses the package entrypoint and the current stable public API in a small Vite and React Three Fiber app:
 
 - `FlowProvider`
 - `useFlow`
@@ -32,7 +32,8 @@ This example uses the current stable public API in a small Vite and React Three 
 - No animation timeline system.
 - No router integration.
 - No GSAP or Framer Motion integration.
-- No portfolio template, website template, or large demo system.
+- No portfolio template, website template, code generation, or large demo system.
+- No Next.js-specific behavior or router integration.
 
 ## Run commands
 

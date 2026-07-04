@@ -8,13 +8,9 @@ Use it when your R3F site behaves like a sequence of sections, scenes, or story 
 
 ## Project status
 
-Current forward-looking planning is tracked in [docs/roadmap-v1.2.5-to-v2.0.0.md](docs/roadmap-v1.2.5-to-v2.0.0.md). It treats v1.2.5 through v1.5.0 as preparation, documentation, tests, examples, and behavior hardening, and treats v2.0.0 as stabilization and cleanup rather than a rewrite.
+This README is kept focused on the current public package surface ahead of the v2.0.0 readiness audit: `FlowProvider`, `useFlow`, `useFlowProgress`, `useFlowFrame`, and the optional wheel, touch, and keyboard input hooks. v2.0.0 readiness is about stabilizing and clarifying the existing usage model, not adding new runtime features or broadening the public API.
 
-The roadmap describes an AI-friendly and agent-readable direction: clearer docs, smaller examples, predictable behavior, stronger TypeScript guidance, and an easier-to-navigate project structure. That direction is about making the existing library easier for humans and coding agents to understand; it does not mean adding AI-specific product features, code generation workflows, chat features, or new public APIs.
-
-Historical planning and release references remain available in [docs/roadmap-v1.0.0.md](docs/roadmap-v1.0.0.md), [docs/releases/v1.0.0-readiness.md](docs/releases/v1.0.0-readiness.md), [docs/releases/v0.9.0-readiness.md](docs/releases/v0.9.0-readiness.md), [docs/releases/v0.8.0-readiness.md](docs/releases/v0.8.0-readiness.md), [docs/roadmap-v0.7.0.md](docs/roadmap-v0.7.0.md), [docs/releases/v0.6.0.md](docs/releases/v0.6.0.md), [docs/roadmap-v0.6.0.md](docs/roadmap-v0.6.0.md), [docs/releases/v0.5.0.md](docs/releases/v0.5.0.md), [docs/roadmap-v0.5.0.md](docs/roadmap-v0.5.0.md), [docs/releases/v0.4.0.md](docs/releases/v0.4.0.md), and [docs/roadmap-v0.4.0.md](docs/roadmap-v0.4.0.md).
-
-For package usage, including `FlowProvider` setup and hook consumption, see [packages/r3f-interactive-flow/README.md](packages/r3f-interactive-flow/README.md). For the v1.8.0 React and R3F bridge baseline, see [docs/react-r3f-bridge-v1.8.0.md](docs/react-r3f-bridge-v1.8.0.md). For the v1.7.0 input integration baseline, see [docs/input-integration-v1.7.0.md](docs/input-integration-v1.7.0.md). For the v1.6.0 transition behavior baseline, see [docs/transition-behavior-v1.6.0.md](docs/transition-behavior-v1.6.0.md). For the v0.3.0 design baseline, see [docs/v0.3.0-spec.md](docs/v0.3.0-spec.md). For real-world DOM UI and Canvas wiring, see [docs/dom-ui-to-canvas-guide.md](docs/dom-ui-to-canvas-guide.md).
+For package usage, including `FlowProvider` setup and hook consumption, see [packages/r3f-interactive-flow/README.md](packages/r3f-interactive-flow/README.md). For real-world DOM UI and Canvas wiring, see [docs/dom-ui-to-canvas-guide.md](docs/dom-ui-to-canvas-guide.md). For the React/R3F bridge, input integration, and transition behavior baselines, see [docs/react-r3f-bridge-v1.8.0.md](docs/react-r3f-bridge-v1.8.0.md), [docs/input-integration-v1.7.0.md](docs/input-integration-v1.7.0.md), and [docs/transition-behavior-v1.6.0.md](docs/transition-behavior-v1.6.0.md).
 
 ## Why this exists
 
