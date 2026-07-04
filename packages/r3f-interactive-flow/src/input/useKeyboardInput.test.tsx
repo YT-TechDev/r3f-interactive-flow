@@ -475,6 +475,83 @@ describe("useKeyboardInput", () => {
     expect(latestControls?.direction).toBe("next");
   });
 
+  it("moves the keydown listener when a target ref points to a new element", () => {
+    const firstTarget = document.createElement("div") as unknown as MinimalElement;
+    const secondTarget = document.createElement("div") as unknown as MinimalElement;
+    const targetRef = { current: firstTarget as unknown as HTMLElement };
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ target: targetRef }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(firstTarget.listenerCount("keydown")).toBe(1);
+    expect(secondTarget.listenerCount("keydown")).toBe(0);
+
+    targetRef.current = secondTarget as unknown as HTMLElement;
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ target: targetRef }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ target: targetRef }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(firstTarget.listenerCount("keydown")).toBe(0);
+    expect(secondTarget.listenerCount("keydown")).toBe(1);
+
+    dispatchKeyDown("ArrowDown", {}, firstTarget);
+
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+
+    dispatchKeyDown("ArrowDown", {}, secondTarget);
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
+  it("re-enables keyboard input on the current target ref only", () => {
+    const firstTarget = document.createElement("div") as unknown as MinimalElement;
+    const secondTarget = document.createElement("div") as unknown as MinimalElement;
+    const targetRef = { current: firstTarget as unknown as HTMLElement };
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ enabled: false, target: targetRef }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(firstTarget.listenerCount("keydown")).toBe(0);
+
+    targetRef.current = secondTarget as unknown as HTMLElement;
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ enabled: true, target: targetRef }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(firstTarget.listenerCount("keydown")).toBe(0);
+    expect(secondTarget.listenerCount("keydown")).toBe(1);
+
+    dispatchKeyDown("ArrowDown", {}, firstTarget);
+    expect(latestControls?.phase).toBe("intro");
+
+    dispatchKeyDown("ArrowDown", {}, secondTarget);
+    expect(latestControls?.phase).toBe("work");
+  });
+
   it("cleans up the keydown event listener on unmount", () => {
     const removeEventListenerSpy = vi.spyOn(globalThis, "removeEventListener");
 

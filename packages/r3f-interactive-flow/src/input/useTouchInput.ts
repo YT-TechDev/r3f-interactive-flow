@@ -53,6 +53,8 @@ export function useTouchInput<TPhase extends string>(options: UseTouchInputOptio
   const startPositionRef = useRef<number | null>(null);
   const gestureIgnoredRef = useRef(false);
   const lastNavigationAtRef = useRef<number | null>(null);
+  const eventTarget =
+    typeof window === "undefined" ? undefined : resolveInputTarget(options.target);
 
   useEffect(() => {
     flowRef.current = flow;
@@ -65,7 +67,7 @@ export function useTouchInput<TPhase extends string>(options: UseTouchInputOptio
       return;
     }
 
-    if (typeof window === "undefined") {
+    if (typeof window === "undefined" || eventTarget === undefined) {
       return;
     }
 
@@ -74,8 +76,6 @@ export function useTouchInput<TPhase extends string>(options: UseTouchInputOptio
     const cooldown = options.cooldown ?? DEFAULT_COOLDOWN;
     const ignore = options.ignore ?? [];
     const preventDefault = options.preventDefault ?? true;
-    const eventTarget = resolveInputTarget(options.target);
-
     validateCooldown(cooldown);
     validateThreshold(threshold);
 
@@ -185,6 +185,7 @@ export function useTouchInput<TPhase extends string>(options: UseTouchInputOptio
     options.ignore,
     options.preventDefault,
     options.target,
+    eventTarget,
     options.threshold
   ]);
 }

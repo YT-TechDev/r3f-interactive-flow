@@ -453,6 +453,89 @@ describe("useTouchInput", () => {
     expect(latestControls?.direction).toBe("next");
   });
 
+  it("moves touch listeners and clears an active gesture when a target ref points to a new element", () => {
+    const firstTarget = document.createElement("div") as unknown as MinimalElement;
+    const secondTarget = document.createElement("div") as unknown as MinimalElement;
+    const targetRef = { current: firstTarget as unknown as HTMLElement };
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ target: targetRef, threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] }, firstTarget);
+
+    targetRef.current = secondTarget as unknown as HTMLElement;
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ target: targetRef, threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ target: targetRef, threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    for (const type of touchEventTypes) {
+      expect(firstTarget.listenerCount(type)).toBe(0);
+      expect(secondTarget.listenerCount(type)).toBe(1);
+    }
+
+    dispatchTouch("touchend", { changedTouches: [{ clientX: 0, clientY: 49 }] }, firstTarget);
+    dispatchTouch("touchend", { changedTouches: [{ clientX: 0, clientY: 49 }] }, secondTarget);
+
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+
+    swipe(100, 59, secondTarget);
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
+  it("re-enables touch input on the current target ref only", () => {
+    const firstTarget = document.createElement("div") as unknown as MinimalElement;
+    const secondTarget = document.createElement("div") as unknown as MinimalElement;
+    const targetRef = { current: firstTarget as unknown as HTMLElement };
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ enabled: false, target: targetRef, threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    for (const type of touchEventTypes) {
+      expect(firstTarget.listenerCount(type)).toBe(0);
+    }
+
+    targetRef.current = secondTarget as unknown as HTMLElement;
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ enabled: true, target: targetRef, threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    for (const type of touchEventTypes) {
+      expect(firstTarget.listenerCount(type)).toBe(0);
+      expect(secondTarget.listenerCount(type)).toBe(1);
+    }
+
+    swipe(100, 59, firstTarget);
+    expect(latestControls?.phase).toBe("intro");
+
+    swipe(100, 59, secondTarget);
+    expect(latestControls?.phase).toBe("work");
+  });
+
   it("does not navigate from touch events after the input hook unmounts", () => {
     let latestControls: FlowControls<TestPhase> | undefined;
 

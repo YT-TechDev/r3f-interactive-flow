@@ -75,6 +75,8 @@ export function useKeyboardInput<TPhase extends string>(
   const machineRef = useRef(machine);
   const syncSnapshotRef = useRef(syncSnapshot);
   const lastNavigationAtRef = useRef<number>(-Infinity);
+  const eventTarget =
+    typeof window === "undefined" ? undefined : resolveInputTarget(options.target);
 
   useEffect(() => {
     flowRef.current = flow;
@@ -87,7 +89,7 @@ export function useKeyboardInput<TPhase extends string>(
       return;
     }
 
-    if (typeof window === "undefined") {
+    if (typeof window === "undefined" || eventTarget === undefined) {
       return;
     }
 
@@ -97,7 +99,6 @@ export function useKeyboardInput<TPhase extends string>(
 
     validateCooldown(cooldown);
     const { nextKeys, prevKeys } = resolveKeyboardKeys(options);
-    const eventTarget = resolveInputTarget(options.target);
 
     const handleKeyDown: EventListener = (event): void => {
       const keyboardEvent = event as KeyboardEvent;
@@ -161,6 +162,7 @@ export function useKeyboardInput<TPhase extends string>(
     options.nextKeys,
     options.preventDefault,
     options.prevKeys,
-    options.target
+    options.target,
+    eventTarget
   ]);
 }

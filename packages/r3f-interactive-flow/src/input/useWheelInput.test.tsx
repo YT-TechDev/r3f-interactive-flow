@@ -451,6 +451,83 @@ describe("useWheelInput", () => {
     expect(latestControls?.phase).toBe("work");
   });
 
+  it("moves the wheel listener when a target ref points to a new element", () => {
+    const firstTarget = document.createElement("div") as unknown as MinimalElement;
+    const secondTarget = document.createElement("div") as unknown as MinimalElement;
+    const targetRef = { current: firstTarget as unknown as HTMLElement };
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ target: targetRef, threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(firstTarget.listenerCount("wheel")).toBe(1);
+    expect(secondTarget.listenerCount("wheel")).toBe(0);
+
+    targetRef.current = secondTarget as unknown as HTMLElement;
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ target: targetRef, threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ target: targetRef, threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(firstTarget.listenerCount("wheel")).toBe(0);
+    expect(secondTarget.listenerCount("wheel")).toBe(1);
+
+    dispatchWheel(41, firstTarget);
+
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+
+    dispatchWheel(41, secondTarget);
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
+  it("re-enables wheel input on the current target ref only", () => {
+    const firstTarget = document.createElement("div") as unknown as MinimalElement;
+    const secondTarget = document.createElement("div") as unknown as MinimalElement;
+    const targetRef = { current: firstTarget as unknown as HTMLElement };
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ enabled: false, target: targetRef, threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(firstTarget.listenerCount("wheel")).toBe(0);
+
+    targetRef.current = secondTarget as unknown as HTMLElement;
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ enabled: true, target: targetRef, threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(firstTarget.listenerCount("wheel")).toBe(0);
+    expect(secondTarget.listenerCount("wheel")).toBe(1);
+
+    dispatchWheel(41, firstTarget);
+    expect(latestControls?.phase).toBe("intro");
+
+    dispatchWheel(41, secondTarget);
+    expect(latestControls?.phase).toBe("work");
+  });
+
   it("can attach explicitly to window", () => {
     let latestControls: FlowControls<TestPhase> | undefined;
 
