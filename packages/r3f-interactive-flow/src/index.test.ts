@@ -1,6 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
 import * as publicApi from ".";
+import indexSource from "./index.ts?raw";
+import keyboardInputSource from "./input/useKeyboardInput.ts?raw";
+import touchInputSource from "./input/useTouchInput.ts?raw";
+import wheelInputSource from "./input/useWheelInput.ts?raw";
+import flowProviderSource from "./react/FlowProvider.tsx?raw";
+import useFlowSource from "./react/useFlow.ts?raw";
+import useFlowProgressSource from "./react/useFlowProgress.ts?raw";
+import useFlowFrameSource from "./r3f/useFlowFrame.ts?raw";
 import type {
   FlowFrameCallback,
   FlowFrameState,
@@ -39,6 +47,28 @@ type RuntimeExportCoverageIsExact = keyof typeof publicApi extends ExpectedRunti
 
 const runtimeExportCoverageIsExact: RuntimeExportCoverageIsExact = true;
 
+const clientEntryFiles = [
+  "index.ts",
+  "react/FlowProvider.tsx",
+  "react/useFlow.ts",
+  "react/useFlowProgress.ts",
+  "r3f/useFlowFrame.ts",
+  "input/useWheelInput.ts",
+  "input/useKeyboardInput.ts",
+  "input/useTouchInput.ts"
+] as const;
+
+const clientEntrySources = {
+  "index.ts": indexSource,
+  "react/FlowProvider.tsx": flowProviderSource,
+  "react/useFlow.ts": useFlowSource,
+  "react/useFlowProgress.ts": useFlowProgressSource,
+  "r3f/useFlowFrame.ts": useFlowFrameSource,
+  "input/useWheelInput.ts": wheelInputSource,
+  "input/useKeyboardInput.ts": keyboardInputSource,
+  "input/useTouchInput.ts": touchInputSource
+} satisfies Record<(typeof clientEntryFiles)[number], string>;
+
 describe("public API", () => {
   it("exposes the expected core package entrypoint exports", () => {
     for (const exportName of expectedCoreRuntimeExports) {
@@ -75,6 +105,12 @@ describe("public API", () => {
       await expect(import(".")).resolves.toHaveProperty("useWheelInput");
     } finally {
       Object.assign(globalThis, { window: originalWindow });
+    }
+  });
+
+  it("marks every client-facing entry file with a use client directive", () => {
+    for (const filePath of clientEntryFiles) {
+      expect(clientEntrySources[filePath], filePath).toMatch(/^"use client";/);
     }
   });
 
