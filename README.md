@@ -2,102 +2,26 @@
 
 `r3f-interactive-flow` is a small, predictable control layer for phase-based interactive React Three Fiber websites.
 
-It helps you describe an experience as a known list of phases, move between those phases with `next`, `prev`, and `goTo`, read transition progress in React UI, and bridge the same flow into Canvas-bound frame updates. React remains responsible for application and UI state, React Three Fiber remains responsible for frame-based scene updates, and this library keeps the phase transition contract between them explicit.
+It helps you describe an experience as a known list of phases, move between those phases with `next`, `prev`, and `goTo`, read transition progress in React UI, connect optional browser input hooks, and bridge the same flow state into Canvas-bound frame updates with `useFlowFrame`. React remains responsible for application and UI state, React Three Fiber remains responsible for frame-based scene updates, and this library keeps the phase transition contract between them explicit.
 
-Use it when your R3F site behaves like a sequence of sections, scenes, or story beats and you want navigation, transition state, progress, locking, and cooldown behavior to stay predictable. Do not use it as a general animation system, asset library, router layer, effects package, portfolio template, or replacement for scene-specific Three.js / R3F code.
+This README describes the current stable public API ahead of v2.0.0 release preparation. It does not announce a v2.0.0 release.
 
-## Project status
-
-This README is kept focused on the current public package surface ahead of the v2.0.0 readiness audit: `FlowProvider`, `useFlow`, `useFlowProgress`, `useFlowFrame`, and the optional wheel, touch, and keyboard input hooks. v2.0.0 readiness is about stabilizing and clarifying the existing usage model, not adding new runtime features or broadening the public API.
-
-For package usage, including `FlowProvider` setup and hook consumption, see [packages/r3f-interactive-flow/README.md](packages/r3f-interactive-flow/README.md). For real-world DOM UI and Canvas wiring, see [docs/dom-ui-to-canvas-guide.md](docs/dom-ui-to-canvas-guide.md). For the React/R3F bridge, input integration, and transition behavior baselines, see [docs/react-r3f-bridge-v1.8.0.md](docs/react-r3f-bridge-v1.8.0.md), [docs/input-integration-v1.7.0.md](docs/input-integration-v1.7.0.md), and [docs/transition-behavior-v1.6.0.md](docs/transition-behavior-v1.6.0.md).
-
-## Why this exists
-
-Interactive 3D websites often need the same control flow in several places:
-
-- DOM or UI input decides when the experience should move
-- React stores the current phase and UI state
-- React Three Fiber updates visual objects every frame
-- scene transitions need progress values that remain predictable
-
-React manages application and UI state. React Three Fiber manages frame-based scene updates. `r3f-interactive-flow` provides a small bridge between those two responsibilities through predictable phase transitions.
+For complete package usage, see [packages/r3f-interactive-flow/README.md](packages/r3f-interactive-flow/README.md). For the v2.0.0 public API and package export audits, see [docs/releases/v2.0.0-public-api-audit.md](docs/releases/v2.0.0-public-api-audit.md) and [docs/releases/v2.0.0-package-exports-audit.md](docs/releases/v2.0.0-package-exports-audit.md).
 
 ## What it provides
 
-`r3f-interactive-flow` provides focused primitives for interactive R3F experiences:
-
-- phase-based flow control
-- `next`, `prev`, and `goTo`
-- transition progress
-- transition direction
-- input locking and cooldown support
-- wheel, touch, and keyboard input hooks
+- phase-based flow state for a known list of phases
+- `next`, `prev`, and `goTo` controls
+- transition progress and transition direction
+- lock and cooldown behavior for predictable navigation
+- optional wheel, touch, and keyboard input hooks
+- DOM/UI to Canvas coordination through one shared provider
 - an R3F frame bridge through `useFlowFrame`
-- a small public API designed to stay predictable
-
-## When to use it
-
-Use `r3f-interactive-flow` when your experience has a small, named set of phases and you need a shared control layer for DOM UI, input handlers, and R3F scene updates. It is a good fit for:
-
-- scrollytelling or presentation-style R3F sites
-- portfolio, product, or landing pages with explicit scene phases
-- DOM overlays that need to stay in sync with Canvas transitions
-- input-driven movement between known sections
-- codebases where predictable transition state is more important than a large feature surface
-
-## When not to use it
-
-Do not use this package when you mainly need a rendering abstraction, a design system, a route manager, a full animation engine, or a collection of ready-made visual effects. For frame-perfect object animation, write scene-specific R3F / Three.js code and use `useFlowFrame` only as the bridge to the current flow state. For routing, templates, shaders, particles, camera rigs, or effects, use focused tools built for those jobs.
-
-## What it intentionally does not provide
-
-This library intentionally keeps a narrow scope. It is not:
-
-- an animation timeline system
-- a camera preset API
-- a shader or effect collection
-- a particle system API
-- a GSAP wrapper
-- a Framer Motion wrapper
-- a Next.js router integration
-- an AI codegen CLI
-- a portfolio template
-- a large demo template
-- a heavy runtime dependency package
-- an `@react-three/drei`-style utility collection
-
-The library's value is that it stays small, predictable, and focused on phase flow rather than becoming a broad R3F toolkit.
-
-## Installation
-
-```bash
-pnpm add r3f-interactive-flow three @react-three/fiber react react-dom
-```
-
-npm and yarn equivalents are also fine:
-
-```bash
-npm install r3f-interactive-flow three @react-three/fiber react react-dom
-yarn add r3f-interactive-flow three @react-three/fiber react react-dom
-```
-
-## Peer dependencies
-
-`react`, `react-dom`, `three`, and `@react-three/fiber` are peer dependencies and should be installed by the application.
-
-```json
-{
-  "@react-three/fiber": ">=8.0.0 <10.0.0",
-  "react": ">=18.0.0 <20.0.0",
-  "react-dom": ">=18.0.0 <20.0.0",
-  "three": ">=0.150.0 <1.0.0"
-}
-```
+- a small public API imported from the package root
 
 ## Public API
 
-The current public runtime primitives are intentionally small:
+Import public APIs from the package root:
 
 ```ts
 import {
@@ -126,43 +50,57 @@ import type {
 } from "r3f-interactive-flow";
 ```
 
-Current public exports:
+Do not import from internal package paths such as `r3f-interactive-flow/react`, `r3f-interactive-flow/r3f`, or `r3f-interactive-flow/input`; those paths are not public package exports.
 
-- `FlowProvider`
-- `useFlow`
-- `useFlowProgress`
-- `useFlowFrame`
-- `useWheelInput`
-- `useTouchInput`
-- `useKeyboardInput`
-- `FlowFrameState`
-- `FlowFrameCallback`
-- `FlowInputTarget`
-- `FlowTransitionBaseOptions`
-- `FlowTransitionOptions`
-- `UseWheelInputOptions`
-- `UseTouchInputOptions`
-- `UseKeyboardInputOptions`
+## Installation
+
+```bash
+pnpm add r3f-interactive-flow three @react-three/fiber react react-dom
+```
+
+npm and yarn equivalents are also fine:
+
+```bash
+npm install r3f-interactive-flow three @react-three/fiber react react-dom
+yarn add r3f-interactive-flow three @react-three/fiber react react-dom
+```
+
+## Peer dependencies
+
+`react`, `react-dom`, `three`, and `@react-three/fiber` are peer dependencies and should be installed by the application.
+
+```json
+{
+  "@react-three/fiber": ">=8.0.0 <10.0.0",
+  "react": ">=18.0.0 <20.0.0",
+  "react-dom": ">=18.0.0 <20.0.0",
+  "three": ">=0.150.0 <1.0.0"
+}
+```
+
+The package does not add Next.js, `@react-three/drei`, GSAP, Framer Motion, or visual-effect libraries as dependencies.
 
 ## Basic usage
 
-Define phases as a const tuple, pass them to `FlowProvider`, and use hooks inside the provider.
+Define phases as a stable const tuple, pass them to `FlowProvider`, and use hooks inside the provider.
 
 ```tsx
 "use client";
 
-import { FlowProvider, useFlow } from "r3f-interactive-flow";
+import { FlowProvider, useFlow, useFlowProgress } from "r3f-interactive-flow";
 
 const phases = ["intro", "work", "contact"] as const;
 type Phase = (typeof phases)[number];
 
 function FlowControls() {
   const { phase, next, prev, goTo } = useFlow<Phase>();
+  const progress = useFlowProgress();
 
   return (
     <div>
       <p>Current phase: {phase}</p>
-      <button onClick={prev}>Prev</button>
+      <p>Progress: {Math.round(progress * 100)}%</p>
+      <button onClick={prev}>Previous</button>
       <button onClick={next}>Next</button>
       <button onClick={() => goTo("contact")}>Contact</button>
     </div>
@@ -171,238 +109,92 @@ function FlowControls() {
 
 export function App() {
   return (
-    <FlowProvider phases={phases}>
+    <FlowProvider phases={phases} transition={{ duration: 700, cooldown: 250 }}>
       <FlowControls />
     </FlowProvider>
   );
 }
 ```
 
-`FlowProvider` should receive stable `phases` and configuration props. Define phase tuples outside components or memoize derived configuration. This is the smallest starting point; the package README covers provider options, progress, browser input, and R3F frame updates when you need them.
+`FlowProvider` should receive stable `phases` and configuration props. Define phase tuples outside components or memoize derived configuration.
 
-## FlowProvider transition options
+## DOM/UI to Canvas coordination
 
-`transition` is the preferred timing API for `FlowProvider`. It supports global defaults and source-phase overrides:
-
-```tsx
-<FlowProvider
-  phases={["intro", "skills", "projects", "contact"] as const}
-  transition={{
-    duration: 1000,
-    cooldown: 500,
-    byPhase: {
-      intro: {
-        duration: 1600,
-        cooldown: 800
-      },
-      skills: {
-        duration: 800
-      }
-    }
-  }}
->
-  <App />
-</FlowProvider>
-```
-
-- `transition.duration` sets transition duration in milliseconds.
-- `transition.cooldown` sets accepted-navigation cooldown in milliseconds.
-- `transition.easing` sets the easing function.
-- `transition.byPhase` overrides any of those fields for transitions that start from a specific source phase. For example, `byPhase.intro` is used when leaving `intro`, regardless of the target phase.
-- Fallback is per field: a phase override with only `duration` still uses global, legacy, or default cooldown/easing.
-- `transition` wins over legacy `transitionDurationMs`, `cooldownMs`, and `easing` when both are provided. The legacy props still work for compatibility.
-- `lockDuringTransition` is intentionally not part of this API yet; transitions still ignore new navigation while active.
-
-## Tested navigation guards and cooldown behavior
-
-Current tested navigation behavior is intentionally narrow and predictable:
-
-- `next()`, `prev()`, and `goTo(phase)` start transitions only when the request is valid.
-- Navigation requested while a transition is already active is ignored. Ignored navigation does not restart, reset, or extend the active transition or its cooldown.
-- `lock()` blocks otherwise valid navigation requests. `unlock()` allows navigation again. Locking does not cancel a transition that has already started.
-- Core transition cooldown starts from accepted navigation only. Boundary no-ops, same-phase `goTo`, locked navigation, and active-transition navigation do not start, reset, or extend that cooldown.
-- Input hook cooldown and core transition cooldown are separate concepts. Hook cooldown throttles repeated browser input before it reaches the flow controls; core cooldown guards accepted phase navigation in the flow machine.
-- Input hook cooldown is recorded only when browser input produces an accepted navigation. Rejected boundary input, disabled input, ignored targets, locked flow, and active-transition input do not consume or extend hook-local cooldown.
-- Input hooks support `enabled: false` and can be re-enabled later; disabled hooks do not navigate, and re-enabled hooks resume listener behavior.
-
-## Flow controls
-
-`useFlow` returns the current flow snapshot and control functions.
-
-```ts
-type FlowDirection = "next" | "prev" | "none";
-
-type FlowControls<TPhase extends string> = {
-  phase: TPhase;
-  phaseIndex: number;
-  progress: number;
-  direction: FlowDirection;
-  isTransitioning: boolean;
-  isLocked: boolean;
-  next: () => void;
-  prev: () => void;
-  goTo: (phase: TPhase) => void;
-  lock: () => void;
-  unlock: () => void;
-};
-```
-
-This shape is useful for DOM UI, labels, buttons, and phase-aware React components. Treat the returned `progress` as part of the public React snapshot: it is useful for coarse UI status, but it is not intended to be a frame-perfect animation value.
-
-## Transition progress
-
-`useFlowProgress` returns the current transition progress from the active `FlowProvider` snapshot. Use it for DOM labels, status displays, and phase-aware UI that can follow React state updates.
+Use one `FlowProvider` around the DOM controls, optional input helpers, status UI, and `<Canvas>` subtree that should share one flow state. Use `useFlow` and `useFlowProgress` for DOM/client UI. Use `useFlowFrame` only from components rendered inside `<Canvas>`.
 
 ```tsx
-import { useFlowProgress } from "r3f-interactive-flow";
+"use client";
 
-function ProgressLabel() {
-  const progress = useFlowProgress();
+import { Canvas } from "@react-three/fiber";
+import { useRef } from "react";
+import type * as THREE from "three";
+import { FlowProvider, useFlowFrame, useWheelInput } from "r3f-interactive-flow";
 
-  return <p>Progress: {progress.toFixed(2)}</p>;
-}
-```
+const phases = ["intro", "work", "contact"] as const;
+type Phase = (typeof phases)[number];
 
-`useFlowProgress` is intentionally DOM-facing. Do not rely on React state from `useFlow` or `useFlowProgress` to update every frame. For frame-driven R3F scene updates, use `useFlowFrame` inside Canvas-bound components instead of pushing every frame into React state.
-
-## DOM state and frame state
-
-DOM/UI components and R3F scene components can share the same `FlowProvider`, but they should read progress at different layers:
-
-```tsx
-function PhaseStatus() {
-  const flow = useFlow<Phase>();
-
-  return (
-    <div>
-      <p>Phase: {flow.phase}</p>
-      <p>Status progress: {flow.progress.toFixed(2)}</p>
-      <button onClick={flow.next}>Next</button>
-    </div>
-  );
+function InputLayer() {
+  useWheelInput<Phase>({ threshold: 40, cooldown: 500 });
+  return null;
 }
 
-function FlowMesh() {
+function SceneObject() {
   const meshRef = useRef<THREE.Mesh | null>(null);
 
-  useFlowFrame(({ progress }) => {
+  useFlowFrame<Phase>(({ phase, progress }) => {
     if (!meshRef.current) {
       return;
     }
 
     meshRef.current.position.x = progress * 2;
+    meshRef.current.visible = phase !== "contact";
   });
 
   return <mesh ref={meshRef} />;
 }
-```
 
-Use `useFlow` and `useFlowProgress` for DOM state, controls, labels, and coarse transition status. Use `useFlowFrame` for per-frame R3F visuals that mutate refs or other Canvas-local frame state.
-
-## R3F usage with useFlowFrame
-
-Use `useFlowFrame` inside a Canvas-bound component to receive frame-driven transition progress. `useFlowFrame` advances transition progress by calling the core flow machine update from the R3F frame loop.
-
-```tsx
-import { Canvas } from "@react-three/fiber";
-import { useRef } from "react";
-import { FlowProvider, useFlowFrame } from "r3f-interactive-flow";
-import type * as THREE from "three";
-
-const phases = ["intro", "work", "contact"] as const;
-
-function FlowBox() {
-  const meshRef = useRef<THREE.Mesh | null>(null);
-
-  useFlowFrame(({ progress }, delta) => {
-    if (!meshRef.current) {
-      return;
-    }
-
-    meshRef.current.rotation.y += delta;
-    meshRef.current.position.x = progress * 2;
-  });
-
-  return (
-    <mesh ref={meshRef}>
-      <boxGeometry />
-      <meshStandardMaterial />
-    </mesh>
-  );
-}
-
-export function Scene() {
+export function Experience() {
   return (
     <FlowProvider phases={phases}>
+      <InputLayer />
       <Canvas>
-        <FlowBox />
+        <SceneObject />
       </Canvas>
     </FlowProvider>
   );
 }
 ```
 
-### v0.3.0 `useFlowFrame` migration
+Input hooks attach browser listeners from effects and drive the existing `next` and `prev` controls. They do not access browser APIs at module import time, do not provide a full gesture system, and do not belong inside R3F scene objects by default.
 
-`useFlowFrame` now passes a typed frame state object as the first callback argument.
+## Next.js App Router boundary
 
-Before:
+Use `FlowProvider`, `useFlow`, `useFlowProgress`, `useFlowFrame`, and input hooks from Client Components in Next.js App Router projects.
 
-```tsx
-useFlowFrame((progress, delta) => {
-  // ...
-});
-```
-
-After:
-
-```tsx
-useFlowFrame(({ progress }, delta) => {
-  // ...
-});
-```
-
-The frame state also includes `phase`, `phaseIndex`, `direction`, and `isTransitioning`.
-
-`useFlowFrame` uses React Three Fiber's `useFrame` internally, so it must be called inside a component rendered within `<Canvas>`.
-
-## Input hooks
-
-The input hooks connect browser input to `next` and `prev`.
-
-- `useWheelInput`
-  - wheel down -> `next`
-  - wheel up -> `prev` on the default `y` axis
-  - options: `target`, `threshold`, `axis`, `cooldown`, `enabled`, `preventDefault`, `ignore`
-- `useTouchInput`
-  - swipe up -> `next`
-  - swipe down -> `prev` on the default `y` axis
-  - options: `target`, `threshold`, `axis`, `cooldown`, `enabled`, `preventDefault`, `ignore`
-
-Wheel and touch `threshold` values must be finite and non-negative. `threshold: 0` is allowed; values below `0`, `NaN`, and infinities are invalid.
-
-- `useKeyboardInput`
-  - `ArrowDown`, `ArrowRight`, `PageDown`, Space -> `next` by default
-  - `ArrowUp`, `ArrowLeft`, `PageUp` -> `prev` by default
-  - options: `target`, `enabled`, `preventDefault`, `keys`, `cooldown`, `ignoreWhenTyping`
-  - `keys.next` and `keys.prev` are the current keyboard configuration API. `nextKeys` and `prevKeys` still work as deprecated compatibility aliases.
-
-When a page has focused buttons or links, consider passing a `keys` object that omits Space so native Space activation still belongs to the focused control.
-
-Input hooks only attach browser event listeners inside React effects and are guarded for non-browser environments. They do not access browser APIs at module import time.
-
-`enabled: false` disables listener behavior. `target` accepts a direct `Window` or element target, or a React ref object pointing to an element. If `target` is omitted, or a ref is currently empty, the hooks fall back to `window`. When a target changes, the hooks clean up listeners from the old target before attaching to the new one.
-
-## Next.js compatibility
-
-This package is designed to be usable from Next.js App Router Client Components.
-
-- Use `FlowProvider`, `useFlow`, `useFlowProgress`, `useFlowFrame`, and input hooks from Client Components.
-- The package entry is marked as a client entry for Next.js App Router compatibility.
-- Browser APIs are used inside hooks and effects, not at module import time.
+- Server Components can pass serializable data into a Client Component wrapper.
+- Do not render `FlowProvider` or call flow hooks directly from Server Components.
+- Do not access `window`, `document`, or browser event APIs at module import time.
 - `useFlowFrame` still follows React Three Fiber rules and must be used inside a Canvas-bound component.
 - Next.js is not a dependency.
-- Next.js-specific router integration is intentionally out of scope for now.
+- Next.js router integration is intentionally out of scope.
+
+## Non-goals
+
+Do not use this package when you need a rendering abstraction, design system, route manager, full animation engine, or collection of ready-made visual effects. This library is intentionally not:
+
+- a visual effects collection
+- an `@react-three/drei` replacement
+- a particle library
+- a camera preset library
+- a shader or effect library
+- a portfolio template
+- a full animation framework
+- a GSAP wrapper
+- a Framer Motion wrapper
+- a router integration
+- a CLI or codegen system
+
+For scene animation, visual effects, camera behavior, shaders, particles, routes, templates, or application-specific interaction design, use scene-specific R3F / Three.js code or focused tools built for those jobs.
 
 ## Example
 
@@ -425,19 +217,18 @@ The package is split by responsibility:
 
 ```txt
 packages/r3f-interactive-flow/src/
-  core/
-    React-independent phase machine, easing, and types
-  react/
-    FlowProvider, context, and React hooks
-  r3f/
-    React Three Fiber bridge hooks
-  input/
-    browser input hooks for wheel, touch, and keyboard
+  core/   React-independent phase machine, easing, and types
+  react/  FlowProvider, context, and React hooks
+  r3f/    React Three Fiber bridge hooks
+  input/  browser input hooks for wheel, touch, and keyboard
 ```
 
 Architecture rules:
 
-- `core/` does not import React.
+- `core/` stays React-independent.
+- `react/` owns provider, context, and hooks.
+- `r3f/` owns Canvas-bound frame bridge hooks.
+- `input/` owns browser input handling.
 - DOM input logic does not live in R3F scene logic.
 - R3F hooks are only used in Canvas-bound components.
 - Frame-driven values should not be pushed into React state every frame.
@@ -451,39 +242,14 @@ From the repository root:
 pnpm install
 ```
 
-### Common validation sets
-
-Choose the smallest validation set that matches the PR. Documentation-only PRs usually do not need release checks.
-
-| PR type                                    | Commands                                                                                                                        |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| Documentation-only PRs                     | `pnpm format`<br>`pnpm lint`                                                                                                    |
-| Example documentation or example usage PRs | `pnpm format`<br>`pnpm lint`<br>`pnpm --filter vite-basic build`                                                                |
-| Library code or type changes               | `pnpm build`<br>`pnpm typecheck`<br>`pnpm test`<br>`pnpm lint`<br>`pnpm format`                                                 |
-| Package output or export-related changes   | `pnpm build`<br>`pnpm package:verify`<br>`pnpm typecheck`<br>`pnpm test`<br>`pnpm lint`<br>`pnpm format`<br>`pnpm pack:dry-run` |
-| Release-prep review                        | `pnpm release:check`                                                                                                            |
-
-## Release readiness
-
-Before publishing, run:
+Common validation commands:
 
 ```bash
-pnpm release:check
+pnpm format
+pnpm lint
 ```
 
-For the full maintainer checklist, see [docs/release.md](docs/release.md).
-
-For the v0.2.0 implementation plan, see [docs/roadmap-v0.2.0.md](docs/roadmap-v0.2.0.md).
-
-For the behavior audit and intended v0.2.0 rules, see [docs/behavior-v0.2.0.md](docs/behavior-v0.2.0.md).
-
-To publish with Changesets after checks pass:
-
-```bash
-pnpm release
-```
-
-`pnpm release` publishes to npm, so only maintainers should run it when they intentionally want to publish. Do not run publish, tag, or GitHub Release commands for normal stabilization PRs.
+Documentation-only PRs usually do not need release checks. Maintainers can run `pnpm release:check` during release validation when they intentionally need the full release-prep check set.
 
 ## Contributing
 
