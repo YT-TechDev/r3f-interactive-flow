@@ -235,15 +235,15 @@ function InputLayer() {
 
 The hooks attach browser event listeners from effects, support `enabled: false`, and do not access browser APIs at module import time. They drive the existing flow controls; they are not a full gesture system and do not bypass locks, active transitions, boundaries, or cooldown behavior.
 
-## Next.js App Router boundary
+## Client usage and Next.js App Router boundary
 
-Use public React, input, and R3F hooks from Client Components in Next.js App Router projects.
+`FlowProvider`, `useFlow`, `useFlowProgress`, `useFlowFrame`, and input hooks are client-side React APIs. In Next.js App Router projects, use them from Client Components and add `"use client"` to files that render the provider or call these hooks.
 
-- Server Components can pass serializable data into a Client Component wrapper.
+- Server Components can pass serializable data into a Client Component wrapper, but this package does not claim Server Component support.
 - Do not render `FlowProvider` or call flow hooks directly from Server Components.
-- Do not access `window`, `document`, or browser event APIs at module import time.
+- Do not access `window`, `document`, or browser event APIs at module import time. Browser input hooks attach listeners only from client-side runtime effects.
 - `useFlowFrame` still belongs only in Canvas-bound components.
-- The package does not add Next.js as a dependency.
+- The package is Next.js compatible, but not Next.js integrated. Next.js is not a dependency.
 - The package does not provide Next.js router integration.
 
 ## Hook boundary summary
