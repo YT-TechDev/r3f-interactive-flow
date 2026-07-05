@@ -187,4 +187,93 @@ describe("createFlowMachine lock and cooldown baseline", () => {
       isLocked: false
     });
   });
+
+  it("treats rapid repeated next calls as a single accepted transition before cooldown", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact", "summary"] as const,
+      transitionDurationMs: 100,
+      cooldownMs: 300
+    });
+
+    machine.next();
+    machine.next();
+    machine.next();
+
+    expect(machine.getSnapshot()).toEqual({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false
+    });
+
+    machine.update(100);
+
+    const completedSnapshot = machine.getSnapshot();
+
+    machine.next();
+    machine.next();
+
+    expect(machine.getSnapshot()).toEqual(completedSnapshot);
+
+    machine.update(300);
+    machine.next();
+
+    expect(machine.getSnapshot()).toEqual({
+      phase: "contact",
+      phaseIndex: 2,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false
+    });
+  });
+
+  it("does not queue locked navigation while cooldown elapses in the background", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 100,
+      cooldownMs: 300
+    });
+
+    machine.next();
+    machine.update(100);
+    machine.lock();
+
+    machine.next();
+    machine.goTo("contact");
+    machine.update(300);
+
+    expect(machine.getSnapshot()).toEqual({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 1,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: true
+    });
+
+    machine.unlock();
+
+    expect(machine.getSnapshot()).toEqual({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 1,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+
+    machine.goTo("contact");
+
+    expect(machine.getSnapshot()).toEqual({
+      phase: "contact",
+      phaseIndex: 2,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false
+    });
+  });
 });
