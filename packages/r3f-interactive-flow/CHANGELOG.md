@@ -1,5 +1,26 @@
 # r3f-interactive-flow
 
+## 2.1.0
+
+`r3f-interactive-flow@2.1.0` is a release-prep update for input, transition, and package boundary hardening. It records completed validation work without changing source behavior, public API, package exports, or dependencies.
+
+### Hardened
+
+- Added focused core test coverage for rapid repeated input and lock/cooldown edge cases.
+- Clarified Client Component and Next.js App Router usage expectations.
+- Confirmed existing wheel, touch, and keyboard input listener setup and cleanup behavior remains safe.
+- Confirmed package files, exports, dependencies, peer dependencies, and README import guidance remain safe.
+
+### Scope
+
+- No public API changes are included in this PR.
+- No dependency changes are included in this PR.
+- No package export changes are included in this PR.
+- No source behavior changes are included in this PR.
+- No npm publish is included in this PR.
+- No git tag is included in this PR.
+- No GitHub Release is included in this PR.
+
 ## 2.0.0
 
 `r3f-interactive-flow@2.0.0` finalizes the stable package root API and release documentation after v2.0.0 readiness validation. It prepares the package version and changelog for the manual release steps without changing source behavior, tests, package exports, or dependencies.
