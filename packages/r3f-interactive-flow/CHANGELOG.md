@@ -1,5 +1,26 @@
 # r3f-interactive-flow
 
+## 2.2.0
+
+`r3f-interactive-flow@2.2.0` is a usage guidance and public API coverage hardening release. It records completed documentation and type-level validation work without changing source behavior, public API, package exports, or dependencies.
+
+### Hardened
+
+- Added type-level coverage for package root public API usage.
+- Added focused usage recipes for stable public APIs.
+- Improved human- and coding-agent-readable usage guidance.
+- Clarified the mental model, supported root imports, hook placement rules, and do / do not boundaries.
+
+### Scope
+
+- No public API changes are included in this PR.
+- No dependency changes are included in this PR.
+- No package export changes are included in this PR.
+- No source behavior changes are included in this PR.
+- No npm publish is included in this PR.
+- No git tag is included in this PR.
+- No GitHub Release is included in this PR.
+
 ## 2.1.0
 
 `r3f-interactive-flow@2.1.0` is a release-prep update for input, transition, and package boundary hardening. It records completed validation work without changing source behavior, public API, package exports, or dependencies.
