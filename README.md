@@ -4,9 +4,9 @@
 
 It helps you describe an experience as a known list of phases, move between those phases with `next`, `prev`, and `goTo`, read transition progress in React UI, connect optional browser input hooks, and bridge the same flow state into Canvas-bound frame updates with `useFlowFrame`. React remains responsible for application and UI state, React Three Fiber remains responsible for frame-based scene updates, and this library keeps the phase transition contract between them explicit.
 
-This README describes the current stable public API ahead of v2.0.0 release preparation. It does not announce a v2.0.0 release.
+This README describes the current stable public API for r3f-interactive-flow. For release history, see [packages/r3f-interactive-flow/CHANGELOG.md](packages/r3f-interactive-flow/CHANGELOG.md).
 
-For complete package usage, see [packages/r3f-interactive-flow/README.md](packages/r3f-interactive-flow/README.md). For the v2.0.0 public API and package export audits, see [docs/releases/v2.0.0-public-api-audit.md](docs/releases/v2.0.0-public-api-audit.md) and [docs/releases/v2.0.0-package-exports-audit.md](docs/releases/v2.0.0-package-exports-audit.md).
+For complete package usage, see [packages/r3f-interactive-flow/README.md](packages/r3f-interactive-flow/README.md).
 
 ## What it provides
 
