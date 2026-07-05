@@ -1,5 +1,32 @@
 # r3f-interactive-flow
 
+## 2.0.0
+
+`r3f-interactive-flow@2.0.0` finalizes the stable package root API and release documentation after v2.0.0 readiness validation. It prepares the package version and changelog for the manual release steps without changing source behavior, tests, package exports, or dependencies.
+
+### Changed
+
+- Finalized the stable public API documentation for the package root exports.
+- Finalized the package export boundary as root-only.
+- Finalized README guidance for v2.0.0 usage, peer dependencies, hook boundaries, Next.js Client Component usage, and non-goals.
+- Added v2.0.0 migration guidance.
+- Added a v2.0.0 release notes draft.
+- Recorded full v2.0.0 release validation, including install, format, lint, tests, build, package typecheck, package dry-run, and Vite example build.
+- Confirmed the package root import boundary.
+
+### Scope
+
+- No public API expansion is included in this PR.
+- No package export expansion is included in this PR.
+- No runtime dependencies are included in this PR.
+- No Next.js dependency is included in this PR.
+- No source code changes are included in this PR.
+- No test changes are included in this PR.
+- No npm publish is included in this PR.
+- No git tag is included in this PR.
+- No GitHub Release is included in this PR.
+- No milestone closeout is included in this PR.
+
 ## 1.9.0
 
 `r3f-interactive-flow@1.9.0` is a release-candidate hardening release. It prepares package metadata and changelog documentation for manual publish, tag, and release steps without expanding the public API, adding runtime dependencies, or changing source behavior.
