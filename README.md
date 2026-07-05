@@ -118,6 +118,130 @@ export function App() {
 
 `FlowProvider` should receive stable `phases` and configuration props. Define phase tuples outside components or memoize derived configuration.
 
+## Focused usage recipes
+
+These recipes use package root imports only. Keep DOM controls and input layers under `FlowProvider`; keep R3F frame work inside Canvas-bound components.
+
+### Minimal phase navigation
+
+```tsx
+import { FlowProvider, useFlow } from "r3f-interactive-flow";
+
+const phases = ["intro", "work", "contact"] as const;
+type Phase = (typeof phases)[number];
+
+function Navigation() {
+  const { phase, next, prev, goTo } = useFlow<Phase>();
+
+  return (
+    <nav>
+      <p>Phase: {phase}</p>
+      <button onClick={prev}>Previous</button>
+      <button onClick={next}>Next</button>
+      <button onClick={() => goTo("contact")}>Contact</button>
+    </nav>
+  );
+}
+
+export function App() {
+  return (
+    <FlowProvider phases={phases} initialPhase="intro">
+      <Navigation />
+    </FlowProvider>
+  );
+}
+```
+
+### DOM controls with flow state
+
+```tsx
+function PhaseControls() {
+  const { phase, phaseIndex, next, prev, goTo } = useFlow<Phase>();
+
+  return (
+    <section>
+      <p>
+        {phaseIndex + 1} / {phases.length}: {phase}
+      </p>
+      <button onClick={prev} disabled={phaseIndex === 0}>
+        Previous
+      </button>
+      <button onClick={next} disabled={phaseIndex === phases.length - 1}>
+        Next
+      </button>
+      <button onClick={() => goTo("work")}>Work</button>
+    </section>
+  );
+}
+```
+
+Use DOM controls outside `<Canvas>` when they are regular page UI. They can still share the same flow state as the Canvas subtree through one `FlowProvider`.
+
+### Reading transition progress
+
+```tsx
+import { useFlowProgress } from "r3f-interactive-flow";
+
+function ProgressBar() {
+  const progress = useFlowProgress();
+
+  return <progress max={1} value={progress} aria-label="Flow transition progress" />;
+}
+```
+
+Use `useFlowProgress` for coarse UI such as labels and progress bars. Avoid copying every-frame transition values into React state for scene animation; use `useFlowFrame` for frame-driven R3F updates.
+
+### Driving R3F frame updates
+
+```tsx
+import { useRef } from "react";
+import type * as THREE from "three";
+import { useFlowFrame } from "r3f-interactive-flow";
+
+function FlowMesh() {
+  const meshRef = useRef<THREE.Mesh | null>(null);
+
+  useFlowFrame<Phase>(({ phase, progress }, delta) => {
+    if (!meshRef.current) {
+      return;
+    }
+
+    meshRef.current.rotation.y += delta;
+    meshRef.current.position.x = phase === "work" ? progress * 2 : 0;
+  });
+
+  return <mesh ref={meshRef} />;
+}
+```
+
+Call `useFlowFrame` only from components rendered inside `<Canvas>` and under `FlowProvider`. Update refs or Three.js objects in the frame callback instead of routing high-frequency scene values through React state.
+
+### Basic input hooks
+
+```tsx
+import { useKeyboardInput, useTouchInput, useWheelInput } from "r3f-interactive-flow";
+
+function InputLayer() {
+  useWheelInput<Phase>({ threshold: 40, cooldown: 500, ignore: ["[data-flow-ignore]"] });
+  useTouchInput<Phase>({ threshold: 50, cooldown: 500, ignore: ["[data-flow-ignore]"] });
+  useKeyboardInput<Phase>({
+    cooldown: 250,
+    keys: {
+      next: ["ArrowDown", "ArrowRight", "PageDown"],
+      prev: ["ArrowUp", "ArrowLeft", "PageUp"]
+    }
+  });
+
+  return null;
+}
+```
+
+Mount input hooks from a client-side input layer under `FlowProvider`, outside the R3F scene tree by default. Use `ignore` selectors for wheel and touch regions that should not trigger flow navigation, such as `<div data-flow-ignore />`. Keyboard input ignores typing targets by default.
+
+### Lock and cooldown notes
+
+Use the existing `lock`, `unlock`, provider transition cooldown, and input hook cooldown options to prevent repeated accidental phase changes. Input hooks respect active transitions, locks, phase boundaries, and cooldowns; they drive the same `next` and `prev` controls rather than bypassing flow state.
+
 ## DOM/UI to Canvas coordination
 
 Use one `FlowProvider` around the DOM controls, optional input helpers, status UI, and `<Canvas>` subtree that should share one flow state. Use `useFlow` and `useFlowProgress` for DOM/client UI. Use `useFlowFrame` only from components rendered inside `<Canvas>`.
