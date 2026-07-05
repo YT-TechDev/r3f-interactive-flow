@@ -4,7 +4,7 @@
 
 It helps an app describe a known list of phases, move between those phases with `next`, `prev`, and `goTo`, read transition progress from DOM/UI, connect optional browser input hooks, and bridge the same flow state into Canvas-bound frame updates with `useFlowFrame`.
 
-This README describes the current stable public API ahead of v2.0.0 release preparation. It does not announce a v2.0.0 release.
+This README describes the current stable public API for r3f-interactive-flow. For release history, see CHANGELOG.md.
 
 ## Mental model
 
