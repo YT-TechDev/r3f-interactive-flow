@@ -19,6 +19,16 @@ For complete package usage, see [packages/r3f-interactive-flow/README.md](packag
 - an R3F frame bridge through `useFlowFrame`
 - a small public API imported from the package root
 
+## Mental model
+
+- `FlowProvider` owns one phase machine for a known list of phases.
+- `useFlow` reads the current phase snapshot and controls phase changes with `next`, `prev`, `goTo`, `lock`, and `unlock`.
+- `useFlowProgress` reads transition progress for DOM/client UI such as labels and progress bars.
+- `useFlowFrame` bridges the same transition state into React Three Fiber frame updates and belongs inside Canvas-bound components.
+- `useWheelInput`, `useTouchInput`, and `useKeyboardInput` are optional browser input helpers that call the existing flow controls from components mounted under `FlowProvider`.
+
+React manages application and UI state. React Three Fiber manages frame-based scene updates. This package keeps phase transitions, input, DOM/UI coordination, and the Canvas frame bridge explicit.
+
 ## Public API
 
 Import public APIs from the package root:
@@ -51,6 +61,8 @@ import type {
 ```
 
 Do not import from internal package paths such as `r3f-interactive-flow/react`, `r3f-interactive-flow/r3f`, or `r3f-interactive-flow/input`; those paths are not public package exports.
+
+Supported imports are package-root imports only. Internal source, build, or responsibility-specific paths are not public API, including `r3f-interactive-flow/src/*`, `r3f-interactive-flow/dist/*`, `r3f-interactive-flow/react`, `r3f-interactive-flow/r3f`, and `r3f-interactive-flow/input`.
 
 ## Installation
 
@@ -301,6 +313,30 @@ Input hooks attach browser listeners from effects and drive the existing `next` 
 - `useFlowFrame` still follows React Three Fiber rules and must be used inside a Canvas-bound component.
 - The package is Next.js compatible, but not Next.js integrated. Next.js is not a dependency.
 - Next.js router integration is intentionally out of scope.
+
+## Do / do not
+
+Do:
+
+- Import supported APIs from the package root.
+- Keep phase names explicit with `as const` tuples.
+- Put `FlowProvider` above the DOM controls, input layer, and Canvas subtree that share flow state.
+- Mount browser input hooks under `FlowProvider`, outside the R3F scene tree by default.
+- Use refs or Three.js objects inside `useFlowFrame` for frame-driven scene updates.
+- Keep examples small and phase-focused.
+
+Do not:
+
+- Import from internal source, build, or responsibility-specific paths.
+- Use React state for every-frame scene animation values.
+- Put browser input listener logic inside R3F scene components unless there is a clear scene-specific reason.
+- Treat this package as a router, animation timeline, camera preset, shader, particle, visual-effects, template, CLI, or codegen library.
+- Add Next.js router integration or Server Component support claims to examples.
+- Add dependencies or public API surface for convenience.
+
+## Agent-readable boundaries
+
+When editing this project or writing examples, keep changes within phase management, transition progress, input handling, DOM/UI to Canvas coordination, and the R3F frame bridge. Prefer small examples over full templates, preserve package-root imports, and avoid adding runtime dependencies, package exports, or public APIs for convenience.
 
 ## Non-goals
 
