@@ -6,7 +6,7 @@ It helps you describe an experience as a known list of phases, move between thos
 
 This README describes the current stable public API for r3f-interactive-flow. For release history, see [packages/r3f-interactive-flow/CHANGELOG.md](packages/r3f-interactive-flow/CHANGELOG.md).
 
-For complete package usage, see [packages/r3f-interactive-flow/README.md](packages/r3f-interactive-flow/README.md).
+For step-by-step usage guides aimed at users and AI coding agents, see [docs/guides/README.md](docs/guides/README.md). For complete package usage, see [packages/r3f-interactive-flow/README.md](packages/r3f-interactive-flow/README.md).
 
 ## What it provides
 
