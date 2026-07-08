@@ -1,5 +1,31 @@
 # r3f-interactive-flow
 
+## 2.3.0
+
+`r3f-interactive-flow@2.3.0` is a documentation-focused release for the completed user-facing documentation foundation. It records completed guide structure, npm documentation audit, and example README alignment work without changing source behavior, public API, package exports, or dependencies.
+
+### Documentation
+
+- Added the user-facing guides structure under `docs/guides`.
+- Added a getting started guide for first-time setup and usage.
+- Added a core concepts guide for the phase flow mental model.
+- Added an R3F usage guide for Canvas-bound integration patterns.
+- Added an input handling guide for wheel, touch, and keyboard usage.
+- Added a common mistakes guide for practical integration pitfalls.
+- Added a Next.js Client Component usage guide.
+- Completed an npm-distributed documentation audit.
+- Aligned the `vite-basic` README with the user-facing guides.
+
+### Scope
+
+- No source/runtime behavior changes are included in this PR.
+- No public API changes are included in this PR.
+- No package export changes are included in this PR.
+- No dependency changes are included in this PR.
+- No npm publish is included in this PR.
+- No git tag is included in this PR.
+- No GitHub Release is included in this PR.
+
 ## 2.2.0
 
 `r3f-interactive-flow@2.2.0` is a usage guidance and public API coverage hardening release. It records completed documentation and type-level validation work without changing source behavior, public API, package exports, or dependencies.
