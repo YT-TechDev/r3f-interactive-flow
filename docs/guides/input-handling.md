@@ -10,7 +10,6 @@ It assumes you have read [Getting started](./getting-started.md) and
 
 All examples use package-root imports only:
 
-<!-- prettier-ignore -->
 ```tsx
 import {
   FlowProvider,
@@ -31,9 +30,9 @@ They do not create a second navigation system.
 - `useKeyboardInput` maps configured keys to `next` and `prev`.
 
 The hooks are optional. You can use regular buttons, links, or your own event
-handlers instead. The important part is that every input path should still move
-through the same `FlowProvider` controls, so locks, active transitions,
-boundaries, and cooldowns stay consistent.
+handlers instead. The important part is that every input path still moves through
+the same `FlowProvider` controls, so locks, active transitions, boundaries, and
+cooldowns stay consistent.
 
 Input hooks belong in DOM/client components because they attach browser event
 listeners from React effects. They need a browser runtime, and they need to be
@@ -53,7 +52,12 @@ with the Canvas kept separate.
 "use client";
 
 import { Canvas } from "@react-three/fiber";
-import { FlowProvider, useWheelInput, useTouchInput, useKeyboardInput } from "r3f-interactive-flow";
+import {
+  FlowProvider,
+  useWheelInput,
+  useTouchInput,
+  useKeyboardInput
+} from "r3f-interactive-flow";
 
 const phases = ["intro", "work", "contact"] as const;
 type Phase = (typeof phases)[number];
@@ -164,8 +168,8 @@ axis aligned with how the phase sequence is presented in your UI.
 
 ## Keyboard input
 
-`useKeyboardInput` listens for keydown events and maps configured keys to
-`next` and `prev`.
+`useKeyboardInput` listens for keydown events and maps configured keys to `next`
+and `prev`.
 
 ```tsx
 import { useKeyboardInput } from "r3f-interactive-flow";
@@ -227,7 +231,12 @@ Keep browser input hooks in DOM/client components, and keep frame work in
 Canvas-bound components.
 
 ```tsx
-import { useFlow, useWheelInput, useTouchInput, useKeyboardInput } from "r3f-interactive-flow";
+import {
+  useFlow,
+  useWheelInput,
+  useTouchInput,
+  useKeyboardInput
+} from "r3f-interactive-flow";
 
 function InputLayer() {
   useWheelInput<Phase>({ threshold: 40, cooldown: 500 });
