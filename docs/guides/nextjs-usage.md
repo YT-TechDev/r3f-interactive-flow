@@ -50,7 +50,7 @@ const phases: Phase[] = ["intro", "details", "contact"];
 
 function FlowControls() {
   const { phase, next, prev } = useFlow<Phase>();
-  const progress = useFlowProgress<Phase>();
+  const progress = useFlowProgress();
 
   return (
     <section>
