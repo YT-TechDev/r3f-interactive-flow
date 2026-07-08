@@ -15,7 +15,7 @@ import {
   FlowProvider,
   useWheelInput,
   useTouchInput,
-  useKeyboardInput
+  useKeyboardInput,
 } from "r3f-interactive-flow";
 ```
 
@@ -56,7 +56,7 @@ import {
   FlowProvider,
   useWheelInput,
   useTouchInput,
-  useKeyboardInput
+  useKeyboardInput,
 } from "r3f-interactive-flow";
 
 const phases = ["intro", "work", "contact"] as const;
@@ -110,7 +110,7 @@ function WheelInputLayer() {
     threshold: 40,
     cooldown: 500,
     axis: "y",
-    ignore: ["[data-flow-ignore]"]
+    ignore: ["[data-flow-ignore]"],
   });
 
   return null;
@@ -127,7 +127,9 @@ should not control the flow, such as a scrollable panel or form area.
 
 ```tsx
 function Sidebar() {
-  return <div data-flow-ignore>Scrollable content that should not change phase.</div>;
+  return (
+    <div data-flow-ignore>Scrollable content that should not change phase.</div>
+  );
 }
 ```
 
@@ -148,7 +150,7 @@ function TouchInputLayer() {
     threshold: 50,
     cooldown: 500,
     axis: "y",
-    ignore: ["[data-flow-ignore]"]
+    ignore: ["[data-flow-ignore]"],
   });
 
   return null;
@@ -179,8 +181,8 @@ function KeyboardInputLayer() {
     cooldown: 250,
     keys: {
       next: ["ArrowDown", "ArrowRight", "PageDown"],
-      prev: ["ArrowUp", "ArrowLeft", "PageUp"]
-    }
+      prev: ["ArrowUp", "ArrowLeft", "PageUp"],
+    },
   });
 
   return null;
@@ -235,7 +237,7 @@ import {
   useFlow,
   useWheelInput,
   useTouchInput,
-  useKeyboardInput
+  useKeyboardInput,
 } from "r3f-interactive-flow";
 
 function InputLayer() {
