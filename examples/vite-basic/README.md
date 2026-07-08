@@ -2,38 +2,37 @@
 
 ## Purpose
 
-This example uses the package entrypoint and the current stable public API in a small Vite and React Three Fiber app:
+This is a small Vite and React Three Fiber usage example for `r3f-interactive-flow`. It shows how the package README and user guides translate into a runnable app without turning the example into a docs site, framework integration, or template system.
 
-- `FlowProvider`
-- `useFlow`
-- `useFlowProgress`
-- `useFlowFrame`
-- `useWheelInput`
-- `useTouchInput`
-- `useKeyboardInput`
+For package-level API details, see the [package README](../../packages/r3f-interactive-flow/README.md).
 
-## What it demonstrates
+## What this example demonstrates
 
-- Stable phase tuple and transition configuration.
-- Optional browser input hooks in a DOM layer outside the Canvas.
-- DOM controls using `useFlow`.
-- DOM status and progress using `useFlowProgress`.
-- Canvas-bound mesh updates using `useFlowFrame`.
-- Optional wheel, touch, and keyboard navigation with threshold and cooldown options.
-- Ignore selectors for buttons, forms, links, and interactive UI.
-- Grouped keyboard `keys.next` / `keys.prev` bindings.
-- Keeping R3F frame updates inside Canvas-bound components.
+- `FlowProvider` setup with a stable phase tuple and transition cooldown configuration.
+- `useFlow` for DOM controls that move to the previous, next, or selected phase.
+- `useFlowProgress` for DOM UI that displays stable flow state and progress snapshots.
+- `useFlowFrame` for Canvas-bound mesh updates that follow React Three Fiber hook rules.
+- Optional `useWheelInput`, `useTouchInput`, and `useKeyboardInput` helpers in a DOM input layer outside the Canvas.
+- Input thresholds, cooldowns, ignore selectors, and grouped keyboard `keys.next` / `keys.prev` bindings.
 
 ## What it intentionally does not demonstrate
 
-- No visual effects collection.
-- No camera preset API.
-- No shader API.
-- No animation timeline system.
+- No docs site or documentation framework.
+- No framework integration beyond this Vite/R3F example.
+- No visual effects collection, camera preset API, shader API, particle system, or animation timeline system.
 - No router integration.
 - No GSAP or Framer Motion integration.
 - No portfolio template, website template, code generation, or large demo system.
-- No Next.js-specific behavior or router integration.
+- No Next.js-specific behavior.
+
+## Related guides
+
+- [Getting started](../../docs/guides/getting-started.md) explains the basic package setup that this example uses.
+- [Core concepts](../../docs/guides/core-concepts.md) covers phases, transitions, progress, and flow state.
+- [R3F usage](../../docs/guides/r3f-usage.md) explains why `useFlowFrame` belongs inside Canvas-bound components.
+- [Input handling](../../docs/guides/input-handling.md) covers the optional wheel, touch, and keyboard hooks used by this example.
+- [Common mistakes](../../docs/guides/common-mistakes.md) lists the boundaries this example follows, including keeping DOM input logic out of R3F scene logic.
+- [Next.js usage](../../docs/guides/nextjs-usage.md) is separate boundary guidance for Next.js projects and is not required for this Vite example.
 
 ## Run commands
 
