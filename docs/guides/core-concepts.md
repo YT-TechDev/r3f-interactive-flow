@@ -250,8 +250,8 @@ Three hooks read the same flow state for different jobs:
   `direction`, `isTransitioning`, and `isLocked`; call `next`, `prev`, `goTo`,
   `lock`, and `unlock`. This is your DOM/UI and navigation surface.
 - **`useFlowProgress`** — just the transition `progress` value, for DOM UI such as
-  labels and progress bars. It updates continuously while a transition runs, and a
-  focused read for the common UI case.
+  labels and progress bars. It updates continuously while a transition runs and is
+  a focused read for the common UI case.
 - **`useFlowFrame`** — the same snapshot delivered inside the React Three Fiber
   frame loop, for per-frame scene updates. It must be called from a component
   rendered inside `<Canvas>` and under `FlowProvider`, and it is covered in the
