@@ -90,6 +90,53 @@ export function App() {
 Keep per-frame scene work inside scene components. Use `useFlow` and
 `useFlowProgress` for regular React UI outside Canvas.
 
+## Assuming transitions need a Canvas or `useFlowFrame`
+
+`FlowProvider` owns the transition clock and advances the machine itself, one step
+per animation frame while a transition settles. It does not depend on a mounted
+`<Canvas>` or any `useFlowFrame` consumer. `useFlowFrame` is a read-only observer
+for scene animation — it never advances the machine — so navigation and DOM
+progress work in a Canvas-free app.
+
+### Mistake
+
+Reaching for `useFlowFrame` (and therefore a `<Canvas>`) just to make a DOM
+progress bar move, or believing a transition will not complete without one.
+
+### Better
+
+Read `useFlowProgress` directly in DOM UI. It updates every frame during a
+transition, so a `<progress>` element animates smoothly with no Canvas anywhere:
+
+```tsx
+import { FlowProvider, useFlow, useFlowProgress } from "r3f-interactive-flow";
+
+const phases = ["intro", "work", "contact"] as const;
+type Phase = (typeof phases)[number];
+
+function Navigator() {
+  const { phase, next, prev } = useFlow<Phase>();
+  const progress = useFlowProgress();
+
+  return (
+    <div>
+      <p>{phase}</p>
+      <progress max={1} value={progress} aria-label="Flow transition progress" />
+      <button onClick={prev}>Previous</button>
+      <button onClick={next}>Next</button>
+    </div>
+  );
+}
+
+export function App() {
+  return (
+    <FlowProvider phases={phases} transition={{ duration: 700 }}>
+      <Navigator />
+    </FlowProvider>
+  );
+}
+```
+
 ## Calling React or R3F hooks in the wrong tree
 
 React hooks, R3F hooks, and browser input hooks each belong to different parts of
