@@ -21,10 +21,10 @@ For step-by-step usage guides aimed at users and AI coding agents, see [docs/gui
 
 ## Mental model
 
-- `FlowProvider` owns one phase machine for a known list of phases.
-- `useFlow` reads the current phase snapshot and controls phase changes with `next`, `prev`, `goTo`, `lock`, and `unlock`.
-- `useFlowProgress` reads transition progress for DOM/client UI such as labels and progress bars.
-- `useFlowFrame` bridges the same transition state into React Three Fiber frame updates and belongs inside Canvas-bound components.
+- `FlowProvider` owns one phase machine and the single transition clock that advances it, one step per animation frame while a transition settles.
+- `useFlow` reads the current phase snapshot and controls phase changes with `next`, `prev`, `goTo`, `lock`, and `unlock`. Its `progress` advances continuously during a transition.
+- `useFlowProgress` reads that same transition progress for DOM/client UI such as labels and progress bars, and updates every frame while a transition runs.
+- `useFlowFrame` is a read-only R3F observer for scene animation: it reads the same machine inside the Canvas frame loop without advancing it, and belongs inside Canvas-bound components.
 - `useWheelInput`, `useTouchInput`, and `useKeyboardInput` are optional browser input helpers that call the existing flow controls from components mounted under `FlowProvider`.
 
 React manages application and UI state. React Three Fiber manages frame-based scene updates. This package keeps phase transitions, input, DOM/UI coordination, and the Canvas frame bridge explicit.
@@ -201,7 +201,7 @@ function ProgressBar() {
 }
 ```
 
-Use `useFlowProgress` for coarse UI such as labels and progress bars. Avoid copying every-frame transition values into React state for scene animation; use `useFlowFrame` for frame-driven R3F updates.
+`useFlowProgress` is for DOM UI such as labels and progress bars. Navigation and this progress readout are fully Canvas-free: the provider drives each transition on its own clock, and this value updates every animation frame, so the `<progress>` element moves smoothly from `0` to `1` even with no `<Canvas>` mounted. Reserve `useFlowFrame` for animating an R3F scene instead of copying every-frame values into React state.
 
 ### Driving R3F frame updates
 

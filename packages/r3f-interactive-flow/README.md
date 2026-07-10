@@ -8,10 +8,10 @@ This README describes the current stable public API for r3f-interactive-flow. Fo
 
 ## Mental model
 
-- `FlowProvider` owns one phase machine for a known list of phases.
-- `useFlow` reads the current phase snapshot and controls phase changes with `next`, `prev`, `goTo`, `lock`, and `unlock`.
-- `useFlowProgress` reads transition progress for DOM/client UI such as labels and progress bars.
-- `useFlowFrame` bridges the same transition state into React Three Fiber frame updates and belongs inside Canvas-bound components.
+- `FlowProvider` owns one phase machine and the single transition clock that advances it, one step per animation frame while a transition settles.
+- `useFlow` reads the current phase snapshot and controls phase changes with `next`, `prev`, `goTo`, `lock`, and `unlock`. Its `progress` advances continuously during a transition.
+- `useFlowProgress` reads that same transition progress for DOM/client UI such as labels and progress bars, and updates every frame while a transition runs.
+- `useFlowFrame` is a read-only R3F observer for scene animation: it reads the same machine inside the Canvas frame loop without advancing it, and belongs inside Canvas-bound components.
 - `useWheelInput`, `useTouchInput`, and `useKeyboardInput` are optional browser input helpers that call the existing flow controls from components mounted under `FlowProvider`.
 
 React manages application and UI state. React Three Fiber manages frame-based scene updates. This package keeps phase transitions, input, DOM/UI coordination, and the Canvas frame bridge explicit.
@@ -221,7 +221,7 @@ function ProgressBar() {
 }
 ```
 
-Use `useFlowProgress` for coarse UI such as labels and progress bars. Avoid copying every-frame transition values into React state for scene animation; use `useFlowFrame` for frame-driven R3F updates.
+`useFlowProgress` is for DOM UI such as labels and progress bars. It updates every animation frame while a transition runs, so this `<progress>` element moves smoothly from `0` to `1` with no `<Canvas>` mounted — navigation and progress are fully Canvas-free. Reserve `useFlowFrame` for animating an R3F scene instead of copying every-frame values into React state.
 
 ### Driving R3F frame updates
 
@@ -321,11 +321,11 @@ export function ExperienceShell() {
 
 `useFlow` returns the current phase snapshot and controls such as `next`, `prev`, `goTo`, `lock`, and `unlock`. Use it for DOM/client controls, labels, and phase-aware UI.
 
-`useFlowProgress` returns the current transition progress from the active provider snapshot. Use it for DOM progress labels, status displays, and coarse UI. For frame-driven scene updates, use `useFlowFrame` inside Canvas-bound components instead of pushing every-frame values through React state.
+`useFlowProgress` returns the current transition progress from the active provider snapshot. Use it for DOM progress labels, status displays, and progress bars; it advances continuously while a transition runs. For frame-driven scene animation, use `useFlowFrame` inside Canvas-bound components instead of pushing every-frame values through React state.
 
 ## R3F frame bridge
 
-`useFlowFrame` bridges flow state into the React Three Fiber frame loop. It must be called from a component rendered inside `<Canvas>` and under `FlowProvider`.
+`useFlowFrame` bridges flow state into the React Three Fiber frame loop for scene animation. It is a read-only observer: it reads the provider-owned machine each frame without advancing it, so transitions are driven by the provider clock whether or not any `useFlowFrame` consumer is mounted. It must be called from a component rendered inside `<Canvas>` and under `FlowProvider`.
 
 ```tsx
 function FlowBox() {
@@ -388,7 +388,7 @@ The hooks attach browser event listeners from effects, support `enabled: false`,
 | ---------------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
 | `FlowProvider`                                       | Client-side React tree around the UI and Canvas integration area         | One shared phase machine for DOM controls, status UI, optional input helpers, and the `<Canvas>` subtree |
 | `useFlow`                                            | Client-side React components rendered under `FlowProvider`               | Phase state, labels, navigation controls, locks, and DOM/client UI wiring                                |
-| `useFlowProgress`                                    | Client-side React components rendered under `FlowProvider`               | Coarse DOM progress labels, status text, progress bars, and UI snapshots                                 |
+| `useFlowProgress`                                    | Client-side React components rendered under `FlowProvider`               | DOM progress labels, status text, and progress bars that update continuously during a transition         |
 | `useFlowFrame`                                       | R3F scene components rendered inside `<Canvas>` and under `FlowProvider` | Bridging flow state into the R3F frame loop for refs and Canvas-local objects                            |
 | `useWheelInput`, `useTouchInput`, `useKeyboardInput` | Client-side React input layer components rendered under `FlowProvider`   | Browser wheel, touch, and keyboard listeners that drive existing flow controls                           |
 

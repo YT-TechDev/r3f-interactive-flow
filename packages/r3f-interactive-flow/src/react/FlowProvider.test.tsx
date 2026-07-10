@@ -1069,6 +1069,118 @@ describe("FlowProvider provider-owned transition clock", () => {
     uninstallFrameClock();
   });
 
+  it("advances React progress continuously through a Canvas-free navigation", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let latestProgress: number | undefined;
+
+    renderFlow(
+      <>
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <ProgressProbe onRender={(progress) => (latestProgress = progress)} />
+      </>,
+      undefined,
+      { transition: { duration: 1000 } }
+    );
+
+    // Transition start: React progress is 0 and the machine is transitioning.
+    act(() => {
+      latestControls?.next();
+    });
+
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      progress: 0,
+      isTransitioning: true
+    });
+    expect(latestProgress).toBe(0);
+
+    // Intermediate frame: React progress moves strictly between 0 and 1.
+    advanceClock(16); // baseline frame establishes the time origin (delta 0)
+    advanceClock(250);
+
+    expect(latestControls?.isTransitioning).toBe(true);
+    expect(latestControls?.progress).toBeGreaterThan(0);
+    expect(latestControls?.progress).toBeLessThan(1);
+    expect(latestProgress).toBe(latestControls?.progress);
+
+    // Completion frame: React progress reaches 1 and the transition ends.
+    advanceClock(1500);
+
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 1,
+      direction: "none",
+      isTransitioning: false
+    });
+    expect(latestProgress).toBe(1);
+    expect(container.textContent).toContain('"progress":1');
+    expect(container.textContent).toContain('"isTransitioning":false');
+    expect(pendingFrameCount()).toBe(0);
+  });
+
+  it("reports the same in-flight progress to every useFlowProgress consumer", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let firstProgress: number | undefined;
+    let secondProgress: number | undefined;
+
+    renderFlow(
+      <>
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <ProgressProbe onRender={(progress) => (firstProgress = progress)} />
+        <ProgressProbe onRender={(progress) => (secondProgress = progress)} />
+      </>,
+      undefined,
+      { transition: { duration: 1000 } }
+    );
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    advanceClock(16);
+    advanceClock(400);
+
+    expect(firstProgress).toBeGreaterThan(0);
+    expect(firstProgress).toBeLessThan(1);
+    expect(secondProgress).toBe(firstProgress);
+    expect(firstProgress).toBe(latestControls?.progress);
+  });
+
+  it("keeps useFlow().progress and useFlowProgress aligned across every transition frame", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let latestSnapshot: (RenderedSnapshot & { progressHook: number }) | undefined;
+
+    renderFlow(
+      <>
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <ConsistencyProbe onRender={(snapshot) => (latestSnapshot = snapshot)} />
+      </>,
+      undefined,
+      { transition: { duration: 1000 } }
+    );
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    expect(latestSnapshot?.progressHook).toBe(latestSnapshot?.progress);
+
+    advanceClock(16); // baseline frame (delta 0)
+
+    for (const deltaMs of [100, 150, 250, 500]) {
+      advanceClock(deltaMs);
+      expect(latestSnapshot?.progressHook).toBe(latestSnapshot?.progress);
+    }
+
+    expect(latestSnapshot).toMatchObject({
+      phase: "work",
+      progress: 1,
+      progressHook: 1,
+      isTransitioning: false
+    });
+  });
+
   it("completes an accepted navigation without a mounted useFlowFrame consumer", () => {
     let latestControls: FlowControls<TestPhase> | undefined;
 

@@ -372,8 +372,9 @@ describe("useFlowFrame", () => {
       },
       0.4
     );
-    // React snapshot stays coarse (0) during the transition.
-    expect(container.textContent).toContain('"progress":0');
+    // React snapshot advances continuously with the provider clock; the R3F
+    // frame callback only observed it, so it is still mid-transition at 0.5.
+    expect(container.textContent).toContain('"progress":0.5');
     expect(container.textContent).toContain('"isTransitioning":true');
   });
 
@@ -427,11 +428,12 @@ describe("useFlowFrame", () => {
       },
       0.3
     );
-    // React snapshot remains coarse during the active transition.
+    // React snapshot advances continuously with the provider clock, in step
+    // with the value the read-only R3F observer just saw.
     expect(latestControls).toMatchObject({
       phase: "work",
       phaseIndex: 1,
-      progress: 0,
+      progress: 0.5,
       direction: "next",
       isTransitioning: true
     });

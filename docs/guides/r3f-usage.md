@@ -22,15 +22,18 @@ API, or particle system.
 Two systems are involved, and each keeps its own job:
 
 - **React manages phase state.** Which phase you are on, whether a transition is
-  running, and any coarse UI derived from that state are React's responsibility.
-  React re-renders when that state changes — for example, when a phase settles.
+  running, and the DOM UI derived from that state are React's responsibility.
+  React re-renders when that state changes — including each frame of an active
+  transition, so a `useFlowProgress` bar animates smoothly.
 - **React Three Fiber manages frame-based visual updates.** A scene updates many
   times per second inside the Canvas frame loop, mutating Three.js objects
   directly rather than through React re-renders.
 - **`r3f-interactive-flow` bridges both** through predictable phase transitions.
-  It exposes the same transition snapshot to the React side (`useFlow`,
-  `useFlowProgress`) and to the Canvas frame loop (`useFlowFrame`), so both read
-  one shared machine instead of drifting out of sync.
+  One provider-owned machine and clock feed the React side (`useFlow`,
+  `useFlowProgress`) and the Canvas frame loop (`useFlowFrame`) alike. Both read
+  that one machine, so they agree on where the flow is — though they sample it in
+  independent loops, so they are not guaranteed to read the exact same `progress`
+  at the exact same instant.
 
 The library decides _when_ you are moving, _where_ you are moving, and _how far_
 you have moved. Your React code decides what the UI looks like, and your Three.js
@@ -44,7 +47,7 @@ keeps DOM input logic and Canvas scene logic from tangling together.
 - **App / provider layer** — renders `FlowProvider` with a stable `phases`
   tuple, and holds both the DOM controls and the `<Canvas>` subtree beneath it.
 - **DOM controls layer** — regular page UI rendered _outside_ `<Canvas>`. Uses
-  `useFlow` for navigation and `useFlowProgress` for coarse progress display.
+  `useFlow` for navigation and `useFlowProgress` for a live progress display.
 - **Canvas layer** — the `<Canvas>` element and its lights, camera, and scene
   objects.
 - **Scene object layer** — individual meshes and groups rendered _inside_
@@ -95,7 +98,7 @@ memoize it if it is derived at runtime.
 
 DOM controls are ordinary React components rendered outside `<Canvas>`. Use
 `useFlow` to read the current phase and move between phases, and `useFlowProgress`
-for a coarse progress readout.
+for a live progress readout.
 
 ```tsx
 import { useFlow, useFlowProgress } from "r3f-interactive-flow";
@@ -126,7 +129,10 @@ wire them straight to buttons.
 ## Canvas-bound scene updates
 
 For per-frame scene work, use `useFlowFrame`. It delivers the same transition
-snapshot inside the React Three Fiber frame loop, alongside the frame `delta`.
+snapshot inside the React Three Fiber frame loop, alongside the frame `delta`. It
+is a read-only observer: it reads the provider-owned machine each frame and never
+advances it, so the transition is driven by the provider clock whether or not any
+`useFlowFrame` consumer is mounted.
 
 `useFlowFrame` follows the React Three Fiber `useFrame` rule: it must only be
 called from a component that is rendered inside `<Canvas>`. It also requires
@@ -196,15 +202,18 @@ function FlowMesh() {
 ```
 
 Because the callback runs every frame, `progress` is always current without any
-React re-render. The library reads the same machine on the DOM and Canvas sides,
-so a DOM progress label and a Canvas mesh driven by the same transition stay in
-agreement.
+React re-render. The library reads the same provider-owned machine on the DOM and
+Canvas sides, so a DOM progress label and a Canvas mesh follow the same
+transition. They sample that machine in independent loops, though, so treat them
+as two views of one transition rather than two reads guaranteed to be identical at
+every instant.
 
 ## What not to put in React state
 
-A running transition changes `progress` continuously — potentially 60 or more
-times per second. Do not copy that value into React state each frame to animate
-the scene.
+`useFlowProgress` already keeps a DOM progress bar current — the provider updates
+it each frame during a transition. What to avoid is animating the _scene_ through
+React: copying `progress` out of `useFlowFrame` into your own `useState` each
+frame to move a mesh.
 
 ```tsx
 // Do not do this: a state write every frame forces a React re-render every frame.
@@ -215,19 +224,18 @@ function Broken() {
 }
 ```
 
-Writing to React state every frame triggers a re-render every frame, which is
-wasteful and works against how both libraries are designed. React is built around
-discrete state changes; R3F is built to mutate the scene imperatively inside its
-own loop. So:
+That extra state write reconciles the React subtree every frame, which is wasteful
+and works against how both libraries are designed. R3F is built to mutate the
+scene imperatively inside its own loop. So:
 
-- Use **React state** (`useFlow`, `useFlowProgress`) for discrete, low-frequency
-  values and coarse UI — labels, buttons, progress bars, status text.
+- Use **React state** (`useFlow`, `useFlowProgress`) for DOM UI — labels, buttons,
+  progress bars, status text.
 - Use the **frame loop** (`useFlowFrame`) for continuous, per-frame visual work —
   positions, rotations, material values. Keep those values in refs and Three.js
   objects, not in React state.
 
-`useFlowProgress` is intentionally suited to UI snapshots. It is not the tool for
-animating a scene frame by frame — that is what `useFlowFrame` is for.
+`useFlowProgress` is the right tool for DOM progress indicators. It is not the
+tool for animating a scene frame by frame — that is what `useFlowFrame` is for.
 
 ## Troubleshooting
 

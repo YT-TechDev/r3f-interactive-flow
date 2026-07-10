@@ -143,7 +143,9 @@ transition, a lock, or a cooldown, so controls stay predictable.
 ## Read transition progress
 
 `useFlowProgress` returns the current transition progress as a number from `0`
-to `1`. Use it for coarse DOM UI such as labels and progress bars.
+to `1`. Use it for DOM UI such as labels and progress bars. While a transition
+runs, the provider updates this value each animation frame, so it moves smoothly
+from `0` to `1` — no Canvas required.
 
 ```tsx
 import { useFlowProgress } from "r3f-interactive-flow";
@@ -155,8 +157,10 @@ function ProgressBar() {
 }
 ```
 
-Use `useFlowProgress` for UI snapshots. Avoid copying every-frame values into
-React state to animate a scene.
+This works in a Canvas-free app: `FlowProvider` drives the transition on its own
+clock, and DOM consumers such as this `<progress>` element re-render as it
+advances. Reserve `useFlowFrame` for animating a Three.js scene rather than
+copying every-frame values into React state.
 
 ## Where R3F fits
 

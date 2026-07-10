@@ -118,7 +118,11 @@ tied to any particular easing curve — it is a normalized position within the
 current transition that you are free to map onto anything: an opacity, a
 rotation, a progress bar, a scroll indicator.
 
-For coarse DOM/UI, read it with `useFlowProgress`:
+For DOM/UI, read it with `useFlowProgress`. While a transition runs, the provider
+advances its single clock once per animation frame and updates the React snapshot
+each frame, so this value moves continuously from `0` to `1` — smooth enough to
+drive a `<progress>` element or a percentage label directly, with no Canvas
+required:
 
 ```tsx
 function ProgressBar() {
@@ -205,33 +209,38 @@ This is the central idea of the library. Two systems are involved, and each has
 a job:
 
 - **React manages state.** Which phase you are on, whether a transition is
-  running, and coarse UI derived from it are React's responsibility. React
-  re-renders when that state changes — for example, when the phase settles.
+  running, and the DOM UI derived from it are React's responsibility. React
+  re-renders when that state changes — including each frame of an active
+  transition, so a `useFlowProgress` bar or a `useFlow().progress` label animates
+  smoothly from `0` to `1`.
 - **React Three Fiber manages frame-based visual updates.** A scene updates many
   times per second inside the Canvas frame loop, mutating Three.js objects
   directly.
 
-The library feeds the same transition snapshot to both, but it deliberately does
-_not_ push high-frequency values through React on every frame.
+Both sides read the same provider-owned machine, advanced by one provider-owned
+clock. They sample it in independent render loops, though, so do not assume a DOM
+render and a Canvas frame capture the exact same `progress` value at the exact
+same instant — treat them as two views of one machine, not one shared sample.
 
-### Why not copy frame values into React state
+### Why not copy frame values into React state for scene animation
 
-A running transition changes `progress` continuously — potentially 60 or more
-times per second. If you copied that value into React state each frame, you would
-trigger a React re-render every frame. That is wasteful and works against how
-both libraries are designed: React is built around discrete state changes, while
-R3F is built to mutate the scene imperatively inside its own render loop.
+The provider already keeps React progress current for DOM UI. The thing to avoid
+is routing _scene animation_ through React: copying `progress` out of
+`useFlowFrame` into a `useState` each frame to move a mesh forces the whole React
+subtree to reconcile every frame, which fights how both libraries are designed.
+React is built around state changes; R3F is built to mutate the scene imperatively
+inside its own loop.
 
 So the rule is:
 
-- Use **React state** (`useFlow`, `useFlowProgress`) for discrete, low-frequency
-  values and coarse UI — labels, buttons, progress bars, status text.
-- Use the **frame loop** for continuous, per-frame visual work — mesh positions,
-  rotations, material values, camera movement. Keep those values in refs and
-  Three.js objects, not in React state.
+- Use **React state** (`useFlow`, `useFlowProgress`) for DOM UI — labels, buttons,
+  progress bars, status text. These update continuously during a transition.
+- Use the **frame loop** (`useFlowFrame`) for per-frame visual work — mesh
+  positions, rotations, material values, camera movement. Keep those values in
+  refs and Three.js objects, not in React state.
 
-`useFlowProgress` is intentionally suited to snapshots and coarse UI. It is not
-the tool for animating a scene frame by frame.
+`useFlowProgress` is the right tool for DOM progress indicators. It is not the
+tool for animating a scene frame by frame — that is what `useFlowFrame` is for.
 
 ## How the hooks fit together
 
@@ -240,8 +249,9 @@ Three hooks read the same flow state for different jobs:
 - **`useFlow`** — the phase snapshot and controls. Read `phase`, `phaseIndex`,
   `direction`, `isTransitioning`, and `isLocked`; call `next`, `prev`, `goTo`,
   `lock`, and `unlock`. This is your DOM/UI and navigation surface.
-- **`useFlowProgress`** — just the transition `progress` value, for coarse DOM/UI
-  such as labels and progress bars. A focused read for the common UI case.
+- **`useFlowProgress`** — just the transition `progress` value, for DOM UI such as
+  labels and progress bars. It updates continuously while a transition runs and is
+  a focused read for the common UI case.
 - **`useFlowFrame`** — the same snapshot delivered inside the React Three Fiber
   frame loop, for per-frame scene updates. It must be called from a component
   rendered inside `<Canvas>` and under `FlowProvider`, and it is covered in the

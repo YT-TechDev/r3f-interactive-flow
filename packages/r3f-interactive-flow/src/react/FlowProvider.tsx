@@ -89,9 +89,12 @@ export function FlowProvider<TPhase extends string>({
       machine.update(deltaMs);
       const after = machine.getSnapshot();
 
-      // Preserve the coarse React snapshot model: only synchronize React state at
-      // transition completion, never per frame.
-      if (before.isTransitioning && !after.isTransitioning) {
+      // Synchronize the React snapshot on every frame that advances a
+      // transition, including the completion frame, so DOM consumers
+      // (useFlowProgress and useFlow().progress) move continuously from 0 to 1.
+      // Cooldown-only frames change no React-facing value, so they intentionally
+      // skip React work to avoid per-frame renders while idle-settling.
+      if (before.isTransitioning || after.isTransitioning) {
         setSnapshot(after);
       }
 
