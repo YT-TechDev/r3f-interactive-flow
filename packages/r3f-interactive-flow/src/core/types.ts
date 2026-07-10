@@ -32,4 +32,10 @@ export type FlowControls<TPhase extends string> = FlowSnapshot<TPhase> & {
 export type FlowMachine<TPhase extends string> = FlowControls<TPhase> & {
   update: (deltaMs: number) => void;
   getSnapshot: () => FlowSnapshot<TPhase>;
+  /**
+   * True while the machine still requires clock advancement, i.e. an active
+   * transition or a non-zero remaining cooldown. Internal signal used by the
+   * FlowProvider clock to decide when to keep or stop scheduling frames.
+   */
+  isSettling: boolean;
 };

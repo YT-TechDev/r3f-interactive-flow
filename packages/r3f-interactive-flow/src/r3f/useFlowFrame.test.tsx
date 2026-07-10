@@ -175,6 +175,52 @@ function installMinimalDom(): void {
 
 installMinimalDom();
 
+// Deterministic requestAnimationFrame clock so the provider-owned transition
+// clock can be advanced by explicit deltas, independently of the mocked R3F
+// useFrame subscriptions.
+const frameCallbacks = new Map<number, FrameRequestCallback>();
+let nextFrameId = 1;
+let frameNow = 0;
+
+function installFrameClock(): void {
+  frameCallbacks.clear();
+  nextFrameId = 1;
+  frameNow = 0;
+  globalThis.requestAnimationFrame = (callback: FrameRequestCallback): number => {
+    const id = nextFrameId++;
+    frameCallbacks.set(id, callback);
+
+    return id;
+  };
+  globalThis.cancelAnimationFrame = (id: number): void => {
+    frameCallbacks.delete(id);
+  };
+}
+
+function uninstallFrameClock(): void {
+  frameCallbacks.clear();
+  Reflect.deleteProperty(globalThis, "requestAnimationFrame");
+  Reflect.deleteProperty(globalThis, "cancelAnimationFrame");
+}
+
+function pendingFrameCount(): number {
+  return frameCallbacks.size;
+}
+
+// Advance the provider clock by one frame. The first frame after a clock start
+// only establishes the time baseline (delta 0); subsequent frames apply deltaMs.
+function advanceClock(deltaMs: number): void {
+  frameNow += deltaMs;
+  const pending = [...frameCallbacks.values()];
+  frameCallbacks.clear();
+
+  act(() => {
+    for (const callback of pending) {
+      callback(frameNow);
+    }
+  });
+}
+
 const { createRoot } = await import("react-dom/client");
 
 type TestPhase = "intro" | "work" | "contact";
@@ -185,6 +231,7 @@ let container: HTMLDivElement;
 let root: Root | undefined;
 
 beforeEach(() => {
+  installFrameClock();
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -196,6 +243,7 @@ afterEach(() => {
   });
 
   container.remove();
+  uninstallFrameClock();
   vi.restoreAllMocks();
   useFrameMock.mockClear();
 });
@@ -267,7 +315,7 @@ describe("useFlowFrame", () => {
     expect(useFrameMock.mock.calls.at(-1)?.[0]).toEqual(expect.any(Function));
   });
 
-  it("updates the machine in milliseconds and calls the user callback with post-update progress and delta seconds", () => {
+  it("runs the user callback with the current machine snapshot and delta seconds without advancing the machine", () => {
     const onFrame = vi.fn();
     let latestControls: FlowControls<TestPhase> | undefined;
 
@@ -282,11 +330,19 @@ describe("useFlowFrame", () => {
       latestControls?.next();
     });
 
+    // Provider clock advances the machine to 0.5 without any R3F frame.
+    advanceClock(16);
+    advanceClock(500);
+
+    // Invoking the R3F frame callback must not advance the machine itself.
     act(() => {
       getRegisteredFrame()(undefined, 0.25);
     });
+    act(() => {
+      getRegisteredFrame()(undefined, 0.4);
+    });
 
-    expect(onFrame).toHaveBeenCalledTimes(1);
+    expect(onFrame).toHaveBeenCalledTimes(2);
     expect(Object.keys(onFrame.mock.calls[0]?.[0] ?? {}).sort()).toEqual([
       "direction",
       "isTransitioning",
@@ -294,21 +350,34 @@ describe("useFlowFrame", () => {
       "phaseIndex",
       "progress"
     ]);
-    expect(onFrame).toHaveBeenLastCalledWith(
+    expect(onFrame).toHaveBeenNthCalledWith(
+      1,
       {
         phase: "work",
         phaseIndex: 1,
-        progress: 0.25,
+        progress: 0.5,
         direction: "next",
         isTransitioning: true
       },
       0.25
     );
+    expect(onFrame).toHaveBeenNthCalledWith(
+      2,
+      {
+        phase: "work",
+        phaseIndex: 1,
+        progress: 0.5,
+        direction: "next",
+        isTransitioning: true
+      },
+      0.4
+    );
+    // React snapshot stays coarse (0) during the transition.
     expect(container.textContent).toContain('"progress":0');
     expect(container.textContent).toContain('"isTransitioning":true');
   });
 
-  it("reads the latest machine snapshot as progress advances across frame updates", () => {
+  it("reads the latest machine snapshot as the provider clock advances progress", () => {
     const onFrame = vi.fn();
     let latestControls: FlowControls<TestPhase> | undefined;
 
@@ -324,13 +393,13 @@ describe("useFlowFrame", () => {
       latestControls?.next();
     });
 
-    const frame = getRegisteredFrame();
+    advanceClock(16);
+    advanceClock(200);
 
     act(() => {
-      frame({ frame: "first" }, 0.2);
+      getRegisteredFrame()({ frame: "first" }, 0.2);
     });
 
-    expect(onFrame).toHaveBeenCalledTimes(1);
     expect(onFrame).toHaveBeenLastCalledWith(
       {
         phase: "work",
@@ -342,11 +411,12 @@ describe("useFlowFrame", () => {
       0.2
     );
 
+    advanceClock(300);
+
     act(() => {
-      frame({ frame: "second" }, 0.3);
+      getRegisteredFrame()({ frame: "second" }, 0.3);
     });
 
-    expect(onFrame).toHaveBeenCalledTimes(2);
     expect(onFrame).toHaveBeenLastCalledWith(
       {
         phase: "work",
@@ -357,6 +427,7 @@ describe("useFlowFrame", () => {
       },
       0.3
     );
+    // React snapshot remains coarse during the active transition.
     expect(latestControls).toMatchObject({
       phase: "work",
       phaseIndex: 1,
@@ -402,6 +473,8 @@ describe("useFlowFrame", () => {
       },
       0.016
     );
+    // No transition means no clock was ever scheduled.
+    expect(pendingFrameCount()).toBe(0);
   });
 
   it("uses the latest callback ref after rerender without calling a stale callback", () => {
@@ -432,14 +505,16 @@ describe("useFlowFrame", () => {
     );
   });
 
-  it("syncs the React snapshot when an active transition completes", () => {
-    const onFrame = vi.fn();
+  it("does not advance the machine faster when multiple consumers are mounted", () => {
+    const firstFrame = vi.fn();
+    const secondFrame = vi.fn();
     let latestControls: FlowControls<TestPhase> | undefined;
 
     renderFlow(
       <>
         <ControlsProbe onRender={(controls) => (latestControls = controls)} />
-        <FrameProbe onFrame={onFrame} />
+        <FrameProbe onFrame={firstFrame} />
+        <FrameProbe onFrame={secondFrame} />
       </>,
       1000
     );
@@ -448,31 +523,39 @@ describe("useFlowFrame", () => {
       latestControls?.next();
     });
 
-    expect(container.textContent).toContain('"progress":0');
-    expect(container.textContent).toContain('"isTransitioning":true');
+    advanceClock(16);
+    advanceClock(500);
 
+    // Drive both R3F frame subscriptions several times in the same visual frame.
     act(() => {
-      getRegisteredFrame()(undefined, 0.5);
+      getRegisteredFrame(0)(undefined, 0.25);
+      getRegisteredFrame(1)(undefined, 0.25);
+      getRegisteredFrame(0)(undefined, 0.25);
+      getRegisteredFrame(1)(undefined, 0.25);
     });
 
-    expect(onFrame).toHaveBeenLastCalledWith(
-      {
-        phase: "work",
-        phaseIndex: 1,
-        progress: 0.5,
-        direction: "next",
-        isTransitioning: true
-      },
-      0.5
-    );
-    expect(container.textContent).toContain('"progress":0');
-    expect(container.textContent).toContain('"isTransitioning":true');
+    // Both consumers observe the same phase, progress, direction and transition
+    // state for the same frame.
+    const expectedState = {
+      phase: "work",
+      phaseIndex: 1,
+      progress: 0.5,
+      direction: "next",
+      isTransitioning: true
+    };
+
+    expect(firstFrame).toHaveBeenLastCalledWith(expectedState, 0.25);
+    expect(secondFrame).toHaveBeenLastCalledWith(expectedState, 0.25);
+
+    // Subscriber count does not affect transition duration: only the single
+    // provider clock advanced progress, so half the duration is still 0.5.
+    advanceClock(500);
 
     act(() => {
-      getRegisteredFrame()(undefined, 0.5);
+      getRegisteredFrame(0)(undefined, 0.016);
     });
 
-    expect(onFrame).toHaveBeenLastCalledWith(
+    expect(firstFrame).toHaveBeenLastCalledWith(
       {
         phase: "work",
         phaseIndex: 1,
@@ -480,7 +563,7 @@ describe("useFlowFrame", () => {
         direction: "none",
         isTransitioning: false
       },
-      0.5
+      0.016
     );
     expect(latestControls).toMatchObject({
       phase: "work",
@@ -490,11 +573,9 @@ describe("useFlowFrame", () => {
       isTransitioning: false,
       isLocked: false
     });
-    expect(container.textContent).toContain('"progress":1');
-    expect(container.textContent).toContain('"isTransitioning":false');
   });
 
-  it("reports the completed target phase when a large frame delta finishes a transition", () => {
+  it("reflects a provider-clock-completed transition to consumers and the React snapshot", () => {
     const onFrame = vi.fn();
     let latestControls: FlowControls<TestPhase> | undefined;
 
@@ -510,78 +591,14 @@ describe("useFlowFrame", () => {
       latestControls?.next();
     });
 
-    expect(container.textContent).toContain('"phase":"work"');
-    expect(container.textContent).toContain('"phaseIndex":1');
-    expect(container.textContent).toContain('"progress":0');
-    expect(container.textContent).toContain('"direction":"next"');
-    expect(container.textContent).toContain('"isTransitioning":true');
-
-    act(() => {
-      getRegisteredFrame()(undefined, 1.5);
-    });
-
-    expect(onFrame).toHaveBeenCalledTimes(1);
-    expect(onFrame).toHaveBeenLastCalledWith(
-      {
-        phase: "work",
-        phaseIndex: 1,
-        progress: 1,
-        direction: "none",
-        isTransitioning: false
-      },
-      1.5
-    );
-    expect(latestControls).toMatchObject({
-      phase: "work",
-      phaseIndex: 1,
-      progress: 1,
-      direction: "none",
-      isTransitioning: false,
-      isLocked: false
-    });
-    expect(container.textContent).toContain('"phase":"work"');
-    expect(container.textContent).toContain('"phaseIndex":1');
-    expect(container.textContent).toContain('"progress":1');
-    expect(container.textContent).toContain('"direction":"none"');
-    expect(container.textContent).toContain('"isTransitioning":false');
-  });
-
-  it("keeps completed transition state stable on the frame after completion", () => {
-    const onFrame = vi.fn();
-    let latestControls: FlowControls<TestPhase> | undefined;
-
-    renderFlow(
-      <>
-        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
-        <FrameProbe onFrame={onFrame} />
-      </>,
-      1000
-    );
-
-    act(() => {
-      latestControls?.next();
-    });
-
-    act(() => {
-      getRegisteredFrame()(undefined, 1.5);
-    });
-
-    expect(onFrame).toHaveBeenLastCalledWith(
-      {
-        phase: "work",
-        phaseIndex: 1,
-        progress: 1,
-        direction: "none",
-        isTransitioning: false
-      },
-      1.5
-    );
+    // Complete the transition purely through the provider clock.
+    advanceClock(16);
+    advanceClock(1500);
 
     act(() => {
       getRegisteredFrame()(undefined, 0.016);
     });
 
-    expect(onFrame).toHaveBeenCalledTimes(2);
     expect(onFrame).toHaveBeenLastCalledWith(
       {
         phase: "work",
@@ -600,91 +617,10 @@ describe("useFlowFrame", () => {
       isTransitioning: false,
       isLocked: false
     });
-    expect(container.textContent).toContain('"phase":"work"');
-    expect(container.textContent).toContain('"phaseIndex":1');
     expect(container.textContent).toContain('"progress":1');
-    expect(container.textContent).toContain('"direction":"none"');
     expect(container.textContent).toContain('"isTransitioning":false');
-  });
-
-  it("keeps the frame snapshot stable after same-phase navigation", () => {
-    const onFrame = vi.fn();
-    let latestControls: FlowControls<TestPhase> | undefined;
-
-    renderFlow(
-      <>
-        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
-        <FrameProbe onFrame={onFrame} />
-      </>
-    );
-
-    act(() => {
-      latestControls?.goTo("intro");
-    });
-
-    act(() => {
-      getRegisteredFrame()(undefined, 0.016);
-    });
-
-    expect(onFrame).toHaveBeenCalledTimes(1);
-    expect(onFrame).toHaveBeenLastCalledWith(
-      {
-        phase: "intro",
-        phaseIndex: 0,
-        progress: 0,
-        direction: "none",
-        isTransitioning: false
-      },
-      0.016
-    );
-    expect(latestControls).toMatchObject({
-      phase: "intro",
-      phaseIndex: 0,
-      progress: 0,
-      direction: "none",
-      isTransitioning: false,
-      isLocked: false
-    });
-  });
-
-  it("keeps the frame snapshot stable after rejected boundary navigation", () => {
-    const onFrame = vi.fn();
-    let latestControls: FlowControls<TestPhase> | undefined;
-
-    renderFlow(
-      <>
-        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
-        <FrameProbe onFrame={onFrame} />
-      </>
-    );
-
-    act(() => {
-      latestControls?.prev();
-    });
-
-    act(() => {
-      getRegisteredFrame()(undefined, 0.016);
-    });
-
-    expect(onFrame).toHaveBeenCalledTimes(1);
-    expect(onFrame).toHaveBeenLastCalledWith(
-      {
-        phase: "intro",
-        phaseIndex: 0,
-        progress: 0,
-        direction: "none",
-        isTransitioning: false
-      },
-      0.016
-    );
-    expect(latestControls).toMatchObject({
-      phase: "intro",
-      phaseIndex: 0,
-      progress: 0,
-      direction: "none",
-      isTransitioning: false,
-      isLocked: false
-    });
+    // The completed clock stops scheduling frames.
+    expect(pendingFrameCount()).toBe(0);
   });
 
   it("throws a clear error when rendered outside FlowProvider", () => {

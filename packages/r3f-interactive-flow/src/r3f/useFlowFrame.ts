@@ -30,28 +30,24 @@ export function useFlowFrame<TPhase extends string>(callback: FlowFrameCallback<
     throw new Error("useFlowFrame must be used inside FlowProvider.");
   }
 
-  const { machine, syncSnapshot } = context;
+  const { machine } = context;
 
+  // The FlowProvider owns the single transition clock. This hook only reads the
+  // current machine snapshot and runs the user callback, so any number of
+  // consumers observe a consistent snapshot within the same frame without
+  // advancing the machine.
   useFrame((_, delta) => {
-    const before = machine.getSnapshot();
-
-    machine.update(delta * 1000);
-
-    const after = machine.getSnapshot();
+    const snapshot = machine.getSnapshot();
 
     callbackRef.current(
       {
-        phase: after.phase as TPhase,
-        phaseIndex: after.phaseIndex,
-        progress: after.progress,
-        direction: after.direction,
-        isTransitioning: after.isTransitioning
+        phase: snapshot.phase as TPhase,
+        phaseIndex: snapshot.phaseIndex,
+        progress: snapshot.progress,
+        direction: snapshot.direction,
+        isTransitioning: snapshot.isTransitioning
       },
       delta
     );
-
-    if (before.isTransitioning && !after.isTransitioning) {
-      syncSnapshot();
-    }
   });
 }
