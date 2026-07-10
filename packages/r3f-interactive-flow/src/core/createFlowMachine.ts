@@ -246,6 +246,9 @@ export function createFlowMachine<TPhase extends string>(
     get isLocked() {
       return isLocked;
     },
+    get isSettling() {
+      return isTransitioning || cooldownRemainingMs > 0;
+    },
     next() {
       navigateToIndex(phaseIndex + 1);
     },

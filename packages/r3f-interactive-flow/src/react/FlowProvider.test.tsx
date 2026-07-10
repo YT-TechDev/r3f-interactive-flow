@@ -1013,3 +1013,216 @@ describe("FlowProvider and hooks", () => {
     expect(container.textContent).toBe("useFlowProgress must be used inside FlowProvider.");
   });
 });
+
+// Deterministic requestAnimationFrame clock used only for the provider-owned
+// clock tests below. It is installed per test and removed afterwards so the
+// suites above keep running with no requestAnimationFrame available.
+const frameCallbacks = new Map<number, FrameRequestCallback>();
+let nextFrameId = 1;
+let frameNow = 0;
+
+function installFrameClock(): void {
+  frameCallbacks.clear();
+  nextFrameId = 1;
+  frameNow = 0;
+  globalThis.requestAnimationFrame = (callback: FrameRequestCallback): number => {
+    const id = nextFrameId++;
+    frameCallbacks.set(id, callback);
+
+    return id;
+  };
+  globalThis.cancelAnimationFrame = (id: number): void => {
+    frameCallbacks.delete(id);
+  };
+}
+
+function uninstallFrameClock(): void {
+  frameCallbacks.clear();
+  Reflect.deleteProperty(globalThis, "requestAnimationFrame");
+  Reflect.deleteProperty(globalThis, "cancelAnimationFrame");
+}
+
+function pendingFrameCount(): number {
+  return frameCallbacks.size;
+}
+
+// Advance the provider clock by one frame. The first frame after a clock start
+// only establishes the time baseline (delta 0); later frames apply deltaMs.
+function advanceClock(deltaMs: number): void {
+  frameNow += deltaMs;
+  const pending = [...frameCallbacks.values()];
+  frameCallbacks.clear();
+
+  act(() => {
+    for (const callback of pending) {
+      callback(frameNow);
+    }
+  });
+}
+
+describe("FlowProvider provider-owned transition clock", () => {
+  beforeEach(() => {
+    installFrameClock();
+  });
+
+  afterEach(() => {
+    uninstallFrameClock();
+  });
+
+  it("completes an accepted navigation without a mounted useFlowFrame consumer", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(<ControlsProbe onRender={(controls) => (latestControls = controls)} />, undefined, {
+      transition: { duration: 1000 }
+    });
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      progress: 0,
+      isTransitioning: true
+    });
+
+    advanceClock(16);
+    advanceClock(1500);
+
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 1,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+    expect(container.textContent).toContain('"progress":1');
+    expect(container.textContent).toContain('"isTransitioning":false');
+    // Scheduled clock work is cleaned up after completion.
+    expect(pendingFrameCount()).toBe(0);
+  });
+
+  it("advances cooldown without a Canvas frame subscriber", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(<ControlsProbe onRender={(controls) => (latestControls = controls)} />, undefined, {
+      transition: { duration: 100, cooldown: 300 }
+    });
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    // Baseline frame, then finish the 100ms transition; 200ms of cooldown remain.
+    advanceClock(16);
+    advanceClock(100);
+
+    expect(latestControls).toMatchObject({ phase: "work", isTransitioning: false });
+    // The clock keeps running to consume the remaining cooldown.
+    expect(pendingFrameCount()).toBe(1);
+
+    // Navigation is still blocked while the cooldown has not elapsed.
+    act(() => {
+      latestControls?.next();
+    });
+
+    expect(latestControls).toMatchObject({ phase: "work", isTransitioning: false });
+
+    // Consume the remaining cooldown purely through the provider clock.
+    advanceClock(200);
+
+    expect(pendingFrameCount()).toBe(0);
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    expect(latestControls).toMatchObject({ phase: "contact", isTransitioning: true });
+  });
+
+  it("cancels scheduled clock work when the provider unmounts", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(<ControlsProbe onRender={(controls) => (latestControls = controls)} />, undefined, {
+      transition: { duration: 1000 }
+    });
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    expect(pendingFrameCount()).toBe(1);
+
+    // Unmount the provider subtree.
+    act(() => {
+      root?.render(<output data-testid="empty">empty</output>);
+    });
+
+    expect(pendingFrameCount()).toBe(0);
+  });
+
+  it("does not create duplicate clocks under React Strict Mode setup and cleanup", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    act(() => {
+      root?.render(
+        <React.StrictMode>
+          <FlowProvider phases={phases} transition={{ duration: 1000 }}>
+            <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+          </FlowProvider>
+        </React.StrictMode>
+      );
+    });
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    // Exactly one clock is scheduled despite Strict Mode double setup/cleanup.
+    expect(pendingFrameCount()).toBe(1);
+
+    advanceClock(16);
+    advanceClock(1500);
+
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      progress: 1,
+      isTransitioning: false
+    });
+    expect(pendingFrameCount()).toBe(0);
+  });
+
+  it("stops the old clock when the machine is replaced by a configuration change", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(<ControlsProbe onRender={(controls) => (latestControls = controls)} />, undefined, {
+      transitionDurationMs: 1000
+    });
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    expect(pendingFrameCount()).toBe(1);
+
+    // Changing timing props replaces the machine; the old clock must not survive.
+    renderFlow(<ControlsProbe onRender={(controls) => (latestControls = controls)} />, undefined, {
+      transitionDurationMs: 500
+    });
+
+    expect(pendingFrameCount()).toBe(0);
+    expect(latestControls).toMatchObject({
+      phase: "intro",
+      phaseIndex: 0,
+      progress: 0,
+      isTransitioning: false
+    });
+
+    // Advancing frames does not resurrect an old clock or throw.
+    advanceClock(16);
+    advanceClock(1000);
+
+    expect(pendingFrameCount()).toBe(0);
+  });
+});
