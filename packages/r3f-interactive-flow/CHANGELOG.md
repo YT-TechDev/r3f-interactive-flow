@@ -1,5 +1,39 @@
 # r3f-interactive-flow
 
+## 2.3.1
+
+`r3f-interactive-flow@2.3.1` is a focused maintenance release that corrects transition clock ownership and React progress synchronization while strengthening packed-package and supported-peer compatibility validation.
+
+### Fixed
+
+- Made `FlowProvider` the single owner of transition and cooldown clock advancement, so transition speed no longer depends on how many `useFlowFrame` consumers are mounted.
+- Ensured transitions and cooldown work complete without requiring an R3F `<Canvas>` or any `useFlowFrame` consumer.
+- Made `useFlowProgress()` and `useFlow().progress` update continuously (`0` to `1`) during transitions for React and DOM consumers, instead of only syncing at transition completion.
+- Kept `useFlowFrame` as a read-only observer of provider-owned transition state; it never advances the machine.
+- Corrected root package declaration routing so ESM consumers resolve `dist/index.d.ts` and CommonJS consumers resolve `dist/index.d.cts`, instead of CommonJS consumers silently resolving the ESM declaration file.
+
+### Hardened
+
+- Added packed-tarball consumer smoke checks covering ESM `import`, CommonJS `require`, ESM and CommonJS/NodeNext TypeScript declaration resolution, private internal path rejection, and `"use client"` output on both runtime bundles.
+- Added focused supported-peer compatibility validation for React 18.3.1 / React DOM 18.3.1 / `@react-three/fiber` 8.18.0 / three 0.150.1, and React 19.2.7 / React DOM 19.2.7 / `@react-three/fiber` 9.6.1 / three 0.185.1.
+- Added regression coverage for provider-owned transition progression, multi-consumer `useFlowFrame` behavior, and aligned `useFlowProgress()` / `useFlow().progress` output.
+
+### Documentation
+
+- Aligned transition progress guidance across the README files and `docs/guides` with the provider-owned, continuously-updating runtime contract.
+- Updated maintainer, contributor, and security guidance to describe stable v2 maintenance instead of stale pre-1.0 milestones.
+
+### Scope
+
+- No public API additions or removals are included.
+- No new public package subpaths are included.
+- No runtime dependencies are added.
+- The root-only package export boundary is unchanged; only ESM/CommonJS declaration routing within it was corrected.
+- No npm publish is included in this PR.
+- No git tag is included in this PR.
+- No GitHub Release is included in this PR.
+- No milestone closeout is included in this PR.
+
 ## 2.3.0
 
 `r3f-interactive-flow@2.3.0` is a documentation-focused release for the completed user-facing documentation foundation. It records completed guide structure, npm documentation audit, and example README alignment work without changing source behavior, public API, package exports, or dependencies.
