@@ -44,6 +44,9 @@ jobs:
       - name: Packed package consumer smoke test
         run: pnpm package:smoke
 
+      - name: Supported peer compatibility
+        run: pnpm package:compat
+
       - name: Typecheck
         run: pnpm typecheck
 
