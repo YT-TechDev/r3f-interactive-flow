@@ -41,6 +41,9 @@ jobs:
       - name: Verify package output
         run: pnpm package:verify
 
+      - name: Packed package consumer smoke test
+        run: pnpm package:smoke
+
       - name: Typecheck
         run: pnpm typecheck
 

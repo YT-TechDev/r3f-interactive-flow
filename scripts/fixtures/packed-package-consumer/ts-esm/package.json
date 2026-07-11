@@ -1,0 +1,5 @@
+{
+  "name": "ts-esm-fixture",
+  "private": true,
+  "type": "module"
+}
