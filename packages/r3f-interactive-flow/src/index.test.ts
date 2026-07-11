@@ -153,9 +153,8 @@ describe("public API", () => {
         types: string;
         exports: {
           ".": {
-            types: string;
-            import: string;
-            require: string;
+            import: { types: string; default: string };
+            require: { types: string; default: string };
           };
         };
         files: string[];
@@ -169,9 +168,8 @@ describe("public API", () => {
     expect(packageJson.default.module).toBe("./dist/index.js");
     expect(packageJson.default.types).toBe("./dist/index.d.ts");
     expect(packageJson.default.exports["."]).toEqual({
-      types: "./dist/index.d.ts",
-      import: "./dist/index.js",
-      require: "./dist/index.cjs"
+      import: { types: "./dist/index.d.ts", default: "./dist/index.js" },
+      require: { types: "./dist/index.d.cts", default: "./dist/index.cjs" }
     });
     expect(packageJson.default.files).toEqual(["dist", "README.md", "LICENSE", "CHANGELOG.md"]);
     expect(packageJson.default.sideEffects).toBe(false);

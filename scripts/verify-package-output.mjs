@@ -72,7 +72,8 @@ const licensePath = join(packageDir, "LICENSE");
 const changelogPath = join(packageDir, "CHANGELOG.md");
 const distEsmPath = join(packageDir, "dist", "index.js");
 const distCjsPath = join(packageDir, "dist", "index.cjs");
-const distTypesPath = join(packageDir, "dist", "index.d.ts");
+const distEsmTypesPath = join(packageDir, "dist", "index.d.ts");
+const distCjsTypesPath = join(packageDir, "dist", "index.d.cts");
 
 assertExists(packageJsonPath, "package.json");
 assertExists(readmePath, "README.md");
@@ -80,7 +81,8 @@ assertExists(licensePath, "LICENSE");
 assertExists(changelogPath, "CHANGELOG.md");
 assertExists(distEsmPath, "dist/index.js");
 assertExists(distCjsPath, "dist/index.cjs");
-assertExists(distTypesPath, "dist/index.d.ts");
+assertExists(distEsmTypesPath, "dist/index.d.ts");
+assertExists(distCjsTypesPath, "dist/index.d.cts");
 
 if (process.exitCode) {
   process.exit(process.exitCode);
@@ -103,16 +105,34 @@ if (!rootExport || typeof rootExport !== "object" || Array.isArray(rootExport)) 
   fail('package.json exports["."] must exist as an object');
 }
 
-assertPackageField(rootExport?.types, "./dist/index.d.ts", 'exports["."].types');
-assertPackageField(rootExport?.import, "./dist/index.js", 'exports["."].import');
-assertPackageField(rootExport?.require, "./dist/index.cjs", 'exports["."].require');
+const importCondition = rootExport?.import;
+const requireCondition = rootExport?.require;
+
+if (!importCondition || typeof importCondition !== "object" || Array.isArray(importCondition)) {
+  fail(
+    'package.json exports["."].import must exist as a conditional object with "types" and "default"'
+  );
+} else {
+  assertPackageField(importCondition.types, "./dist/index.d.ts", 'exports["."].import.types');
+  assertPackageField(importCondition.default, "./dist/index.js", 'exports["."].import.default');
+  assertPackagePathExists(importCondition.types, 'exports["."].import.types');
+  assertPackagePathExists(importCondition.default, 'exports["."].import.default');
+}
+
+if (!requireCondition || typeof requireCondition !== "object" || Array.isArray(requireCondition)) {
+  fail(
+    'package.json exports["."].require must exist as a conditional object with "types" and "default"'
+  );
+} else {
+  assertPackageField(requireCondition.types, "./dist/index.d.cts", 'exports["."].require.types');
+  assertPackageField(requireCondition.default, "./dist/index.cjs", 'exports["."].require.default');
+  assertPackagePathExists(requireCondition.types, 'exports["."].require.types');
+  assertPackagePathExists(requireCondition.default, 'exports["."].require.default');
+}
 
 assertPackagePathExists(packageJson.main, "main");
 assertPackagePathExists(packageJson.module, "module");
 assertPackagePathExists(packageJson.types, "types");
-assertPackagePathExists(rootExport?.types, 'exports["."].types');
-assertPackagePathExists(rootExport?.import, 'exports["."].import');
-assertPackagePathExists(rootExport?.require, 'exports["."].require');
 
 assertUseClient(distEsmPath, "dist/index.js");
 assertUseClient(distCjsPath, "dist/index.cjs");
