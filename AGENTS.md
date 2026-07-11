@@ -16,13 +16,18 @@ This repository contains `r3f-interactive-flow`, a small React Three Fiber utili
 - If checks cannot be run, explain why.
 - Preserve the existing docs tone: practical, direct, and implementation-focused.
 
-## v0.4.0 direction
+## Maintenance direction
 
-The next planned release is `v0.4.0 - Input, transition, and test hardening`.
+`r3f-interactive-flow` is a stable v2 library. Maintenance work should:
 
-v0.4.0 should stabilize the existing phase flow foundation by improving input reliability, transition lifecycle behavior, cooldown and locking behavior, and test coverage. It is not a feature-expansion release.
+- preserve predictable phase-transition and input behavior
+- protect backward compatibility for existing consumers
+- add or strengthen tests that guard established behavior
+- keep documentation and examples aligned with actual runtime behavior
+- keep package exports, type declarations, peer compatibility, and release checks reliable
+- stay small and focused rather than broad or speculative
 
-For planning details, see `docs/roadmap-v0.4.0.md`.
+Feature expansion is not the default direction. Prefer fixing, clarifying, and hardening what already exists over adding new capability.
 
 ## Architecture boundaries
 
@@ -49,7 +54,7 @@ Rules:
 - Keep public exports small and intentional.
 - Avoid broad rewrites and unrelated file changes.
 
-## v0.4.0 non-goals
+## Non-goals
 
 - No visual effects collection, particle API, camera preset API, shader effect API, or animation timeline system.
 - No GSAP, Framer Motion, or router integration.
@@ -71,4 +76,4 @@ Keep the public API centered on:
 - `useTouchInput`
 - `useKeyboardInput`
 
-Public types should be exported intentionally, not incidentally. Do not add new public APIs for v0.4.0 unless a separate issue explicitly approves the change.
+Public types should be exported intentionally, not incidentally. Do not add new public APIs unless a separate issue explicitly approves the change.
