@@ -2,7 +2,7 @@
 
 Thank you for your interest in `r3f-interactive-flow`.
 
-This project is currently focused on stabilizing the v0.2.0 foundation.
+This project maintains a stable v2 package. Contributions should favor small, predictable control primitives, compatibility with established behavior, focused bug fixes, tests, documentation, TypeScript safety, and package reliability over expanding the public API.
 
 ## Project scope
 
@@ -51,6 +51,8 @@ Use pnpm.
 pnpm install
 pnpm build
 pnpm package:verify
+pnpm package:smoke
+pnpm package:compat
 pnpm typecheck
 pnpm test
 pnpm lint
