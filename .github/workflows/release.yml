@@ -52,5 +52,5 @@ jobs:
       - name: Safe release verification
         run: pnpm release:check
 
-      - name: Publish with Changesets and npm provenance
-        run: pnpm exec changeset publish --provenance
+      - name: Publish with npm Trusted Publishing
+        run: npm publish ./packages/r3f-interactive-flow --access public
