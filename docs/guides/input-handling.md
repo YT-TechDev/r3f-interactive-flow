@@ -74,6 +74,21 @@ Because the hooks use the same controls as manual UI, the same rules apply:
 locks, active transitions, phase boundaries, provider cooldowns, and hook-local
 cooldowns can all prevent an input event from moving to another phase.
 
+## `preventDefault` follows accepted navigation
+
+`preventDefault` defaults to `true` on every input hook, but the hooks only
+call `preventDefault()` on a browser event after that event has produced an
+accepted flow navigation (or, for touch, on later events belonging to a
+gesture that already navigated). An input event that is rejected — by a
+threshold miss, a phase boundary, a manual lock, an active transition, a
+provider cooldown, a hook-local cooldown, an ignored region, or a native
+actionable control — leaves the browser's default behavior alone, so page
+scroll, native button/link activation, and text field editing keep working
+normally.
+
+Set `preventDefault: false` on a hook to let accepted navigation happen
+without suppressing the browser's default behavior at all.
+
 ## Wheel input
 
 Use wheel input for scroll-like phase navigation.
@@ -109,8 +124,17 @@ Useful options:
 - `ignore`: selectors for regions where wheel input should not drive flow
   navigation.
 - `enabled`: set to `false` to skip listener setup.
-- `preventDefault`: defaults to `true` for handled, non-ignored wheel events.
+- `preventDefault`: defaults to `true`. The hook only calls `preventDefault()`
+  after a wheel event has produced an accepted navigation; threshold misses,
+  boundaries, locks, transitions, cooldowns, and ignored or actionable targets
+  never suppress the native wheel event.
 - `axis`: use `"x"` instead of the default `"y"` for horizontal wheel input.
+
+`useWheelInput` also skips navigation for wheel events that target a native
+editable field (`input`, `textarea`, `select`, or a `contenteditable` region)
+or an actionable control (`button`, or `a` with an `href`), in addition to any
+selectors passed through `ignore`. These built-in targets keep their native
+wheel/scroll behavior without any extra configuration.
 
 ## Touch input
 
@@ -138,6 +162,19 @@ export function FlowInputLayer() {
 - A downward swipe farther than `threshold` calls `prev`.
 - A short movement at or within the threshold does nothing.
 
+A touch gesture starts at `touchstart` and is committed the first time a
+`touchmove` crosses `threshold` and the flow accepts the resulting navigation.
+Once a gesture is committed:
+
+- navigation happens exactly once for that gesture;
+- later `touchmove` events from the same gesture may still call
+  `preventDefault()` (when enabled) but never navigate again.
+
+If a gesture never produces a qualifying `touchmove` (a sparse or synthetic
+touch stream), `touchend` acts as a fallback and attempts navigation once
+using the start and end positions. `touchcancel`, and `touchend` on an
+uncommitted or ignored gesture, fully reset gesture state.
+
 Useful options:
 
 - `threshold`: minimum swipe distance required before the hook requests
@@ -147,19 +184,33 @@ Useful options:
 - `ignore`: selectors for regions where touch gestures should not drive flow
   navigation.
 - `enabled`: set to `false` to skip listener setup.
-- `preventDefault`: defaults to `true` for non-ignored touch move events.
+- `preventDefault`: defaults to `true`. The hook only calls `preventDefault()`
+  once a gesture has produced an accepted navigation (at the committing
+  `touchmove`, on later `touchmove` events in that same gesture, or at the
+  `touchend` fallback); short gestures, boundaries, locks, transitions,
+  cooldowns, and ignored or actionable gesture origins never suppress the
+  native touch event.
 - `axis`: use `"x"` instead of the default `"y"` for horizontal swipe input.
+
+`useTouchInput` also skips a gesture that starts on a native editable field
+(`input`, `textarea`, `select`, or a `contenteditable` region) or an
+actionable control (`button`, or `a` with an `href`), in addition to any
+selectors passed through `ignore`. A gesture that starts in one of these
+regions stays ignored for its whole lifetime, even if a later `touchmove`
+leaves the region.
 
 ## Ignore selectors for interactive regions
 
-Wheel and touch input support `ignore` selectors. Use them for DOM regions where
-native interaction should win: buttons, links, forms, scrollable panels, drawers,
-menus, and other controls.
+Wheel and touch input already skip native editable fields and actionable
+controls (`input`, `textarea`, `select`, `contenteditable` regions, `button`,
+and `a` with an `href`) without any configuration. Use `ignore` selectors for
+additional DOM regions where native interaction should win: scrollable panels,
+drawers, menus, and other custom controls.
 
 ```tsx
 import { useTouchInput, useWheelInput } from "r3f-interactive-flow";
 
-const inputIgnore = ["button", "a", "input", "textarea", "select", "[data-flow-ignore]"] as const;
+const inputIgnore = ["[data-flow-ignore]"] as const;
 
 export function FlowInputLayer() {
   useWheelInput({ ignore: inputIgnore });
@@ -224,13 +275,23 @@ Useful options:
 - `cooldown`: hook-local time in milliseconds after an accepted input-driven
   navigation. The default is `0`.
 - `enabled`: set to `false` to skip listener setup.
-- `preventDefault`: defaults to `true` for recognized next/previous keys.
+- `preventDefault`: defaults to `true`. The hook only calls `preventDefault()`
+  after a mapped key has produced an accepted navigation; unmapped keys,
+  repeated keys, typing targets, boundaries, locks, transitions, and cooldowns
+  never suppress the native keydown event.
 - `ignoreWhenTyping`: defaults to `true`, so keyboard events from inputs,
   textareas, selects, and contenteditable elements are ignored.
 
-Keyboard input ignores repeated `keydown` events from a held key. If focused
-buttons should keep their native Space behavior, omit Space from `keys.next` as
-shown above.
+Keyboard input ignores repeated `keydown` events from a held key.
+
+Space and Enter get extra protection: when the key is Space or Enter and the
+event target is (or is nested inside) a native actionable control — `button`,
+`a` with an `href`, `input`, `textarea`, or `select` — the hook does not
+navigate and does not call `preventDefault()`, even if Space or Enter is
+mapped to `next` or `prev`. This keeps native button and link activation
+working when Space is the default next key or when Enter is mapped
+explicitly. Space and Enter still navigate normally when mapped and the event
+target is not an actionable control.
 
 ## Thresholds and cooldowns
 
@@ -263,9 +324,18 @@ Navigation does not happen when:
 - provider cooldown is still active;
 - the hook-local cooldown is still active;
 - wheel or touch movement does not pass the threshold;
-- the event starts from an ignored wheel or touch region;
+- the event starts from an ignored, editable, or actionable wheel or touch
+  region;
 - keyboard input comes from a typing target while `ignoreWhenTyping` is enabled;
+- a mapped Space or Enter key targets a native actionable control;
 - the request would move before the first phase or after the last phase.
+
+In every one of these cases the input hooks also leave `preventDefault()`
+uncalled, so the browser's native behavior for that event — page scroll,
+button/link activation, text editing — is unaffected. Only an event that
+actually produces an accepted navigation (or a later event in an
+already-accepted touch gesture) gets suppressed, and only when
+`preventDefault` is left at its default of `true`.
 
 Ignored input does not queue a future transition. Once the relevant lock,
 transition, boundary, or cooldown condition is gone, the user must provide a new

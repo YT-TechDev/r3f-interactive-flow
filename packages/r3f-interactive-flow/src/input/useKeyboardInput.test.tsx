@@ -407,8 +407,9 @@ describe("useKeyboardInput", () => {
     act(() => {
       latestControls?.lock();
     });
-    dispatchKeyDown("ArrowDown");
+    const lockedEvent = dispatchKeyDown("ArrowDown");
 
+    expect(lockedEvent.defaultPrevented).toBe(false);
     expect(latestControls?.phase).toBe("intro");
     expect(latestControls?.isLocked).toBe(true);
 
@@ -433,10 +434,210 @@ describe("useKeyboardInput", () => {
     );
 
     dispatchKeyDown("ArrowDown");
-    dispatchKeyDown("ArrowRight");
+    const transitioningEvent = dispatchKeyDown("ArrowRight");
 
+    expect(transitioningEvent.defaultPrevented).toBe(false);
     expect(latestControls?.phase).toBe("work");
     expect(latestControls?.isTransitioning).toBe(true);
+  });
+
+  it("does not navigate or prevent default for the first phase boundary", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    const event = dispatchKeyDown("ArrowUp");
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+  });
+
+  it("does not navigate or prevent default for the last phase boundary", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let machine: FlowMachine<TestPhase> | undefined;
+    let syncSnapshot: (() => void) | undefined;
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe
+          onRender={(renderedMachine, renderedSyncSnapshot) => {
+            machine = renderedMachine;
+            syncSnapshot = renderedSyncSnapshot;
+          }}
+        />
+      </>,
+      undefined,
+      { transitionDurationMs: 100, cooldownMs: 0 }
+    );
+
+    act(() => {
+      machine?.goTo("contact");
+      machine?.update(100);
+      syncSnapshot?.();
+    });
+
+    const event = dispatchKeyDown("ArrowDown");
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("contact");
+  });
+
+  it("does not navigate or prevent default for Space activation on a button", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    const button = document.createElement("button");
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    const event = dispatchKeyDown(" ", { target: button });
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+  });
+
+  it("does not navigate or prevent default for a mapped Enter key on a button", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    const button = document.createElement("button");
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ keys: { next: ["Enter"], prev: [] } }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    const event = dispatchKeyDown("Enter", { target: button });
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+  });
+
+  it("does not navigate or prevent default for a mapped Enter key on a link with href", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    const link = document.createElement("a");
+    link.setAttribute("href", "#");
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ keys: { next: ["Enter"], prev: [] } }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    const event = dispatchKeyDown("Enter", { target: link });
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+  });
+
+  it("protects native activation from a descendant of a button", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    const button = document.createElement("button");
+    const icon = document.createElement("span");
+    button.appendChild(icon);
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    const event = dispatchKeyDown(" ", { target: icon });
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+  });
+
+  it("protects native activation from a descendant of a link with href", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    const link = document.createElement("a");
+    link.setAttribute("href", "#");
+    const label = document.createElement("span");
+    link.appendChild(label);
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ keys: { next: ["Enter"], prev: [] } }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    const event = dispatchKeyDown("Enter", { target: label });
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+  });
+
+  it("still navigates and prevents default for default Space on a non-actionable target", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    const event = dispatchKeyDown(" ");
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
+  it("still navigates and prevents default for a mapped Enter key on a non-actionable target", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    const container = document.createElement("div");
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ keys: { next: ["Enter"], prev: [] } }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    const event = dispatchKeyDown("Enter", { target: container });
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
+  it("triggers exactly one accepted navigation per accepted keydown event", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let machine: FlowMachine<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe onRender={(renderedMachine) => (machine = renderedMachine)} />
+      </>
+    );
+
+    const nextSpy = machine ? vi.spyOn(machine, "next") : undefined;
+    dispatchKeyDown("ArrowDown");
+
+    expect(nextSpy).toHaveBeenCalledTimes(1);
+    expect(latestControls?.phase).toBe("work");
   });
 
   it("moves the keydown listener when the target changes", () => {
@@ -853,8 +1054,9 @@ describe("useKeyboardInput", () => {
     );
 
     dispatchKeyDown("ArrowDown");
-    dispatchKeyDown("ArrowRight");
+    const cooldownEvent = dispatchKeyDown("ArrowRight");
 
+    expect(cooldownEvent.defaultPrevented).toBe(false);
     expect(latestControls?.phase).toBe("work");
   });
 
@@ -874,18 +1076,21 @@ describe("useKeyboardInput", () => {
     act(() => {
       latestControls?.lock();
     });
-    dispatchKeyDown("ArrowDown");
+    const lockedEvent = dispatchKeyDown("ArrowDown");
 
     vi.setSystemTime(100);
     act(() => {
       latestControls?.unlock();
     });
-    dispatchKeyDown("ArrowDown", { repeat: true });
+    const repeatEvent = dispatchKeyDown("ArrowDown", { repeat: true });
 
     vi.setSystemTime(250);
-    dispatchKeyDown("ArrowDown", { target: input });
+    const typingEvent = dispatchKeyDown("ArrowDown", { target: input });
     dispatchKeyDown("ArrowDown");
 
+    expect(lockedEvent.defaultPrevented).toBe(false);
+    expect(repeatEvent.defaultPrevented).toBe(false);
+    expect(typingEvent.defaultPrevented).toBe(false);
     expect(latestControls?.phase).toBe("work");
     expect(latestControls?.direction).toBe("next");
     vi.useRealTimers();
@@ -1045,8 +1250,9 @@ describe("useKeyboardInput", () => {
     expect(latestControls?.phase).toBe("work");
     expect(latestControls?.isTransitioning).toBe(false);
 
-    dispatchKeyDown("ArrowDown");
+    const cooldownEvent = dispatchKeyDown("ArrowDown");
 
+    expect(cooldownEvent.defaultPrevented).toBe(false);
     expect(latestControls?.phase).toBe("work");
 
     act(() => {

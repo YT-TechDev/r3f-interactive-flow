@@ -3,7 +3,11 @@
 import { useContext, useEffect, useRef } from "react";
 import type { FlowControls, FlowMachine } from "../core/types";
 import { FlowContext, FlowMachineContext } from "../react/FlowContext";
-import { resolveInputTarget, shouldIgnoreInputEvent } from "./inputUtils";
+import {
+  isEditableOrActionableTarget,
+  resolveInputTarget,
+  shouldIgnoreInputEvent
+} from "./inputUtils";
 import type { FlowInputTarget } from "./inputUtils";
 import { navigateAndSyncIfAccepted } from "./navigationAcceptance";
 
@@ -53,6 +57,7 @@ export function useTouchInput<TPhase extends string>(options: UseTouchInputOptio
   const syncSnapshotRef = useRef(syncSnapshot);
   const startPositionRef = useRef<number | null>(null);
   const gestureIgnoredRef = useRef(false);
+  const gestureCommittedRef = useRef(false);
   const lastNavigationAtRef = useRef<number | null>(null);
   useEffect(() => {
     flowRef.current = typedFlow;
@@ -86,13 +91,49 @@ export function useTouchInput<TPhase extends string>(options: UseTouchInputOptio
     const resetTouch = (): void => {
       startPositionRef.current = null;
       gestureIgnoredRef.current = false;
+      gestureCommittedRef.current = false;
+    };
+
+    const attemptNavigation = (delta: number): boolean => {
+      const currentFlow = flowRef.current;
+
+      if (currentFlow.isLocked || currentFlow.isTransitioning) {
+        return false;
+      }
+
+      if (delta < -threshold && currentFlow.phaseIndex === 0) {
+        return false;
+      }
+
+      const now = Date.now();
+
+      if (lastNavigationAtRef.current !== null && now - lastNavigationAtRef.current < cooldown) {
+        return false;
+      }
+
+      const accepted = navigateAndSyncIfAccepted(
+        machineRef.current,
+        syncSnapshotRef.current,
+        delta > threshold ? "next" : "prev"
+      );
+
+      if (!accepted) {
+        return false;
+      }
+
+      lastNavigationAtRef.current = now;
+
+      return true;
     };
 
     const handleTouchStart: EventListener = (event): void => {
       const touchEvent = event as TouchEvent;
       const touch = touchEvent.touches[0];
 
-      gestureIgnoredRef.current = shouldIgnoreInputEvent(touchEvent, ignore);
+      gestureIgnoredRef.current =
+        shouldIgnoreInputEvent(touchEvent, ignore) ||
+        isEditableOrActionableTarget(touchEvent.target);
+      gestureCommittedRef.current = false;
 
       if (touch === undefined) {
         startPositionRef.current = null;
@@ -103,39 +144,58 @@ export function useTouchInput<TPhase extends string>(options: UseTouchInputOptio
     };
 
     const handleTouchMove: EventListener = (event): void => {
-      if (gestureIgnoredRef.current || shouldIgnoreInputEvent(event, ignore)) {
-        return;
-      }
-
-      if (preventDefault) {
-        event.preventDefault();
-      }
-    };
-
-    const handleTouchEnd: EventListener = (event): void => {
-      const startPosition = startPositionRef.current;
-      const gestureIgnored = gestureIgnoredRef.current || shouldIgnoreInputEvent(event, ignore);
-
-      if (startPosition === null) {
-        return;
-      }
-
-      resetTouch();
-
-      if (gestureIgnored) {
-        return;
-      }
-
       const touchEvent = event as TouchEvent;
-      const touch = touchEvent.changedTouches[0];
+
+      if (startPositionRef.current === null || gestureIgnoredRef.current) {
+        return;
+      }
+
+      if (gestureCommittedRef.current) {
+        if (preventDefault) {
+          touchEvent.preventDefault();
+        }
+
+        return;
+      }
+
+      const touch = touchEvent.touches[0];
 
       if (touch === undefined) {
         return;
       }
 
-      const currentFlow = flowRef.current;
+      const delta = startPositionRef.current - getTouchClientPosition(touch, axis);
 
-      if (currentFlow.isLocked || currentFlow.isTransitioning) {
+      if (delta <= threshold && delta >= -threshold) {
+        return;
+      }
+
+      if (!attemptNavigation(delta)) {
+        return;
+      }
+
+      gestureCommittedRef.current = true;
+
+      if (preventDefault) {
+        touchEvent.preventDefault();
+      }
+    };
+
+    const handleTouchEnd: EventListener = (event): void => {
+      const touchEvent = event as TouchEvent;
+      const startPosition = startPositionRef.current;
+      const gestureIgnored = gestureIgnoredRef.current;
+      const gestureCommitted = gestureCommittedRef.current;
+
+      resetTouch();
+
+      if (startPosition === null || gestureIgnored || gestureCommitted) {
+        return;
+      }
+
+      const touch = touchEvent.changedTouches[0];
+
+      if (touch === undefined) {
         return;
       }
 
@@ -145,24 +205,12 @@ export function useTouchInput<TPhase extends string>(options: UseTouchInputOptio
         return;
       }
 
-      if (delta < -threshold && currentFlow.phaseIndex === 0) {
+      if (!attemptNavigation(delta)) {
         return;
       }
 
-      const now = Date.now();
-
-      if (lastNavigationAtRef.current !== null && now - lastNavigationAtRef.current < cooldown) {
-        return;
-      }
-
-      const accepted = navigateAndSyncIfAccepted(
-        machineRef.current,
-        syncSnapshotRef.current,
-        delta > threshold ? "next" : "prev"
-      );
-
-      if (accepted) {
-        lastNavigationAtRef.current = now;
+      if (preventDefault) {
+        touchEvent.preventDefault();
       }
     };
 
@@ -172,7 +220,7 @@ export function useTouchInput<TPhase extends string>(options: UseTouchInputOptio
     eventTarget.addEventListener("touchmove", handleTouchMove, {
       passive: false
     });
-    eventTarget.addEventListener("touchend", handleTouchEnd, { passive: true });
+    eventTarget.addEventListener("touchend", handleTouchEnd, { passive: false });
     eventTarget.addEventListener("touchcancel", resetTouch, { passive: true });
 
     return () => {

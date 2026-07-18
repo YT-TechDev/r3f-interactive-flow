@@ -141,9 +141,11 @@ describe("useWheelInput", () => {
       "work"
     );
 
-    dispatchWheel(40);
-    dispatchWheel(-40);
+    const upEvent = dispatchWheel(40);
+    const downEvent = dispatchWheel(-40);
 
+    expect(upEvent.defaultPrevented).toBe(false);
+    expect(downEvent.defaultPrevented).toBe(false);
     expect(latestControls?.phase).toBe("work");
     expect(latestControls?.direction).toBe("none");
   });
@@ -297,20 +299,161 @@ describe("useWheelInput", () => {
     expect(latestControls?.direction).toBe("none");
   });
 
-  it("defaults preventDefault to true", () => {
-    renderFlow(<WheelInputProbe />);
+  it("defaults preventDefault to true for accepted next navigation", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
 
-    const event = dispatchWheel(0);
+    renderFlow(
+      <>
+        <WheelInputProbe />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    const event = dispatchWheel(41);
 
     expect(event.defaultPrevented).toBe(true);
+    expect(latestControls?.phase).toBe("work");
   });
 
-  it("does not call preventDefault when preventDefault is false", () => {
-    renderFlow(<WheelInputProbe options={{ preventDefault: false }} />);
+  it("defaults preventDefault to true for accepted prev navigation", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
 
-    const event = dispatchWheel(0);
+    renderFlow(
+      <>
+        <WheelInputProbe />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>,
+      "work"
+    );
+
+    const event = dispatchWheel(-41);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(latestControls?.phase).toBe("intro");
+  });
+
+  it("does not call preventDefault for accepted navigation when preventDefault is false", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ preventDefault: false }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    const event = dispatchWheel(41);
 
     expect(event.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("work");
+  });
+
+  it("does not call preventDefault when the wheel delta misses the threshold", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    const event = dispatchWheel(40);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("intro");
+  });
+
+  it("does not call preventDefault for rejected first-boundary wheel input", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    const event = dispatchWheel(-41);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("intro");
+  });
+
+  it("does not call preventDefault for rejected last-boundary wheel input", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let machine: FlowMachine<TestPhase> | undefined;
+    let syncSnapshot: (() => void) | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe
+          onRender={(renderedMachine, renderedSyncSnapshot) => {
+            machine = renderedMachine;
+            syncSnapshot = renderedSyncSnapshot;
+          }}
+        />
+      </>,
+      undefined,
+      { transitionDurationMs: 100, cooldownMs: 0 }
+    );
+
+    act(() => {
+      machine?.goTo("contact");
+      machine?.update(100);
+      syncSnapshot?.();
+    });
+
+    const event = dispatchWheel(41);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("contact");
+  });
+
+  it("does not call preventDefault for wheel events targeting an actionable or editable control", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    const button = document.createElement("button");
+    const input = document.createElement("input");
+
+    renderFlow(
+      <>
+        <WheelInputProbe />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    const buttonEvent = dispatchWheel(41, windowTarget, {
+      target: button as unknown as EventTarget
+    });
+    const inputEvent = dispatchWheel(41, windowTarget, {
+      target: input as unknown as EventTarget
+    });
+
+    expect(buttonEvent.defaultPrevented).toBe(false);
+    expect(inputEvent.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+  });
+
+  it("triggers exactly one accepted navigation per accepted wheel event", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let machine: FlowMachine<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe onRender={(renderedMachine) => (machine = renderedMachine)} />
+      </>
+    );
+
+    const nextSpy = machine ? vi.spyOn(machine, "next") : undefined;
+    dispatchWheel(41);
+
+    expect(nextSpy).toHaveBeenCalledTimes(1);
+    expect(latestControls?.phase).toBe("work");
   });
 
   it("does not navigate when the flow is locked", () => {
@@ -326,8 +469,9 @@ describe("useWheelInput", () => {
     act(() => {
       latestControls?.lock();
     });
-    dispatchWheel(41);
+    const lockedEvent = dispatchWheel(41);
 
+    expect(lockedEvent.defaultPrevented).toBe(false);
     expect(latestControls?.phase).toBe("intro");
     expect(latestControls?.isLocked).toBe(true);
 
@@ -352,8 +496,9 @@ describe("useWheelInput", () => {
     );
 
     dispatchWheel(41);
-    dispatchWheel(41);
+    const transitioningEvent = dispatchWheel(41);
 
+    expect(transitioningEvent.defaultPrevented).toBe(false);
     expect(latestControls?.phase).toBe("work");
     expect(latestControls?.isTransitioning).toBe(true);
   });
@@ -732,8 +877,9 @@ describe("useWheelInput", () => {
     });
 
     vi.setSystemTime(250);
-    dispatchWheel(41);
+    const cooldownEvent = dispatchWheel(41);
 
+    expect(cooldownEvent.defaultPrevented).toBe(false);
     expect(latestControls?.phase).toBe("intro");
 
     vi.setSystemTime(500);
@@ -931,8 +1077,9 @@ describe("useWheelInput", () => {
     expect(latestControls?.phase).toBe("work");
     expect(latestControls?.isTransitioning).toBe(false);
 
-    dispatchWheel(41);
+    const cooldownEvent = dispatchWheel(41);
 
+    expect(cooldownEvent.defaultPrevented).toBe(false);
     expect(latestControls?.phase).toBe("work");
 
     act(() => {

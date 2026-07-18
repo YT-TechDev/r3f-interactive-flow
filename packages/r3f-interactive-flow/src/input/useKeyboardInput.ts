@@ -3,7 +3,7 @@
 import { useContext, useEffect, useRef } from "react";
 import type { FlowControls, FlowMachine } from "../core/types";
 import { FlowContext, FlowMachineContext } from "../react/FlowContext";
-import { resolveInputTarget } from "./inputUtils";
+import { isEditableOrActionableTarget, resolveInputTarget } from "./inputUtils";
 import type { FlowInputTarget } from "./inputUtils";
 import { navigateAndSyncIfAccepted } from "./navigationAcceptance";
 
@@ -122,8 +122,10 @@ export function useKeyboardInput<TPhase extends string>(
         return;
       }
 
-      if (preventDefault) {
-        keyboardEvent.preventDefault();
+      const isActivationKey = keyboardEvent.key === " " || keyboardEvent.key === "Enter";
+
+      if (isActivationKey && isEditableOrActionableTarget(keyboardEvent.target)) {
+        return;
       }
 
       const currentFlow = flowRef.current;
@@ -148,8 +150,14 @@ export function useKeyboardInput<TPhase extends string>(
         isNextKey ? "next" : "prev"
       );
 
-      if (accepted) {
-        lastNavigationAtRef.current = now;
+      if (!accepted) {
+        return;
+      }
+
+      lastNavigationAtRef.current = now;
+
+      if (preventDefault) {
+        keyboardEvent.preventDefault();
       }
     };
 

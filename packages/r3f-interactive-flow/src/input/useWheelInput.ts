@@ -3,7 +3,11 @@
 import { useContext, useEffect, useRef } from "react";
 import type { FlowControls, FlowMachine } from "../core/types";
 import { FlowContext, FlowMachineContext } from "../react/FlowContext";
-import { resolveInputTarget, shouldIgnoreInputEvent } from "./inputUtils";
+import {
+  isEditableOrActionableTarget,
+  resolveInputTarget,
+  shouldIgnoreInputEvent
+} from "./inputUtils";
 import type { FlowInputTarget } from "./inputUtils";
 import { navigateAndSyncIfAccepted } from "./navigationAcceptance";
 
@@ -86,23 +90,22 @@ export function useWheelInput<TPhase extends string>(options: UseWheelInputOptio
     const handleWheel: EventListener = (event): void => {
       const wheelEvent = event as WheelEvent;
 
-      if (shouldIgnoreInputEvent(wheelEvent, ignore)) {
-        return;
-      }
-
-      if (preventDefault) {
-        wheelEvent.preventDefault();
-      }
-
-      const currentFlow = flowRef.current;
-
-      if (currentFlow.isLocked || currentFlow.isTransitioning) {
+      if (
+        shouldIgnoreInputEvent(wheelEvent, ignore) ||
+        isEditableOrActionableTarget(wheelEvent.target)
+      ) {
         return;
       }
 
       const delta = getWheelDelta(wheelEvent, axis);
 
       if (delta <= threshold && delta >= -threshold) {
+        return;
+      }
+
+      const currentFlow = flowRef.current;
+
+      if (currentFlow.isLocked || currentFlow.isTransitioning) {
         return;
       }
 
@@ -122,8 +125,14 @@ export function useWheelInput<TPhase extends string>(options: UseWheelInputOptio
         delta > threshold ? "next" : "prev"
       );
 
-      if (accepted) {
-        lastNavigationAtRef.current = now;
+      if (!accepted) {
+        return;
+      }
+
+      lastNavigationAtRef.current = now;
+
+      if (preventDefault) {
+        wheelEvent.preventDefault();
       }
     };
 
