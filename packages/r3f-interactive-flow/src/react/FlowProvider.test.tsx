@@ -278,6 +278,32 @@ function renderFlow(
   });
 }
 
+function renderInlineFlow({
+  children,
+  initialPhase,
+  providerKey,
+  transitionDurationMs,
+  cooldownMs,
+  easing,
+  transition
+}: Omit<FlowProviderProps<TestPhase>, "phases"> & { providerKey?: string }): void {
+  act(() => {
+    root?.render(
+      <FlowProvider
+        key={providerKey}
+        phases={["intro", "work", "contact"]}
+        {...(initialPhase !== undefined ? { initialPhase } : {})}
+        {...(transitionDurationMs !== undefined ? { transitionDurationMs } : {})}
+        {...(cooldownMs !== undefined ? { cooldownMs } : {})}
+        {...(easing !== undefined ? { easing } : {})}
+        {...(transition !== undefined ? { transition } : {})}
+      >
+        {children}
+      </FlowProvider>
+    );
+  });
+}
+
 function getRenderedSnapshot(): RenderedSnapshot {
   return JSON.parse(container.textContent) as RenderedSnapshot;
 }
@@ -1322,16 +1348,33 @@ describe("FlowProvider provider-owned transition clock", () => {
 
   it("does not create duplicate clocks under React Strict Mode setup and cleanup", () => {
     let latestControls: FlowControls<TestPhase> | undefined;
+    const machineContexts: NonNullable<React.ContextType<typeof FlowMachineContext>>[] = [];
 
     act(() => {
       root?.render(
         <React.StrictMode>
           <FlowProvider phases={phases} transition={{ duration: 1000 }}>
             <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+            <MachineProbe onRender={(value) => machineContexts.push(value)} />
           </FlowProvider>
         </React.StrictMode>
       );
     });
+
+    const committedContext = machineContexts.at(-1);
+
+    act(() => {
+      root?.render(
+        <React.StrictMode>
+          <FlowProvider phases={[...phases]} transition={{ duration: 1000 }}>
+            <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+            <MachineProbe onRender={(value) => machineContexts.push(value)} />
+          </FlowProvider>
+        </React.StrictMode>
+      );
+    });
+
+    expect(machineContexts.at(-1)).toBe(committedContext);
 
     act(() => {
       latestControls?.next();
@@ -1351,36 +1394,179 @@ describe("FlowProvider provider-owned transition clock", () => {
     expect(pendingFrameCount()).toBe(0);
   });
 
-  it("stops the old clock when the machine is replaced by a configuration change", () => {
+  it("preserves state and one clock across equivalent inline configuration renders", () => {
     let latestControls: FlowControls<TestPhase> | undefined;
+    let context: NonNullable<React.ContextType<typeof FlowMachineContext>> | undefined;
+    const easing = (progress: number) => progress;
+    const children = (
+      <>
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe onRender={(value) => (context = value)} />
+      </>
+    );
 
-    renderFlow(<ControlsProbe onRender={(controls) => (latestControls = controls)} />, undefined, {
-      transitionDurationMs: 1000
+    renderInlineFlow({
+      children,
+      transition: { duration: 1000, easing }
     });
 
     act(() => {
       latestControls?.next();
     });
+    advanceClock(16);
+    advanceClock(250);
+    act(() => {
+      latestControls?.lock();
+    });
 
+    const initialMachine = context?.machine;
+    const initialContext = context;
+    const inFlightSnapshot = { ...latestControls };
     expect(pendingFrameCount()).toBe(1);
 
-    // Changing timing props replaces the machine; the old clock must not survive.
-    renderFlow(<ControlsProbe onRender={(controls) => (latestControls = controls)} />, undefined, {
+    renderInlineFlow({
+      children,
+      transition: { duration: 1000, easing }
+    });
+
+    expect(context?.machine).toBe(initialMachine);
+    expect(context).toBe(initialContext);
+    expect(latestControls).toMatchObject({
+      phase: inFlightSnapshot.phase,
+      phaseIndex: inFlightSnapshot.phaseIndex,
+      progress: inFlightSnapshot.progress,
+      direction: inFlightSnapshot.direction,
+      isTransitioning: inFlightSnapshot.isTransitioning,
+      isLocked: true
+    });
+    expect(pendingFrameCount()).toBe(1);
+  });
+
+  it("preserves provider cooldown across equivalent inline configuration renders", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderInlineFlow({
+      children: <ControlsProbe onRender={(controls) => (latestControls = controls)} />,
+      transition: { duration: 100, cooldown: 300 }
+    });
+
+    act(() => {
+      latestControls?.next();
+    });
+    advanceClock(16);
+    advanceClock(100);
+    advanceClock(150);
+
+    renderInlineFlow({
+      children: <ControlsProbe onRender={(controls) => (latestControls = controls)} />,
+      transition: { duration: 100, cooldown: 300 }
+    });
+
+    act(() => {
+      latestControls?.next();
+    });
+    expect(latestControls).toMatchObject({ phase: "work", isTransitioning: false });
+    expect(pendingFrameCount()).toBe(1);
+
+    advanceClock(149);
+    act(() => {
+      latestControls?.next();
+    });
+    expect(latestControls).toMatchObject({ phase: "work", isTransitioning: false });
+
+    advanceClock(1);
+    expect(pendingFrameCount()).toBe(0);
+    act(() => {
+      latestControls?.next();
+    });
+    expect(latestControls).toMatchObject({ phase: "contact", isTransitioning: true });
+  });
+
+  it("ignores material timing changes without a remount", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let context: NonNullable<React.ContextType<typeof FlowMachineContext>> | undefined;
+    const children = (
+      <>
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe onRender={(value) => (context = value)} />
+      </>
+    );
+
+    renderInlineFlow({ children, transitionDurationMs: 1000 });
+
+    act(() => {
+      latestControls?.next();
+    });
+    advanceClock(16);
+    advanceClock(250);
+
+    const machine = context?.machine;
+    const progress = latestControls?.progress;
+
+    renderInlineFlow({ children, transitionDurationMs: 500 });
+
+    expect(context?.machine).toBe(machine);
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      progress,
+      isTransitioning: true
+    });
+
+    advanceClock(250);
+    expect(latestControls?.progress).toBe(0.5);
+  });
+
+  it("remounts with a new machine and cancels old clock when the provider key changes", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let context: NonNullable<React.ContextType<typeof FlowMachineContext>> | undefined;
+    const children = (
+      <>
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe onRender={(value) => (context = value)} />
+      </>
+    );
+
+    renderInlineFlow({ providerKey: "v1", children, transitionDurationMs: 1000 });
+
+    act(() => {
+      latestControls?.next();
+      latestControls?.lock();
+    });
+    advanceClock(16);
+    advanceClock(250);
+
+    const oldMachine = context?.machine;
+    expect(pendingFrameCount()).toBe(1);
+
+    renderInlineFlow({
+      providerKey: "v2",
+      children,
+      initialPhase: "contact",
       transitionDurationMs: 500
     });
 
+    expect(context?.machine).not.toBe(oldMachine);
     expect(pendingFrameCount()).toBe(0);
     expect(latestControls).toMatchObject({
-      phase: "intro",
-      phaseIndex: 0,
+      phase: "contact",
+      phaseIndex: 2,
       progress: 0,
-      isTransitioning: false
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
     });
 
-    // Advancing frames does not resurrect an old clock or throw.
+    act(() => {
+      latestControls?.prev();
+    });
     advanceClock(16);
-    advanceClock(1000);
+    advanceClock(250);
 
-    expect(pendingFrameCount()).toBe(0);
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      progress: 0.5,
+      direction: "prev",
+      isTransitioning: true
+    });
   });
 });

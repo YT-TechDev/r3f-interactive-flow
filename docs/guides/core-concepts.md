@@ -57,9 +57,17 @@ change between renders. A stable list is what makes the flow predictable:
 - **Bounds are well-defined.** The machine knows the first and last phase, so it
   can safely ignore out-of-bounds navigation.
 
-Define the tuple at module scope, or memoize it if it is derived at runtime.
-Rebuilding the array on every render works against the machine and can cause
-unnecessary resets.
+Define the tuple at module scope, or memoize it if it is derived at runtime. A mounted `FlowProvider` reads its phases and transition configuration once, when that provider instance mounts, so an ordinary parent rerender with a fresh but equivalent array or object preserves the current phase, progress, lock, transition, and cooldown state. Hoisting the tuple is still recommended for TypeScript inference, readability, and maintaining a clear phase type, not because equivalent rerenders reset the machine.
+
+Changing configuration props alone does not reconfigure an already mounted provider. To intentionally reset the flow or apply new phases, timing, cooldown, or easing, change the provider element's React `key` so React unmounts the old provider and mounts a new one:
+
+```tsx
+<FlowProvider key={flowConfigurationVersion} phases={phases} transition={transition}>
+  <Experience />
+</FlowProvider>
+```
+
+`key` is React's remount mechanism; it is not a `FlowProvider` API prop.
 
 ## Phase index
 

@@ -28,7 +28,7 @@ export function createControlsProbe<TPhase extends string>() {
 type RenderFlowOptions<TPhase extends string> = Pick<
   FlowProviderProps<TPhase>,
   "transitionDurationMs" | "cooldownMs" | "easing" | "transition"
->;
+> & { providerKey?: string };
 
 export function createFlowTestHarness<TPhase extends string>({
   createRoot,
@@ -65,11 +65,14 @@ export function createFlowTestHarness<TPhase extends string>({
       options: RenderFlowOptions<TPhase> = {}
     ): void {
       act(() => {
+        const { providerKey, ...providerOptions } = options;
+
         root?.render(
           <FlowProvider
+            key={providerKey}
             phases={phases}
             {...(initialPhase !== undefined ? { initialPhase } : {})}
-            {...options}
+            {...providerOptions}
           >
             {children}
           </FlowProvider>
