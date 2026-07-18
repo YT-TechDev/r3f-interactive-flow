@@ -11,16 +11,22 @@ import { useWheelInput } from "./useWheelInput";
 import type { UseWheelInputOptions } from "./useWheelInput";
 
 class MinimalWheelEvent {
+  static readonly DOM_DELTA_PIXEL = 0;
+  static readonly DOM_DELTA_LINE = 1;
+  static readonly DOM_DELTA_PAGE = 2;
+
   defaultPrevented = false;
   target: EventTarget | MinimalEventTarget | null = null;
   readonly type: string;
   readonly deltaX: number;
   readonly deltaY: number;
+  readonly deltaMode: number;
 
   constructor(type: string, eventInitDict: WheelEventInit = {}) {
     this.type = type;
     this.deltaX = eventInitDict.deltaX ?? 0;
     this.deltaY = eventInitDict.deltaY ?? 0;
+    this.deltaMode = eventInitDict.deltaMode ?? MinimalWheelEvent.DOM_DELTA_PIXEL;
   }
 
   preventDefault(): void {
@@ -130,6 +136,67 @@ describe("useWheelInput", () => {
     expect(latestControls?.direction).toBe("prev");
   });
 
+  it("normalizes pixel, line, page, and unknown wheel delta modes before threshold checks", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchWheel(41, windowTarget, { deltaMode: WheelEvent.DOM_DELTA_PIXEL });
+    expect(latestControls?.phase).toBe("work");
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>,
+      "work"
+    );
+
+    dispatchWheel(3, windowTarget, { deltaMode: WheelEvent.DOM_DELTA_LINE });
+    expect(latestControls?.phase).toBe("contact");
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ threshold: 799 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchWheel(1, windowTarget, { deltaMode: WheelEvent.DOM_DELTA_PAGE });
+    expect(latestControls?.phase).toBe("work");
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchWheel(41, windowTarget, { deltaMode: 99 });
+    expect(latestControls?.phase).toBe("work");
+  });
+
+  it("normalizes horizontal wheel input on the x axis", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ axis: "x", threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchWheel(0, windowTarget, { deltaX: 3, deltaMode: WheelEvent.DOM_DELTA_LINE });
+
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
   it("ignores wheel deltas inside the threshold", () => {
     let latestControls: FlowControls<TestPhase> | undefined;
 
@@ -148,6 +215,82 @@ describe("useWheelInput", () => {
     expect(downEvent.defaultPrevented).toBe(false);
     expect(latestControls?.phase).toBe("work");
     expect(latestControls?.direction).toBe("none");
+  });
+
+  it("accumulates same-direction fragments and only prevents the accepted threshold-crossing event", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    const first = dispatchWheel(10);
+    const second = dispatchWheel(15);
+    const third = dispatchWheel(16);
+
+    expect(first.defaultPrevented).toBe(false);
+    expect(second.defaultPrevented).toBe(false);
+    expect(third.defaultPrevented).toBe(true);
+    expect(latestControls?.phase).toBe("work");
+  });
+
+  it("keeps accumulated accepted navigation unprevented when preventDefault is false", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ threshold: 40, preventDefault: false }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    const first = dispatchWheel(20);
+    const second = dispatchWheel(21);
+
+    expect(first.defaultPrevented).toBe(false);
+    expect(second.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("work");
+  });
+
+  it("treats accumulated values exactly equal to the threshold as below trigger", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    const exactThreshold = dispatchWheel(15);
+    dispatchWheel(25);
+
+    expect(exactThreshold.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("intro");
+
+    dispatchWheel(1);
+
+    expect(latestControls?.phase).toBe("work");
+  });
+
+  it("discards overflow after a threshold crossing attempt", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>,
+      "work"
+    );
+
+    dispatchWheel(-100);
+    dispatchWheel(1);
+
+    expect(latestControls?.phase).toBe("intro");
   });
 
   it("allows a threshold of 0", () => {
@@ -1048,6 +1191,8 @@ describe("useWheelInput", () => {
   });
 
   it("does not navigate through wheel input while the flow transition cooldown is active", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
     let latestControls: FlowControls<TestPhase> | undefined;
     let machine: FlowMachine<TestPhase> | undefined;
     let syncSnapshot: (() => void) | undefined;
@@ -1087,10 +1232,180 @@ describe("useWheelInput", () => {
       syncSnapshot?.();
     });
 
+    vi.setSystemTime(201);
     dispatchWheel(41);
 
     expect(latestControls?.phase).toBe("contact");
     expect(latestControls?.direction).toBe("next");
+    vi.useRealTimers();
+  });
+
+  it("uses a reversing event as the first delta of a new burst", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>,
+      "work"
+    );
+
+    dispatchWheel(30);
+    dispatchWheel(-41);
+
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("prev");
+  });
+
+  it("allows at most one accepted navigation in a same-direction wheel burst", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ threshold: 40, cooldown: 0 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>,
+      undefined,
+      { transitionDurationMs: 1, cooldownMs: 0 }
+    );
+
+    const accepted = dispatchWheel(41);
+    const momentum = dispatchWheel(41);
+
+    expect(accepted.defaultPrevented).toBe(true);
+    expect(momentum.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("work");
+  });
+
+  it("starts a new wheel burst after inactivity", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let machine: FlowMachine<TestPhase> | undefined;
+    let syncSnapshot: (() => void) | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ threshold: 40, cooldown: 0 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe
+          onRender={(renderedMachine, renderedSyncSnapshot) => {
+            machine = renderedMachine;
+            syncSnapshot = renderedSyncSnapshot;
+          }}
+        />
+      </>,
+      undefined,
+      { transitionDurationMs: 1, cooldownMs: 0 }
+    );
+
+    dispatchWheel(41);
+    act(() => {
+      machine?.update(1);
+      syncSnapshot?.();
+    });
+    vi.setSystemTime(201);
+    dispatchWheel(41);
+
+    expect(latestControls?.phase).toBe("contact");
+    vi.useRealTimers();
+  });
+
+  it("clears stale accumulation when the wheel event target changes", () => {
+    const firstTarget = document.createElement("div");
+    const secondTarget = document.createElement("div");
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchWheel(30, windowTarget, { target: firstTarget as unknown as EventTarget });
+    dispatchWheel(11, windowTarget, { target: secondTarget as unknown as EventTarget });
+
+    expect(latestControls?.phase).toBe("intro");
+
+    dispatchWheel(30, windowTarget, { target: secondTarget as unknown as EventTarget });
+
+    expect(latestControls?.phase).toBe("work");
+  });
+
+  it("clears stale accumulation after ignored or actionable targets", () => {
+    const ignored = document.createElement("div");
+    ignored.setAttribute("class", "ignore-wheel");
+    const button = document.createElement("button");
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ threshold: 40, ignore: [".ignore-wheel"] }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchWheel(30);
+    dispatchWheel(41, windowTarget, { target: ignored as unknown as EventTarget });
+    dispatchWheel(11);
+
+    expect(latestControls?.phase).toBe("intro");
+
+    dispatchWheel(5);
+    dispatchWheel(41, windowTarget, { target: button as unknown as EventTarget });
+    dispatchWheel(11);
+
+    expect(latestControls?.phase).toBe("intro");
+  });
+
+  it("clears rejected threshold-crossing accumulation without preventing default", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchWheel(-30);
+    const rejected = dispatchWheel(-11);
+    dispatchWheel(1);
+
+    expect(rejected.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("intro");
+  });
+
+  it("does not retain pending accumulation across effect replacement or target changes", () => {
+    const firstTarget = document.createElement("div") as unknown as MinimalElement;
+    const secondTarget = document.createElement("div") as unknown as MinimalElement;
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe
+          options={{ target: firstTarget as unknown as HTMLElement, threshold: 40 }}
+        />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchWheel(30, firstTarget);
+
+    renderFlow(
+      <>
+        <WheelInputProbe
+          options={{ target: secondTarget as unknown as HTMLElement, threshold: 40 }}
+        />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchWheel(11, secondTarget);
+
+    expect(latestControls?.phase).toBe("intro");
   });
 
   it("removes the listener from the old target when the target changes", () => {
