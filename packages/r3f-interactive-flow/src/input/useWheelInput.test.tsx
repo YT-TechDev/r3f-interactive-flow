@@ -1259,23 +1259,85 @@ describe("useWheelInput", () => {
   });
 
   it("allows at most one accepted navigation in a same-direction wheel burst", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
     let latestControls: FlowControls<TestPhase> | undefined;
+    let machine: FlowMachine<TestPhase> | undefined;
+    let syncSnapshot: (() => void) | undefined;
 
     renderFlow(
       <>
         <WheelInputProbe options={{ threshold: 40, cooldown: 0 }} />
         <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe
+          onRender={(renderedMachine, renderedSyncSnapshot) => {
+            machine = renderedMachine;
+            syncSnapshot = renderedSyncSnapshot;
+          }}
+        />
       </>,
       undefined,
       { transitionDurationMs: 1, cooldownMs: 0 }
     );
 
     const accepted = dispatchWheel(41);
+    act(() => {
+      machine?.update(1);
+      syncSnapshot?.();
+    });
+    vi.setSystemTime(100);
     const momentum = dispatchWheel(41);
 
     expect(accepted.defaultPrevented).toBe(true);
     expect(momentum.defaultPrevented).toBe(false);
     expect(latestControls?.phase).toBe("work");
+    vi.useRealTimers();
+  });
+
+  it("preserves consumed wheel burst state across semantically equivalent inline ignore options", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let machine: FlowMachine<TestPhase> | undefined;
+    let syncSnapshot: (() => void) | undefined;
+
+    function InlineIgnoreWheelInputProbe() {
+      useWheelInput<TestPhase>({
+        threshold: 40,
+        cooldown: 0,
+        ignore: ["[data-flow-ignore]"]
+      });
+
+      return null;
+    }
+
+    renderFlow(
+      <>
+        <InlineIgnoreWheelInputProbe />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe
+          onRender={(renderedMachine, renderedSyncSnapshot) => {
+            machine = renderedMachine;
+            syncSnapshot = renderedSyncSnapshot;
+          }}
+        />
+      </>,
+      undefined,
+      { transitionDurationMs: 1, cooldownMs: 0 }
+    );
+
+    const accepted = dispatchWheel(41);
+    act(() => {
+      machine?.update(1);
+      syncSnapshot?.();
+    });
+    vi.setSystemTime(100);
+    const momentum = dispatchWheel(41);
+
+    expect(accepted.defaultPrevented).toBe(true);
+    expect(momentum.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("work");
+    vi.useRealTimers();
   });
 
   it("starts a new wheel burst after inactivity", () => {

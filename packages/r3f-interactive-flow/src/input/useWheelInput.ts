@@ -76,7 +76,28 @@ export function useWheelInput<TPhase extends string>(options: UseWheelInputOptio
   const machineRef = useRef(machine);
   const syncSnapshotRef = useRef(syncSnapshot);
   const lastNavigationAtRef = useRef<number | null>(null);
+  const accumulatedDeltaRef = useRef(0);
+  const lastRelevantEventAtRef = useRef<number | null>(null);
+  const lastEventTargetRef = useRef<EventTarget | null>(null);
+  const hasLastEventTargetRef = useRef(false);
+  const hasConsumedBurstRef = useRef(false);
+  const activeBurstDirectionRef = useRef<"next" | "prev" | null>(null);
+  const ignoreSignature = JSON.stringify(options.ignore ?? []);
+
+  const resetBurst = (): void => {
+    accumulatedDeltaRef.current = 0;
+    lastRelevantEventAtRef.current = null;
+    lastEventTargetRef.current = null;
+    hasLastEventTargetRef.current = false;
+    hasConsumedBurstRef.current = false;
+    activeBurstDirectionRef.current = null;
+  };
+
   useEffect(() => {
+    if (machineRef.current !== machine) {
+      resetBurst();
+    }
+
     flowRef.current = typedFlow;
     machineRef.current = machine;
     syncSnapshotRef.current = syncSnapshot;
@@ -84,6 +105,7 @@ export function useWheelInput<TPhase extends string>(options: UseWheelInputOptio
 
   useEffect(() => {
     if (options.enabled === false) {
+      resetBurst();
       return;
     }
 
@@ -104,22 +126,7 @@ export function useWheelInput<TPhase extends string>(options: UseWheelInputOptio
     const preventDefault = options.preventDefault ?? true;
     validateCooldown(cooldown);
     validateThreshold(threshold);
-
-    let accumulatedDelta = 0;
-    let lastRelevantEventAt: number | null = null;
-    let lastEventTarget: EventTarget | null = null;
-    let hasLastEventTarget = false;
-    let hasConsumedBurst = false;
-    let activeBurstDirection: "next" | "prev" | null = null;
-
-    const resetBurst = (): void => {
-      accumulatedDelta = 0;
-      lastRelevantEventAt = null;
-      lastEventTarget = null;
-      hasLastEventTarget = false;
-      hasConsumedBurst = false;
-      activeBurstDirection = null;
-    };
+    resetBurst();
 
     const handleWheel: EventListener = (event): void => {
       const wheelEvent = event as WheelEvent;
@@ -142,35 +149,41 @@ export function useWheelInput<TPhase extends string>(options: UseWheelInputOptio
       const direction = delta > 0 ? "next" : "prev";
       const eventTarget = wheelEvent.target;
 
-      if (lastRelevantEventAt !== null && now - lastRelevantEventAt > WHEEL_BURST_INACTIVITY_MS) {
+      if (
+        lastRelevantEventAtRef.current !== null &&
+        now - lastRelevantEventAtRef.current > WHEEL_BURST_INACTIVITY_MS
+      ) {
         resetBurst();
       }
 
-      if (hasLastEventTarget && eventTarget !== lastEventTarget) {
+      if (hasLastEventTargetRef.current && eventTarget !== lastEventTargetRef.current) {
         resetBurst();
       }
 
-      if (activeBurstDirection !== null && direction !== activeBurstDirection) {
+      if (
+        activeBurstDirectionRef.current !== null &&
+        direction !== activeBurstDirectionRef.current
+      ) {
         resetBurst();
       }
 
-      lastRelevantEventAt = now;
-      lastEventTarget = eventTarget;
-      hasLastEventTarget = true;
-      activeBurstDirection = direction;
+      lastRelevantEventAtRef.current = now;
+      lastEventTargetRef.current = eventTarget;
+      hasLastEventTargetRef.current = true;
+      activeBurstDirectionRef.current = direction;
 
-      if (hasConsumedBurst) {
+      if (hasConsumedBurstRef.current) {
         return;
       }
 
-      accumulatedDelta += delta;
+      accumulatedDeltaRef.current += delta;
 
-      if (accumulatedDelta <= threshold && accumulatedDelta >= -threshold) {
+      if (accumulatedDeltaRef.current <= threshold && accumulatedDeltaRef.current >= -threshold) {
         return;
       }
 
-      const navigationDirection = accumulatedDelta > threshold ? "next" : "prev";
-      accumulatedDelta = 0;
+      const navigationDirection = accumulatedDeltaRef.current > threshold ? "next" : "prev";
+      accumulatedDeltaRef.current = 0;
       const currentFlow = flowRef.current;
 
       if (currentFlow.isLocked || currentFlow.isTransitioning) {
@@ -196,7 +209,7 @@ export function useWheelInput<TPhase extends string>(options: UseWheelInputOptio
       }
 
       lastNavigationAtRef.current = now;
-      hasConsumedBurst = true;
+      hasConsumedBurstRef.current = true;
 
       if (preventDefault) {
         wheelEvent.preventDefault();
@@ -207,15 +220,15 @@ export function useWheelInput<TPhase extends string>(options: UseWheelInputOptio
 
     return () => {
       eventTarget.removeEventListener("wheel", handleWheel);
+      resetBurst();
     };
   }, [
     options.axis,
     options.cooldown,
     options.enabled,
-    options.ignore,
+    ignoreSignature,
     options.preventDefault,
     options.target,
-    options.threshold,
-    machineContext
+    options.threshold
   ]);
 }
