@@ -120,7 +120,7 @@ describe("createFlowMachine lock and cooldown baseline", () => {
     machine.next();
     machine.goTo("contact");
     machine.prev();
-    machine.update(299);
+    machine.update(499);
     machine.next();
 
     expect(machine.getSnapshot()).toEqual(completedSnapshot);
@@ -133,7 +133,7 @@ describe("createFlowMachine lock and cooldown baseline", () => {
       isLocked: false
     });
 
-    machine.update(101);
+    machine.update(1);
     machine.goTo("contact");
 
     expect(machine.getSnapshot()).toEqual({
@@ -170,7 +170,7 @@ describe("createFlowMachine lock and cooldown baseline", () => {
 
     machine.next();
     machine.goTo("contact");
-    machine.update(299);
+    machine.update(499);
     machine.next();
 
     expect(machine.getSnapshot()).toEqual(completedSnapshot);

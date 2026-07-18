@@ -73,7 +73,7 @@ describe("createFlowMachine transition regressions", () => {
 
     expect(machine.getSnapshot()).toEqual(completedSnapshot);
 
-    machine.update(199);
+    machine.update(299);
     machine.next();
 
     expect(machine.getSnapshot()).toEqual(completedSnapshot);
@@ -220,7 +220,7 @@ describe("createFlowMachine transition regressions", () => {
     expect(machine.getSnapshot()).toEqual(activeTransitionSnapshot);
 
     machine.update(50);
-    machine.update(100);
+    machine.update(200);
     machine.next();
 
     expect(machine.getSnapshot()).toMatchObject({
@@ -325,7 +325,7 @@ describe("createFlowMachine transition regressions", () => {
     const completedSnapshot = machine.getSnapshot();
 
     machine.next();
-    machine.update(199);
+    machine.update(299);
     machine.next();
 
     expect(machine.getSnapshot()).toEqual(completedSnapshot);
@@ -377,7 +377,7 @@ describe("createFlowMachine transition regressions", () => {
       isTransitioning: false
     });
 
-    machine.update(99);
+    machine.update(299);
     machine.next();
     expect(machine.getSnapshot()).toMatchObject({
       phase: "work",
@@ -442,7 +442,7 @@ describe("createFlowMachine transition regressions", () => {
     });
 
     machine.update(100);
-    machine.update(99);
+    machine.update(299);
     machine.next();
     expect(machine.getSnapshot()).toMatchObject({
       phase: "work",
@@ -476,7 +476,7 @@ describe("createFlowMachine transition regressions", () => {
 
     machine.next();
     machine.update(100);
-    machine.update(199);
+    machine.update(299);
     machine.next();
     expect(machine.getSnapshot()).toMatchObject({
       phase: "work",
@@ -490,5 +490,147 @@ describe("createFlowMachine transition regressions", () => {
       direction: "next",
       isTransitioning: true
     });
+  });
+
+  it("runs the full cooldown after transition completion for shorter equal and longer durations", () => {
+    for (const [duration, cooldown] of [
+      [700, 250],
+      [300, 300],
+      [100, 300]
+    ] as const) {
+      const machine = createFlowMachine({
+        phases: ["intro", "work", "contact"] as const,
+        transition: { duration, cooldown }
+      });
+
+      machine.next();
+      expect(machine.isSettling).toBe(true);
+      machine.update(duration);
+      expect(machine.getSnapshot()).toMatchObject({
+        phase: "work",
+        progress: 1,
+        direction: "none",
+        isTransitioning: false
+      });
+      expect(machine.isSettling).toBe(cooldown > 0);
+
+      machine.next();
+      expect(machine.phase).toBe("work");
+      machine.update(cooldown - 1);
+      machine.next();
+      expect(machine.phase).toBe("work");
+      machine.update(1);
+      machine.next();
+      expect(machine.getSnapshot()).toMatchObject({ phase: "contact", isTransitioning: true });
+    }
+  });
+
+  it("allocates frame overshoot chronologically to post-completion cooldown", () => {
+    const exactBoundary = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transition: { duration: 100, cooldown: 300 }
+    });
+    exactBoundary.next();
+    exactBoundary.update(100);
+    exactBoundary.next();
+    expect(exactBoundary.phase).toBe("work");
+    exactBoundary.update(300);
+    exactBoundary.next();
+    expect(exactBoundary.phase).toBe("contact");
+
+    const smallerOvershoot = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transition: { duration: 100, cooldown: 300 }
+    });
+    smallerOvershoot.next();
+    smallerOvershoot.update(150);
+    smallerOvershoot.next();
+    expect(smallerOvershoot.phase).toBe("work");
+    smallerOvershoot.update(249);
+    smallerOvershoot.next();
+    expect(smallerOvershoot.phase).toBe("work");
+    smallerOvershoot.update(1);
+    smallerOvershoot.next();
+    expect(smallerOvershoot.phase).toBe("contact");
+
+    for (const elapsed of [400, 450]) {
+      const machine = createFlowMachine({
+        phases: ["intro", "work", "contact"] as const,
+        transition: { duration: 100, cooldown: 300 }
+      });
+      machine.next();
+      machine.update(elapsed);
+      machine.next();
+      expect(machine.phase).toBe("contact");
+    }
+  });
+
+  it("matches single large updates and equivalent smaller updates", () => {
+    const single = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transition: { duration: 100, cooldown: 300 }
+    });
+    const multiple = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transition: { duration: 100, cooldown: 300 }
+    });
+
+    single.next();
+    multiple.next();
+    single.update(250);
+    multiple.update(80);
+    multiple.update(20);
+    multiple.update(150);
+
+    single.next();
+    multiple.next();
+    expect(single.getSnapshot()).toEqual(multiple.getSnapshot());
+
+    single.update(150);
+    multiple.update(100);
+    multiple.update(50);
+    single.next();
+    multiple.next();
+    expect(single.getSnapshot()).toEqual(multiple.getSnapshot());
+  });
+
+  it("supports zero-duration transitions with provider cooldown semantics", () => {
+    const positiveCooldown = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 0,
+      cooldownMs: 300
+    });
+
+    positiveCooldown.next();
+    expect(positiveCooldown.getSnapshot()).toEqual({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 1,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+    expect(positiveCooldown.isSettling).toBe(true);
+    positiveCooldown.next();
+    expect(positiveCooldown.phase).toBe("work");
+    positiveCooldown.update(300);
+    positiveCooldown.next();
+    expect(positiveCooldown.phase).toBe("contact");
+
+    const zeroCooldown = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transition: { duration: 0, cooldown: 0 }
+    });
+    zeroCooldown.next();
+    expect(zeroCooldown.isSettling).toBe(false);
+    zeroCooldown.next();
+    expect(zeroCooldown.getSnapshot()).toMatchObject({ phase: "contact", progress: 1 });
+
+    const byPhase = createFlowMachine({
+      phases: ["intro", "work"] as const,
+      transition: { duration: 100, byPhase: { intro: { duration: 0 } } }
+    });
+    byPhase.next();
+    expect(byPhase.getSnapshot()).toMatchObject({ phase: "work", progress: 1 });
   });
 });

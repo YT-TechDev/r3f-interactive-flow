@@ -812,7 +812,7 @@ describe("FlowProvider and hooks", () => {
     });
 
     act(() => {
-      context?.machine.update(199);
+      context?.machine.update(299);
       context?.syncSnapshot();
       latestControls?.next();
     });
@@ -933,7 +933,7 @@ describe("FlowProvider and hooks", () => {
     });
 
     act(() => {
-      context?.machine.update(99);
+      context?.machine.update(299);
       context?.syncSnapshot();
       latestControls?.next();
     });
@@ -1272,7 +1272,7 @@ describe("FlowProvider provider-owned transition clock", () => {
       latestControls?.next();
     });
 
-    // Baseline frame, then finish the 100ms transition; 200ms of cooldown remain.
+    // Baseline frame, then finish the 100ms transition; 300ms of cooldown remain.
     advanceClock(16);
     advanceClock(100);
 
@@ -1288,7 +1288,7 @@ describe("FlowProvider provider-owned transition clock", () => {
     expect(latestControls).toMatchObject({ phase: "work", isTransitioning: false });
 
     // Consume the remaining cooldown purely through the provider clock.
-    advanceClock(200);
+    advanceClock(300);
 
     expect(pendingFrameCount()).toBe(0);
 

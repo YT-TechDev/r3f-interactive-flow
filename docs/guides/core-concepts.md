@@ -186,11 +186,13 @@ function GatedControls() {
 }
 ```
 
-**Cooldown** is an automatic, brief window after a transition during which new
-navigation is ignored. It absorbs rapid repeated triggers — a fast scroll, a held
-key, a double tap — so a single intent produces a single phase change. Cooldown
-is configured, not called: the provider accepts a transition cooldown, and the
-input hooks accept their own cooldown.
+**Cooldown** is an automatic, brief window after a transition completes during
+which new navigation is ignored. It absorbs rapid repeated triggers — a fast
+scroll, a held key, a double tap — so a single intent produces a single phase
+change. Provider transition cooldown starts at the transition completion
+boundary, runs for the complete configured duration after that boundary, and
+applies globally to manual controls and all input hooks. Input hook cooldown is
+separate: it starts only after that hook produces an accepted input navigation.
 
 ```tsx
 <FlowProvider phases={phases} transition={{ duration: 700, cooldown: 250 }}>
@@ -200,8 +202,12 @@ input hooks accept their own cooldown.
 
 Both are conceptual guardrails on the same navigation controls. Locking is a
 deliberate hold you manage; cooldown is a short automatic settle the library
-manages for you. Neither bypasses the machine — they just decide when a
-navigation call is accepted.
+manages for you. Active positive-duration transitions also reject `next`,
+`prev`, and `goTo`; there is no `lockDuringTransition` option in the current v2
+API. A transition duration of `0` is supported as an immediate transition:
+`progress` is `1`, `isTransitioning` is `false`, and any provider cooldown starts
+immediately after that synchronous completion. Neither locking nor cooldown
+bypasses the machine — they just decide when a navigation call is accepted.
 
 ## React state vs frame updates
 
