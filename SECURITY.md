@@ -22,3 +22,7 @@ When reporting, include:
 - Any relevant proof of concept
 
 We will review and address security reports as soon as reasonably possible.
+
+## Release Supply Chain
+
+Production npm publishing should use the manual GitHub Actions Trusted Publishing workflow with OIDC and provenance instead of long-lived npm tokens. Maintainers should keep package version updates, changelog edits, git tags, and GitHub Releases as separate explicit release actions. See `docs/release.md` for the release contract and the external npm/GitHub owner settings required before an OIDC publish.
