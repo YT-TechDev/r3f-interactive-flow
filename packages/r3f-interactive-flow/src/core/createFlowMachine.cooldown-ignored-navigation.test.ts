@@ -29,7 +29,7 @@ describe("createFlowMachine cooldown ignored navigation hardening", () => {
       isLocked: false
     });
 
-    machine.update(399);
+    machine.update(499);
     machine.goTo("contact");
 
     expect(machine.getSnapshot()).toEqual(completedSnapshot);
@@ -105,7 +105,7 @@ describe("createFlowMachine cooldown ignored navigation hardening", () => {
       isLocked: false
     });
 
-    machine.update(399);
+    machine.update(499);
     machine.prev();
     machine.next();
 

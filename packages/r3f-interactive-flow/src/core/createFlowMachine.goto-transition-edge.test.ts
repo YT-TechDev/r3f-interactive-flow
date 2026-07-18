@@ -150,7 +150,7 @@ describe("createFlowMachine goTo transition edge cases", () => {
 
     machine.goTo("intro");
     machine.goTo("contact");
-    machine.update(299);
+    machine.update(499);
     machine.goTo("intro");
 
     expect(machine.getSnapshot()).toEqual(completedSnapshot);

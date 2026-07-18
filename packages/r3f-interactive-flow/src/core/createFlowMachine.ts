@@ -49,8 +49,8 @@ function resolveTransitionDurationMs(transitionDurationMs?: number): number {
     return DEFAULT_TRANSITION_DURATION_MS;
   }
 
-  if (!Number.isFinite(transitionDurationMs) || transitionDurationMs <= 0) {
-    throw new Error("transitionDurationMs must be a finite positive number.");
+  if (!Number.isFinite(transitionDurationMs) || transitionDurationMs < 0) {
+    throw new Error("transitionDurationMs must be a finite number greater than or equal to 0.");
   }
 
   return transitionDurationMs;
@@ -75,8 +75,8 @@ function assertEasing(easing: EasingFunction | undefined, label: string): void {
 }
 
 function validateTransitionDuration(duration: number | undefined, label: string): void {
-  if (duration !== undefined && (!Number.isFinite(duration) || duration <= 0)) {
-    throw new Error(`${label} must be a finite positive number.`);
+  if (duration !== undefined && (!Number.isFinite(duration) || duration < 0)) {
+    throw new Error(`${label} must be a finite number greater than or equal to 0.`);
   }
 }
 
@@ -196,7 +196,17 @@ export function createFlowMachine<TPhase extends string>(
     phaseIndex = targetPhaseIndex;
     progress = 0;
     elapsedMs = 0;
-    cooldownRemainingMs = activeCooldownMs;
+    cooldownRemainingMs = 0;
+
+    if (activeTransitionDurationMs === 0) {
+      progress = 1;
+      direction = "none";
+      isTransitioning = false;
+      cooldownRemainingMs = activeCooldownMs;
+
+      return;
+    }
+
     isTransitioning = true;
   };
 
@@ -205,25 +215,31 @@ export function createFlowMachine<TPhase extends string>(
       throw new Error("deltaMs must be a finite number.");
     }
 
-    const elapsedDeltaMs = Math.max(0, deltaMs);
+    let remainingDeltaMs = Math.max(0, deltaMs);
 
-    if (cooldownRemainingMs > 0) {
-      cooldownRemainingMs = Math.max(0, cooldownRemainingMs - elapsedDeltaMs);
-    }
+    if (isTransitioning) {
+      const remainingTransitionMs = Math.max(0, activeTransitionDurationMs - elapsedMs);
+      const transitionDeltaMs = Math.min(remainingDeltaMs, remainingTransitionMs);
 
-    if (!isTransitioning) {
-      return;
-    }
+      elapsedMs += transitionDeltaMs;
+      remainingDeltaMs -= transitionDeltaMs;
 
-    elapsedMs += elapsedDeltaMs;
+      const rawProgress = clamp01(elapsedMs / activeTransitionDurationMs);
+      progress = rawProgress >= 1 ? 1 : clamp01(activeEasing(rawProgress));
 
-    const rawProgress = clamp01(elapsedMs / activeTransitionDurationMs);
-    progress = rawProgress >= 1 ? 1 : clamp01(activeEasing(rawProgress));
+      if (rawProgress < 1) {
+        return;
+      }
 
-    if (rawProgress >= 1) {
       elapsedMs = activeTransitionDurationMs;
+      progress = 1;
       direction = "none";
       isTransitioning = false;
+      cooldownRemainingMs = activeCooldownMs;
+    }
+
+    if (cooldownRemainingMs > 0) {
+      cooldownRemainingMs = Math.max(0, cooldownRemainingMs - remainingDeltaMs);
     }
   };
 

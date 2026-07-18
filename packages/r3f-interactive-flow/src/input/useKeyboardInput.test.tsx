@@ -1256,7 +1256,7 @@ describe("useKeyboardInput", () => {
     expect(latestControls?.phase).toBe("work");
 
     act(() => {
-      machine?.update(400);
+      machine?.update(500);
       syncSnapshot?.();
     });
 

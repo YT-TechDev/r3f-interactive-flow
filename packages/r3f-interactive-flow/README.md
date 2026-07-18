@@ -272,7 +272,7 @@ Mount input hooks from a client-side input layer under `FlowProvider`, outside t
 
 ### Lock and cooldown notes
 
-Use the existing `lock`, `unlock`, provider transition cooldown, and input hook cooldown options to prevent repeated accidental phase changes. Input hooks respect active transitions, locks, phase boundaries, and cooldowns; they drive the same `next` and `prev` controls rather than bypassing flow state.
+Use the existing `lock`, `unlock`, provider transition cooldown, and input hook cooldown options to prevent repeated accidental phase changes. Provider transition cooldown starts after the accepted transition completes, runs for the full configured duration after completion, and applies globally to manual controls and all input hooks. Hook-local cooldown starts only after that hook produces an accepted input navigation and remains separate. Input hooks respect active positive-duration transitions, locks, phase boundaries, and cooldowns; they drive the same `next` and `prev` controls rather than bypassing flow state. There is no `lockDuringTransition` option in the current v2 API. A transition duration of `0` is supported as immediate: `progress` settles at `1`, `isTransitioning` is `false`, and any provider cooldown starts immediately after that synchronous completion.
 
 ## FlowProvider and flow controls
 

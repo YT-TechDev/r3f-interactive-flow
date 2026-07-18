@@ -253,7 +253,7 @@ describe("cross-input lock and cooldown behavior", () => {
     expect(flow.getControls()?.phase).toBe("work");
 
     act(() => {
-      flow.getMachine()?.update(400);
+      flow.getMachine()?.update(500);
       flow.sync();
     });
 
@@ -284,7 +284,7 @@ describe("cross-input lock and cooldown behavior", () => {
     expect(flow.getControls()?.phase).toBe("work");
 
     act(() => {
-      flow.getMachine()?.update(400);
+      flow.getMachine()?.update(500);
       flow.sync();
     });
 

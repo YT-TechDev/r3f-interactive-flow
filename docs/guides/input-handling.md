@@ -321,9 +321,12 @@ Thresholds filter noisy input before navigation is requested:
 Cooldowns reduce accidental repeated navigation:
 
 - `transition.cooldown` on `FlowProvider` is part of the shared flow navigation
-  rules.
+  rules. It starts after the accepted transition completes, runs for the full
+  configured duration after completion, and blocks manual controls plus wheel,
+  touch, and keyboard hooks globally.
 - `cooldown` on an input hook is local to that hook and starts only after that
-  hook's accepted navigation request.
+  hook's accepted navigation request. It is separate from provider transition
+  cooldown.
 
 Use provider cooldown for global phase navigation pacing. Use hook cooldown when
 a specific browser input source, such as trackpad wheel bursts or repeated swipe

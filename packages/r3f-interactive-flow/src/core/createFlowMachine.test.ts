@@ -446,7 +446,7 @@ describe("createFlowMachine", () => {
       isLocked: false
     });
 
-    machine.update(500);
+    machine.update(1500);
     machine.next();
 
     expect(machine.getSnapshot()).toMatchObject({
@@ -465,7 +465,7 @@ describe("createFlowMachine", () => {
     });
 
     machine.next();
-    machine.update(500);
+    machine.update(1000);
     machine.next();
 
     expect(machine.getSnapshot()).toMatchObject({
@@ -485,7 +485,7 @@ describe("createFlowMachine", () => {
     });
 
     machine.next();
-    machine.update(500);
+    machine.update(1000);
     machine.next();
 
     expect(machine.getSnapshot()).toMatchObject({
@@ -523,7 +523,7 @@ describe("createFlowMachine", () => {
 
     machine.next();
     machine.update(500);
-    machine.update(500);
+    machine.update(1500);
     machine.next();
 
     expect(machine.getSnapshot()).toMatchObject({
@@ -535,7 +535,7 @@ describe("createFlowMachine", () => {
     });
   });
 
-  it("starts cooldown on accepted navigation instead of transition completion", () => {
+  it("starts cooldown after transition completion", () => {
     const machine = createFlowMachine({
       phases: ["intro", "work", "contact"] as const,
       transitionDurationMs: 1000,
@@ -551,7 +551,7 @@ describe("createFlowMachine", () => {
 
     expect(machine.getSnapshot()).toEqual(activeTransitionSnapshot);
 
-    machine.update(500);
+    machine.update(1000);
     machine.next();
 
     expect(machine.getSnapshot()).toMatchObject({
@@ -620,7 +620,7 @@ describe("createFlowMachine", () => {
 
     expect(machine.getSnapshot()).toEqual(completedSnapshot);
 
-    machine.update(500);
+    machine.update(1000);
     machine.next();
 
     expect(machine.getSnapshot()).toMatchObject({
@@ -733,7 +733,7 @@ describe("createFlowMachine", () => {
     machine.update(500);
     machine.prev();
     machine.unlock();
-    machine.update(500);
+    machine.update(1000);
     machine.next();
 
     expect(machine.getSnapshot()).toMatchObject({
@@ -789,7 +789,7 @@ describe("createFlowMachine", () => {
 
     expect(machine.getSnapshot()).toEqual(completedSnapshot);
 
-    machine.update(500);
+    machine.update(1000);
     machine.next();
 
     expect(machine.getSnapshot()).toMatchObject({
@@ -817,7 +817,7 @@ describe("createFlowMachine", () => {
 
     expect(machine.getSnapshot()).toEqual(completedSnapshot);
 
-    machine.update(500);
+    machine.update(1000);
     machine.goTo("contact");
 
     expect(machine.getSnapshot()).toMatchObject({
@@ -846,7 +846,7 @@ describe("createFlowMachine", () => {
     expect(machine.getSnapshot()).toEqual(activeTransitionSnapshot);
 
     machine.update(500);
-    machine.update(500);
+    machine.update(1500);
     machine.next();
 
     expect(machine.getSnapshot()).toMatchObject({
@@ -886,7 +886,7 @@ describe("createFlowMachine", () => {
       isTransitioning: false
     });
 
-    machine.update(500);
+    machine.update(1000);
     machine.next();
 
     expect(machine.getSnapshot()).toMatchObject({
@@ -931,7 +931,7 @@ describe("createFlowMachine", () => {
 
     expect(machine.getSnapshot()).toEqual(completedSnapshot);
 
-    machine.update(500);
+    machine.update(1000);
     machine.next();
 
     expect(machine.getSnapshot()).toMatchObject({
@@ -1031,7 +1031,7 @@ describe("createFlowMachine", () => {
     machine.next();
     expect(machine.phase).toBe("work");
 
-    machine.update(200);
+    machine.update(400);
     machine.next();
     expect(machine.phase).toBe("contact");
   });
@@ -1058,7 +1058,7 @@ describe("createFlowMachine", () => {
     machine.next();
     expect(machine.phase).toBe("work");
 
-    machine.update(100);
+    machine.update(500);
     machine.next();
     expect(machine.phase).toBe("contact");
   });
@@ -1132,8 +1132,8 @@ describe("createFlowMachine", () => {
 
   it("throws clear errors for invalid global transition values", () => {
     expect(() =>
-      createFlowMachine({ phases: ["intro", "work"] as const, transition: { duration: 0 } })
-    ).toThrow("transition.duration must be a finite positive number.");
+      createFlowMachine({ phases: ["intro", "work"] as const, transition: { duration: -1 } })
+    ).toThrow("transition.duration must be a finite number greater than or equal to 0.");
     expect(() =>
       createFlowMachine({ phases: ["intro", "work"] as const, transition: { cooldown: -1 } })
     ).toThrow("transition.cooldown must be a finite number greater than or equal to 0.");
@@ -1151,7 +1151,9 @@ describe("createFlowMachine", () => {
         phases: ["intro", "work"] as const,
         transition: { byPhase: { intro: { duration: Number.NaN } } }
       })
-    ).toThrow("transition.byPhase.intro.duration must be a finite positive number.");
+    ).toThrow(
+      "transition.byPhase.intro.duration must be a finite number greater than or equal to 0."
+    );
     expect(() =>
       createFlowMachine({
         phases: ["intro", "work"] as const,
@@ -1218,13 +1220,20 @@ describe("createFlowMachine", () => {
     });
   });
 
-  it("throws when transitionDurationMs is not positive", () => {
-    expect(() =>
-      createFlowMachine({
-        phases: ["intro", "work"] as const,
-        transitionDurationMs: 0
-      })
-    ).toThrow(/transitionDurationMs/);
+  it("allows transitionDurationMs to be zero", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work"] as const,
+      transitionDurationMs: 0
+    });
+
+    machine.next();
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "work",
+      progress: 1,
+      direction: "none",
+      isTransitioning: false
+    });
   });
 
   it("throws when transitionDurationMs is not finite", () => {
