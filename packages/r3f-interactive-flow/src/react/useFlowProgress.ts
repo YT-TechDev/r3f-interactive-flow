@@ -10,5 +10,5 @@ export function useFlowProgress(): number {
     throw new Error("useFlowProgress must be used inside FlowProvider.");
   }
 
-  return context.controls.progress;
+  return context.progress;
 }

@@ -5,8 +5,8 @@ import type { ReactNode } from "react";
 import { createFlowMachine } from "../core/createFlowMachine";
 import type { EasingFunction } from "../core/easing";
 import type { FlowControls, FlowSnapshot, FlowTransitionOptions } from "../core/types";
-import { FlowContext } from "./FlowContext";
-import type { FlowContextValue } from "./FlowContext";
+import { FlowContext, FlowMachineContext } from "./FlowContext";
+import type { FlowContextValue, FlowMachineContextValue } from "./FlowContext";
 
 export type FlowProviderProps<TPhase extends string> = {
   phases: readonly TPhase[];
@@ -171,18 +171,21 @@ export function FlowProvider<TPhase extends string>({
     [machine, requestSync, snapshot]
   );
 
-  const contextValue = useMemo<FlowContextValue<TPhase>>(
+  const machineContextValue = useMemo<FlowMachineContextValue<TPhase>>(
     () => ({
-      controls,
       machine,
       syncSnapshot: requestSync
     }),
-    [controls, machine, requestSync]
+    [machine, requestSync]
   );
 
   return (
-    <FlowContext.Provider value={contextValue as unknown as FlowContextValue<string>}>
-      {children}
-    </FlowContext.Provider>
+    <FlowMachineContext.Provider
+      value={machineContextValue as unknown as FlowMachineContextValue<string>}
+    >
+      <FlowContext.Provider value={controls as unknown as FlowContextValue<string>}>
+        {children}
+      </FlowContext.Provider>
+    </FlowMachineContext.Provider>
   );
 }

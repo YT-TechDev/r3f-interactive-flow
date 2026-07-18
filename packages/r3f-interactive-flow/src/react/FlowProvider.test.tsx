@@ -4,7 +4,7 @@ import type { Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FlowControls } from "../core/types";
-import { FlowContext } from "./FlowContext";
+import { FlowMachineContext } from "./FlowContext";
 import type { FlowProviderProps } from "./FlowProvider";
 import { FlowProvider } from "./FlowProvider";
 import { useFlow } from "./useFlow";
@@ -249,9 +249,9 @@ function ConsistencyProbe({
 function MachineProbe({
   onRender
 }: {
-  onRender: (value: NonNullable<React.ContextType<typeof FlowContext>>) => void;
+  onRender: (value: NonNullable<React.ContextType<typeof FlowMachineContext>>) => void;
 }) {
-  const value = useContext(FlowContext);
+  const value = useContext(FlowMachineContext);
 
   if (value === null) {
     throw new Error("missing FlowContext");
@@ -482,7 +482,7 @@ describe("FlowProvider and hooks", () => {
   });
 
   it("keeps useFlowProgress aligned with useFlow progress during transitions", () => {
-    let context: NonNullable<React.ContextType<typeof FlowContext>> | undefined;
+    let context: NonNullable<React.ContextType<typeof FlowMachineContext>> | undefined;
     let latestControls: FlowControls<TestPhase> | undefined;
     let latestProgress: number | undefined;
 
@@ -511,7 +511,7 @@ describe("FlowProvider and hooks", () => {
   });
 
   it("returns completed transition progress from useFlowProgress", () => {
-    let context: NonNullable<React.ContextType<typeof FlowContext>> | undefined;
+    let context: NonNullable<React.ContextType<typeof FlowMachineContext>> | undefined;
     let latestControls: FlowControls<TestPhase> | undefined;
     let latestProgress: number | undefined;
 
@@ -669,7 +669,7 @@ describe("FlowProvider and hooks", () => {
   });
 
   it("keeps the React snapshot stable when next is called at the last phase", () => {
-    let context: NonNullable<React.ContextType<typeof FlowContext>> | undefined;
+    let context: NonNullable<React.ContextType<typeof FlowMachineContext>> | undefined;
     let latestControls: FlowControls<TestPhase> | undefined;
 
     renderFlow(
@@ -711,7 +711,7 @@ describe("FlowProvider and hooks", () => {
   });
 
   it("keeps the completed React snapshot stable when goTo targets the current phase", () => {
-    let context: NonNullable<React.ContextType<typeof FlowContext>> | undefined;
+    let context: NonNullable<React.ContextType<typeof FlowMachineContext>> | undefined;
     let latestControls: FlowControls<TestPhase> | undefined;
 
     renderFlow(
@@ -740,7 +740,7 @@ describe("FlowProvider and hooks", () => {
   });
 
   it("accepts transition options and passes them to the core machine", () => {
-    let context: NonNullable<React.ContextType<typeof FlowContext>> | undefined;
+    let context: NonNullable<React.ContextType<typeof FlowMachineContext>> | undefined;
     let latestControls: FlowControls<TestPhase> | undefined;
 
     renderFlow(
@@ -774,7 +774,7 @@ describe("FlowProvider and hooks", () => {
   });
 
   it("passes transition cooldown through the provider", () => {
-    let context: NonNullable<React.ContextType<typeof FlowContext>> | undefined;
+    let context: NonNullable<React.ContextType<typeof FlowMachineContext>> | undefined;
     let latestControls: FlowControls<TestPhase> | undefined;
 
     renderFlow(
@@ -835,7 +835,7 @@ describe("FlowProvider and hooks", () => {
   });
 
   it("uses transition byPhase options from the source phase through the provider", () => {
-    let context: NonNullable<React.ContextType<typeof FlowContext>> | undefined;
+    let context: NonNullable<React.ContextType<typeof FlowMachineContext>> | undefined;
     let latestControls: FlowControls<TestPhase> | undefined;
 
     renderFlow(
@@ -871,7 +871,7 @@ describe("FlowProvider and hooks", () => {
   });
 
   it("keeps legacy timing props working through the provider", () => {
-    let context: NonNullable<React.ContextType<typeof FlowContext>> | undefined;
+    let context: NonNullable<React.ContextType<typeof FlowMachineContext>> | undefined;
 
     renderFlow(<MachineProbe onRender={(value) => (context = value)} />, undefined, {
       transitionDurationMs: 200,
@@ -888,7 +888,7 @@ describe("FlowProvider and hooks", () => {
   });
 
   it("lets transition props take precedence over legacy timing props through the provider", () => {
-    let context: NonNullable<React.ContextType<typeof FlowContext>> | undefined;
+    let context: NonNullable<React.ContextType<typeof FlowMachineContext>> | undefined;
     let latestControls: FlowControls<TestPhase> | undefined;
 
     renderFlow(
@@ -1145,6 +1145,52 @@ describe("FlowProvider provider-owned transition clock", () => {
     expect(firstProgress).toBeLessThan(1);
     expect(secondProgress).toBe(firstProgress);
     expect(firstProgress).toBe(latestControls?.progress);
+  });
+
+  it("keeps stable machine consumers off frame-driven React snapshot updates", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let machineRenderCount = 0;
+    const progressFrames: number[] = [];
+
+    renderFlow(
+      <>
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <ProgressProbe onRender={(progress) => progressFrames.push(progress)} />
+        <MachineProbe
+          onRender={() => {
+            machineRenderCount += 1;
+          }}
+        />
+      </>,
+      undefined,
+      { transition: { duration: 1000 } }
+    );
+
+    expect(machineRenderCount).toBe(1);
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    // Navigation starts a transition and updates reactive consumers, but the
+    // stable machine boundary itself is unchanged.
+    expect(machineRenderCount).toBe(1);
+    expect(progressFrames.at(-1)).toBe(0);
+
+    advanceClock(16);
+    advanceClock(250);
+    advanceClock(250);
+    advanceClock(1500);
+
+    expect(machineRenderCount).toBe(1);
+    expect(progressFrames).toContain(0);
+    expect(progressFrames.some((progress) => progress > 0 && progress < 1)).toBe(true);
+    expect(progressFrames.at(-1)).toBe(1);
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      progress: 1,
+      isTransitioning: false
+    });
   });
 
   it("keeps useFlow().progress and useFlowProgress aligned across every transition frame", () => {

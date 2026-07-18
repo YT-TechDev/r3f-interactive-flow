@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { FlowControls, FlowMachine } from "../core/types";
 import { installMinimalDom } from "../test-utils/minimalDom";
 import { createFlowTestHarness } from "../test-utils/renderFlow";
-import { FlowContext } from "./FlowContext";
+import { FlowMachineContext } from "./FlowContext";
 import { useFlow } from "./useFlow";
 import { useFlowProgress } from "./useFlowProgress";
 
@@ -39,7 +39,7 @@ function MachineProbe({
 }: {
   onRender: (machine: FlowMachine<TestPhase>, syncSnapshot: () => void) => void;
 }) {
-  const context = useContext(FlowContext);
+  const context = useContext(FlowMachineContext);
 
   if (context === null) {
     throw new Error("MachineProbe must be rendered inside FlowProvider.");
