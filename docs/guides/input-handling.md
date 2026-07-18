@@ -109,11 +109,28 @@ export function FlowInputLayer() {
 }
 ```
 
-`useWheelInput` reads the wheel delta on the `y` axis by default:
+`useWheelInput` reads the wheel delta on the `y` axis by default and
+normalizes browser wheel delta modes before comparing the value with
+`threshold`. Pixel-mode deltas are used directly, line-mode deltas are scaled
+to pixel-like units, and page-mode deltas are scaled to larger page-like units.
+The conversion details stay internal; `threshold` remains the public
+configuration value in normalized internal units.
 
 - A positive delta greater than `threshold` calls `next`.
 - A negative delta less than `-threshold` calls `prev`.
 - A delta at or within the threshold does nothing.
+
+Small same-direction wheel deltas accumulate during a short wheel burst, which
+keeps high-resolution trackpads from missing intentional scroll gestures. A
+direction reversal, a target change, or a short period of wheel inactivity
+resets pending wheel intent, and the current event starts the new burst.
+
+One wheel burst can produce at most one accepted phase navigation. Follow-up
+momentum events in the same direction and on the same target do not advance
+through additional phases. If a threshold-crossing attempt is rejected by a
+boundary, lock, transition, provider cooldown, or hook-local cooldown, the hook
+does not call `preventDefault()` and does not queue stale intent for a later
+automatic navigation.
 
 Useful options:
 
