@@ -156,6 +156,14 @@ export class MinimalElement extends MinimalNode {
     }
   }
 
+  getAttribute(name: string): string | null {
+    return this.attributes[name] ?? null;
+  }
+
+  hasAttribute(name: string): boolean {
+    return Object.prototype.hasOwnProperty.call(this.attributes, name);
+  }
+
   removeAttribute(name: string): void {
     delete this.attributes[name];
 

@@ -83,18 +83,24 @@ function dispatchTouch(
   return event;
 }
 
-function swipe(startY: number, endY: number, target: MinimalEventTarget = windowTarget): void {
+function swipe(
+  startY: number,
+  endY: number,
+  target: MinimalEventTarget = windowTarget
+): MinimalTouchEvent {
   dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: startY }] }, target);
-  dispatchTouch("touchend", { changedTouches: [{ clientX: 0, clientY: endY }] }, target);
+
+  return dispatchTouch("touchend", { changedTouches: [{ clientX: 0, clientY: endY }] }, target);
 }
 
 function horizontalSwipe(
   startX: number,
   endX: number,
   target: MinimalEventTarget = windowTarget
-): void {
+): MinimalTouchEvent {
   dispatchTouch("touchstart", { touches: [{ clientX: startX, clientY: 0 }] }, target);
-  dispatchTouch("touchend", { changedTouches: [{ clientX: endX, clientY: 0 }] }, target);
+
+  return dispatchTouch("touchend", { changedTouches: [{ clientX: endX, clientY: 0 }] }, target);
 }
 
 describe("useTouchInput", () => {
@@ -110,7 +116,7 @@ describe("useTouchInput", () => {
       passive: false
     });
     expect(addEventListenerSpy).toHaveBeenCalledWith("touchend", expect.any(Function), {
-      passive: true
+      passive: false
     });
     expect(addEventListenerSpy).toHaveBeenCalledWith("touchcancel", expect.any(Function), {
       passive: true
@@ -638,20 +644,237 @@ describe("useTouchInput", () => {
     expect(latestControls?.direction).toBe("next");
   });
 
-  it("defaults preventDefault to true for touchmove", () => {
-    renderFlow(<TouchInputProbe />);
+  it("defaults preventDefault to true for an accepted threshold-crossing touchmove", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
 
-    const event = dispatchTouch("touchmove");
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] });
+    const event = dispatchTouch("touchmove", { touches: [{ clientX: 0, clientY: 59 }] });
 
     expect(event.defaultPrevented).toBe(true);
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
   });
 
-  it("does not call preventDefault when preventDefault is false", () => {
-    renderFlow(<TouchInputProbe options={{ preventDefault: false }} />);
+  it("does not call preventDefault for an accepted touchmove when preventDefault is false", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
 
-    const event = dispatchTouch("touchmove");
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ threshold: 40, preventDefault: false }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] });
+    const event = dispatchTouch("touchmove", { touches: [{ clientX: 0, clientY: 59 }] });
 
     expect(event.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
+  it("does not call preventDefault for a touchmove below the threshold", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] });
+    const event = dispatchTouch("touchmove", { touches: [{ clientX: 0, clientY: 70 }] });
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+  });
+
+  it("does not navigate again on a later touchmove or touchend after a gesture commits", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let machine: FlowMachine<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe onRender={(renderedMachine) => (machine = renderedMachine)} />
+      </>
+    );
+
+    const nextSpy = machine ? vi.spyOn(machine, "next") : undefined;
+
+    dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] });
+    const commitEvent = dispatchTouch("touchmove", { touches: [{ clientX: 0, clientY: 59 }] });
+    const laterMoveEvent = dispatchTouch("touchmove", { touches: [{ clientX: 0, clientY: 20 }] });
+    const endEvent = dispatchTouch("touchend", { changedTouches: [{ clientX: 0, clientY: 20 }] });
+
+    expect(commitEvent.defaultPrevented).toBe(true);
+    expect(laterMoveEvent.defaultPrevented).toBe(true);
+    expect(endEvent.defaultPrevented).toBe(false);
+    expect(nextSpy).toHaveBeenCalledTimes(1);
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
+  it("does not prevent default for later touchmove events in an accepted gesture when preventDefault is false", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ threshold: 40, preventDefault: false }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] });
+    dispatchTouch("touchmove", { touches: [{ clientX: 0, clientY: 59 }] });
+    const laterMoveEvent = dispatchTouch("touchmove", { touches: [{ clientX: 0, clientY: 20 }] });
+
+    expect(laterMoveEvent.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("work");
+  });
+
+  it("does not navigate or prevent default for a touchmove gesture starting on an actionable target", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    const button = document.createElement("button") as unknown as MinimalElement;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] }, button);
+    const moveEvent = dispatchTouch(
+      "touchmove",
+      { touches: [{ clientX: 0, clientY: 59 }] },
+      button
+    );
+
+    expect(moveEvent.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+  });
+
+  it("does not navigate or prevent default for a touchmove gesture starting on an editable target", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    const input = document.createElement("input") as unknown as MinimalElement;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] }, input);
+    const moveEvent = dispatchTouch("touchmove", { touches: [{ clientX: 0, clientY: 59 }] }, input);
+
+    expect(moveEvent.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+  });
+
+  it("does not navigate or prevent default for a rejected first-boundary touchmove", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] });
+    const event = dispatchTouch("touchmove", { touches: [{ clientX: 0, clientY: 141 }] });
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+  });
+
+  it("does not navigate or prevent default for a rejected last-boundary touchmove", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let machine: FlowMachine<TestPhase> | undefined;
+    let syncSnapshot: (() => void) | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe
+          onRender={(renderedMachine, renderedSyncSnapshot) => {
+            machine = renderedMachine;
+            syncSnapshot = renderedSyncSnapshot;
+          }}
+        />
+      </>,
+      undefined,
+      { transitionDurationMs: 100, cooldownMs: 0 }
+    );
+
+    act(() => {
+      machine?.goTo("contact");
+      machine?.update(100);
+      syncSnapshot?.();
+    });
+
+    dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] });
+    const event = dispatchTouch("touchmove", { touches: [{ clientX: 0, clientY: 59 }] });
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("contact");
+  });
+
+  it("does not navigate or prevent default for a touchmove while the flow is locked", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    act(() => {
+      latestControls?.lock();
+    });
+
+    dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] });
+    const event = dispatchTouch("touchmove", { touches: [{ clientX: 0, clientY: 59 }] });
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.isLocked).toBe(true);
+  });
+
+  it("triggers exactly one accepted navigation for an accepted touch gesture", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let machine: FlowMachine<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe onRender={(renderedMachine) => (machine = renderedMachine)} />
+      </>
+    );
+
+    const nextSpy = machine ? vi.spyOn(machine, "next") : undefined;
+    swipe(100, 59);
+
+    expect(nextSpy).toHaveBeenCalledTimes(1);
+    expect(latestControls?.phase).toBe("work");
   });
 
   it("uses the default threshold of 50", () => {
@@ -843,8 +1066,9 @@ describe("useTouchInput", () => {
     act(() => {
       latestControls?.lock();
     });
-    swipe(100, 49);
+    const lockedEvent = swipe(100, 49);
 
+    expect(lockedEvent.defaultPrevented).toBe(false);
     expect(latestControls?.phase).toBe("intro");
     expect(latestControls?.isLocked).toBe(true);
 
@@ -869,8 +1093,9 @@ describe("useTouchInput", () => {
     );
 
     swipe(100, 49);
-    swipe(100, 49);
+    const transitioningEvent = swipe(100, 49);
 
+    expect(transitioningEvent.defaultPrevented).toBe(false);
     expect(latestControls?.phase).toBe("work");
     expect(latestControls?.isTransitioning).toBe(true);
   });
@@ -977,10 +1202,11 @@ describe("useTouchInput", () => {
     expect(latestControls?.phase).toBe("intro");
   });
 
-  it("keeps preventDefault enabled by default for non-ignored touchmove", () => {
+  it("keeps preventDefault enabled by default for a non-ignored accepted touchmove", () => {
     renderFlow(<TouchInputProbe options={{ ignore: [".ignore-touch"] }} />);
 
-    const event = dispatchTouch("touchmove");
+    dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] });
+    const event = dispatchTouch("touchmove", { touches: [{ clientX: 0, clientY: 49 }] });
 
     expect(event.defaultPrevented).toBe(true);
   });
@@ -1015,8 +1241,9 @@ describe("useTouchInput", () => {
     });
 
     vi.setSystemTime(250);
-    swipe(100, 49);
+    const cooldownEvent = swipe(100, 49);
 
+    expect(cooldownEvent.defaultPrevented).toBe(false);
     expect(latestControls?.phase).toBe("work");
 
     vi.setSystemTime(500);
@@ -1215,8 +1442,9 @@ describe("useTouchInput", () => {
     expect(latestControls?.phase).toBe("work");
     expect(latestControls?.isTransitioning).toBe(false);
 
-    swipe(100, 59);
+    const cooldownEvent = swipe(100, 59);
 
+    expect(cooldownEvent.defaultPrevented).toBe(false);
     expect(latestControls?.phase).toBe("work");
 
     act(() => {
