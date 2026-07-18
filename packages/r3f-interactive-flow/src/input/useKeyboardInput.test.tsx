@@ -1,4 +1,4 @@
-import React, { act, useContext } from "react";
+import React, { act, useContext, useEffect, useRef } from "react";
 import type { RefObject } from "react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -494,13 +494,13 @@ describe("useKeyboardInput", () => {
     targetRef.current = secondTarget as unknown as HTMLElement;
     renderFlow(
       <>
-        <KeyboardInputProbe options={{ target: targetRef }} />
+        <KeyboardInputProbe options={{ target: targetRef, cooldown: 1 }} />
         <ControlsProbe onRender={(controls) => (latestControls = controls)} />
       </>
     );
     renderFlow(
       <>
-        <KeyboardInputProbe options={{ target: targetRef }} />
+        <KeyboardInputProbe options={{ target: targetRef, cooldown: 1 }} />
         <ControlsProbe onRender={(controls) => (latestControls = controls)} />
       </>
     );
@@ -645,8 +645,8 @@ describe("useKeyboardInput", () => {
     expect(latestControls?.phase).toBe("work");
   });
 
-  it("falls back to window when a target ref is empty", () => {
-    const targetRef = { current: null } satisfies RefObject<HTMLElement | null>;
+  it("does not fall back to window when an explicit target ref is empty", () => {
+    const targetRef: RefObject<HTMLElement | null> = { current: null };
     let latestControls: FlowControls<TestPhase> | undefined;
 
     renderFlow(
@@ -656,9 +656,76 @@ describe("useKeyboardInput", () => {
       </>
     );
 
-    expect(windowTarget.listenerCount("keydown")).toBe(1);
+    expect(windowTarget.listenerCount("keydown")).toBe(0);
 
     dispatchKeyDown("ArrowDown");
+
+    expect(latestControls?.phase).toBe("intro");
+
+    act(() => {
+      getRoot()?.unmount();
+    });
+
+    expect(windowTarget.listenerCount("keydown")).toBe(0);
+  });
+
+  it("attaches on a later relevant effect run after an explicit ref resolves", () => {
+    const target = document.createElement("div") as unknown as MinimalElement;
+    const targetRef: RefObject<HTMLElement | null> = { current: null };
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ target: targetRef, cooldown: 0 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(windowTarget.listenerCount("keydown")).toBe(0);
+    expect(target.listenerCount("keydown")).toBe(0);
+
+    targetRef.current = target as unknown as HTMLElement;
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ target: targetRef, cooldown: 1 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(windowTarget.listenerCount("keydown")).toBe(0);
+    expect(target.listenerCount("keydown")).toBe(1);
+
+    dispatchKeyDown("ArrowDown", {}, target);
+
+    expect(latestControls?.phase).toBe("work");
+  });
+
+  it("resolves a React element ref in the effect after commit", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let attachedTarget: MinimalElement | undefined;
+
+    function RefTimingProbe() {
+      const targetRef = useRef<HTMLDivElement | null>(null);
+      useKeyboardInput<TestPhase>({ target: targetRef });
+
+      useEffect(() => {
+        attachedTarget = targetRef.current as unknown as MinimalElement;
+      });
+
+      return <div ref={targetRef} />;
+    }
+
+    renderFlow(
+      <>
+        <RefTimingProbe />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(windowTarget.listenerCount("keydown")).toBe(0);
+    expect(attachedTarget?.listenerCount("keydown")).toBe(1);
+
+    dispatchKeyDown("ArrowDown", {}, attachedTarget);
 
     expect(latestControls?.phase).toBe("work");
   });

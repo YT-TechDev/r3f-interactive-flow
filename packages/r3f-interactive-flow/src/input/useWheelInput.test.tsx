@@ -1,4 +1,4 @@
-import React, { act, useContext } from "react";
+import React, { act, useContext, useEffect, useRef } from "react";
 import type { RefObject } from "react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -459,7 +459,7 @@ describe("useWheelInput", () => {
 
     renderFlow(
       <>
-        <WheelInputProbe options={{ target: targetRef, threshold: 40 }} />
+        <WheelInputProbe options={{ target: targetRef, threshold: 41 }} />
         <ControlsProbe onRender={(controls) => (latestControls = controls)} />
       </>
     );
@@ -545,8 +545,8 @@ describe("useWheelInput", () => {
     expect(latestControls?.phase).toBe("work");
   });
 
-  it("falls back to window when a provided target ref is empty", () => {
-    const targetRef = { current: null } satisfies RefObject<HTMLElement | null>;
+  it("does not fall back to window when an explicit target ref is empty", () => {
+    const targetRef: RefObject<HTMLElement | null> = { current: null };
     let latestControls: FlowControls<TestPhase> | undefined;
 
     renderFlow(
@@ -556,12 +556,79 @@ describe("useWheelInput", () => {
       </>
     );
 
-    expect(windowTarget.listenerCount("wheel")).toBe(1);
+    expect(windowTarget.listenerCount("wheel")).toBe(0);
 
     dispatchWheel(41);
 
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+
+    act(() => {
+      getRoot()?.unmount();
+    });
+
+    expect(windowTarget.listenerCount("wheel")).toBe(0);
+  });
+
+  it("attaches on a later relevant effect run after an explicit ref resolves", () => {
+    const target = document.createElement("div") as unknown as MinimalElement;
+    const targetRef: RefObject<HTMLElement | null> = { current: null };
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ target: targetRef, threshold: 41 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(windowTarget.listenerCount("wheel")).toBe(0);
+    expect(target.listenerCount("wheel")).toBe(0);
+
+    targetRef.current = target as unknown as HTMLElement;
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ target: targetRef, threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(windowTarget.listenerCount("wheel")).toBe(0);
+    expect(target.listenerCount("wheel")).toBe(1);
+
+    dispatchWheel(41, target);
+
     expect(latestControls?.phase).toBe("work");
-    expect(latestControls?.direction).toBe("next");
+  });
+
+  it("resolves a React element ref in the effect after commit", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let attachedTarget: MinimalElement | undefined;
+
+    function RefTimingProbe() {
+      const targetRef = useRef<HTMLDivElement | null>(null);
+      useWheelInput<TestPhase>({ target: targetRef, threshold: 40 });
+
+      useEffect(() => {
+        attachedTarget = targetRef.current as unknown as MinimalElement;
+      });
+
+      return <div ref={targetRef} />;
+    }
+
+    renderFlow(
+      <>
+        <RefTimingProbe />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    expect(windowTarget.listenerCount("wheel")).toBe(0);
+    expect(attachedTarget?.listenerCount("wheel")).toBe(1);
+
+    dispatchWheel(41, attachedTarget);
+
+    expect(latestControls?.phase).toBe("work");
   });
 
   it("uses deltaY for the y axis and deltaX for the x axis", () => {

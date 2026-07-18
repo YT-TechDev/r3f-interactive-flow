@@ -10,13 +10,15 @@ export function isRefObjectTarget(
   return typeof target === "object" && target !== null && "current" in target;
 }
 
-export function resolveInputTarget(target: FlowInputTarget | undefined): HTMLElement | Window {
+export function resolveInputTarget(
+  target: FlowInputTarget | undefined
+): HTMLElement | Window | null {
   if (target === undefined) {
     return window;
   }
 
   if (isRefObjectTarget(target)) {
-    return target.current ?? window;
+    return target.current;
   }
 
   return target;

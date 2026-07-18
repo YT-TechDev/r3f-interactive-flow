@@ -76,9 +76,6 @@ export function useKeyboardInput<TPhase extends string>(
   const machineRef = useRef(machine);
   const syncSnapshotRef = useRef(syncSnapshot);
   const lastNavigationAtRef = useRef<number>(-Infinity);
-  const eventTarget =
-    typeof window === "undefined" ? undefined : resolveInputTarget(options.target);
-
   useEffect(() => {
     flowRef.current = typedFlow;
     machineRef.current = machine;
@@ -90,7 +87,13 @@ export function useKeyboardInput<TPhase extends string>(
       return;
     }
 
-    if (typeof window === "undefined" || eventTarget === undefined) {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const eventTarget = resolveInputTarget(options.target);
+
+    if (eventTarget === null) {
       return;
     }
 
@@ -163,7 +166,6 @@ export function useKeyboardInput<TPhase extends string>(
     options.nextKeys,
     options.preventDefault,
     options.prevKeys,
-    options.target,
-    eventTarget
+    options.target
   ]);
 }

@@ -54,9 +54,6 @@ export function useWheelInput<TPhase extends string>(options: UseWheelInputOptio
   const machineRef = useRef(machine);
   const syncSnapshotRef = useRef(syncSnapshot);
   const lastNavigationAtRef = useRef<number | null>(null);
-  const eventTarget =
-    typeof window === "undefined" ? undefined : resolveInputTarget(options.target);
-
   useEffect(() => {
     flowRef.current = typedFlow;
     machineRef.current = machine;
@@ -68,7 +65,13 @@ export function useWheelInput<TPhase extends string>(options: UseWheelInputOptio
       return;
     }
 
-    if (typeof window === "undefined" || eventTarget === undefined) {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const eventTarget = resolveInputTarget(options.target);
+
+    if (eventTarget === null) {
       return;
     }
 
@@ -136,7 +139,6 @@ export function useWheelInput<TPhase extends string>(options: UseWheelInputOptio
     options.ignore,
     options.preventDefault,
     options.target,
-    eventTarget,
     options.threshold
   ]);
 }
