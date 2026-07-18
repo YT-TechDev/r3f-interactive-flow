@@ -1,4 +1,4 @@
-import React, { act, useContext } from "react";
+import React, { act, useContext, useEffect, useRef } from "react";
 import type { RefObject } from "react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -328,8 +328,8 @@ describe("useTouchInput", () => {
     expect(latestControls?.phase).toBe("work");
   });
 
-  it("falls back to window for an empty target ref and still handles touch navigation", () => {
-    const targetRef = { current: null } satisfies RefObject<HTMLElement | null>;
+  it("does not fall back to window when an explicit target ref is empty", () => {
+    const targetRef: RefObject<HTMLElement | null> = { current: null };
     let latestControls: FlowControls<TestPhase> | undefined;
 
     renderFlow(
@@ -340,13 +340,88 @@ describe("useTouchInput", () => {
     );
 
     for (const type of touchEventTypes) {
-      expect(windowTarget.listenerCount(type)).toBe(1);
+      expect(windowTarget.listenerCount(type)).toBe(0);
     }
 
     swipe(100, 49);
 
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+
+    act(() => {
+      getRoot()?.unmount();
+    });
+
+    for (const type of touchEventTypes) {
+      expect(windowTarget.listenerCount(type)).toBe(0);
+    }
+  });
+
+  it("attaches on a later relevant effect run after an explicit ref resolves", () => {
+    const target = document.createElement("div") as unknown as MinimalElement;
+    const targetRef: RefObject<HTMLElement | null> = { current: null };
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ target: targetRef, threshold: 51 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    for (const type of touchEventTypes) {
+      expect(windowTarget.listenerCount(type)).toBe(0);
+      expect(target.listenerCount(type)).toBe(0);
+    }
+
+    targetRef.current = target as unknown as HTMLElement;
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ target: targetRef, threshold: 50 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    for (const type of touchEventTypes) {
+      expect(windowTarget.listenerCount(type)).toBe(0);
+      expect(target.listenerCount(type)).toBe(1);
+    }
+
+    swipe(100, 49, target);
+
     expect(latestControls?.phase).toBe("work");
-    expect(latestControls?.direction).toBe("next");
+  });
+
+  it("resolves a React element ref in the effect after commit", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let attachedTarget: MinimalElement | undefined;
+
+    function RefTimingProbe() {
+      const targetRef = useRef<HTMLDivElement | null>(null);
+      useTouchInput<TestPhase>({ target: targetRef, threshold: 50 });
+
+      useEffect(() => {
+        attachedTarget = targetRef.current as unknown as MinimalElement;
+      });
+
+      return <div ref={targetRef} />;
+    }
+
+    renderFlow(
+      <>
+        <RefTimingProbe />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    for (const type of touchEventTypes) {
+      expect(windowTarget.listenerCount(type)).toBe(0);
+      expect(attachedTarget?.listenerCount(type)).toBe(1);
+    }
+
+    swipe(100, 49, attachedTarget);
+
+    expect(latestControls?.phase).toBe("work");
   });
 
   it("can attach directly to a provided HTMLElement target", () => {
@@ -461,7 +536,7 @@ describe("useTouchInput", () => {
 
     renderFlow(
       <>
-        <TouchInputProbe options={{ target: targetRef, threshold: 40 }} />
+        <TouchInputProbe options={{ target: targetRef, threshold: 41 }} />
         <ControlsProbe onRender={(controls) => (latestControls = controls)} />
       </>
     );

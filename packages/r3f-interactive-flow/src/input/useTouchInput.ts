@@ -54,9 +54,6 @@ export function useTouchInput<TPhase extends string>(options: UseTouchInputOptio
   const startPositionRef = useRef<number | null>(null);
   const gestureIgnoredRef = useRef(false);
   const lastNavigationAtRef = useRef<number | null>(null);
-  const eventTarget =
-    typeof window === "undefined" ? undefined : resolveInputTarget(options.target);
-
   useEffect(() => {
     flowRef.current = typedFlow;
     machineRef.current = machine;
@@ -68,7 +65,13 @@ export function useTouchInput<TPhase extends string>(options: UseTouchInputOptio
       return;
     }
 
-    if (typeof window === "undefined" || eventTarget === undefined) {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const eventTarget = resolveInputTarget(options.target);
+
+    if (eventTarget === null) {
       return;
     }
 
@@ -186,7 +189,6 @@ export function useTouchInput<TPhase extends string>(options: UseTouchInputOptio
     options.ignore,
     options.preventDefault,
     options.target,
-    eventTarget,
     options.threshold
   ]);
 }
