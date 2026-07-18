@@ -3,7 +3,7 @@
 import { useFrame } from "@react-three/fiber";
 import { useContext, useEffect, useRef } from "react";
 import type { FlowDirection } from "../core/types";
-import { FlowContext } from "../react/FlowContext";
+import { FlowMachineContext } from "../react/FlowContext";
 
 export type FlowFrameState<TPhase extends string> = {
   phase: TPhase;
@@ -19,7 +19,7 @@ export type FlowFrameCallback<TPhase extends string> = (
 ) => void;
 
 export function useFlowFrame<TPhase extends string>(callback: FlowFrameCallback<TPhase>): void {
-  const context = useContext(FlowContext);
+  const context = useContext(FlowMachineContext);
   const callbackRef = useRef(callback);
 
   useEffect(() => {

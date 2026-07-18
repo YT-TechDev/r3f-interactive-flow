@@ -3,7 +3,7 @@ import type { RefObject } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { FlowControls, FlowMachine } from "../core/types";
-import { FlowContext } from "../react/FlowContext";
+import { FlowMachineContext } from "../react/FlowContext";
 import type { MinimalElement, MinimalEventTarget } from "../test-utils/minimalDom";
 import { installMinimalDom, windowTarget } from "../test-utils/minimalDom";
 import { createControlsProbe, createFlowTestHarness } from "../test-utils/renderFlow";
@@ -49,7 +49,7 @@ function MachineProbe({
 }: {
   onRender: (machine: FlowMachine<TestPhase>, syncSnapshot: () => void) => void;
 }) {
-  const context = useContext(FlowContext);
+  const context = useContext(FlowMachineContext);
 
   if (context === null) {
     throw new Error("MachineProbe must be rendered inside FlowProvider.");

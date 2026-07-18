@@ -2,7 +2,7 @@
 
 import { useContext, useEffect, useRef } from "react";
 import type { FlowControls, FlowMachine } from "../core/types";
-import { FlowContext } from "../react/FlowContext";
+import { FlowContext, FlowMachineContext } from "../react/FlowContext";
 import { resolveInputTarget } from "./inputUtils";
 import type { FlowInputTarget } from "./inputUtils";
 import { navigateAndSyncIfAccepted } from "./navigationAcceptance";
@@ -62,16 +62,17 @@ function shouldIgnoreKeyboardEventTarget(target: EventTarget | null): boolean {
 export function useKeyboardInput<TPhase extends string>(
   options: UseKeyboardInputOptions = {}
 ): void {
-  const context = useContext(FlowContext);
+  const flow = useContext(FlowContext);
+  const machineContext = useContext(FlowMachineContext);
 
-  if (context === null) {
+  if (flow === null || machineContext === null) {
     throw new Error("useFlow must be used inside FlowProvider.");
   }
 
-  const flow = context.controls as unknown as FlowControls<TPhase>;
-  const machine = context.machine as unknown as FlowMachine<TPhase>;
-  const syncSnapshot = context.syncSnapshot;
-  const flowRef = useRef<FlowControls<TPhase>>(flow);
+  const typedFlow = flow as unknown as FlowControls<TPhase>;
+  const machine = machineContext.machine as unknown as FlowMachine<TPhase>;
+  const syncSnapshot = machineContext.syncSnapshot;
+  const flowRef = useRef<FlowControls<TPhase>>(typedFlow);
   const machineRef = useRef(machine);
   const syncSnapshotRef = useRef(syncSnapshot);
   const lastNavigationAtRef = useRef<number>(-Infinity);
@@ -79,10 +80,10 @@ export function useKeyboardInput<TPhase extends string>(
     typeof window === "undefined" ? undefined : resolveInputTarget(options.target);
 
   useEffect(() => {
-    flowRef.current = flow;
+    flowRef.current = typedFlow;
     machineRef.current = machine;
     syncSnapshotRef.current = syncSnapshot;
-  }, [flow, machine, syncSnapshot]);
+  }, [typedFlow, machine, syncSnapshot]);
 
   useEffect(() => {
     if (options.enabled === false) {
