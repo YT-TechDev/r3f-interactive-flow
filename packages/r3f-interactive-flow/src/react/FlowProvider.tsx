@@ -27,7 +27,7 @@ export function FlowProvider<TPhase extends string>({
   transition,
   children
 }: FlowProviderProps<TPhase>): ReactNode {
-  const machine = useMemo(() => {
+  const [machine] = useState(() => {
     return createFlowMachine({
       phases,
       ...(initialPhase !== undefined ? { initialPhase } : {}),
@@ -36,7 +36,7 @@ export function FlowProvider<TPhase extends string>({
       ...(easing !== undefined ? { easing } : {}),
       ...(transition !== undefined ? { transition } : {})
     });
-  }, [cooldownMs, easing, initialPhase, phases, transition, transitionDurationMs]);
+  });
 
   const [snapshot, setSnapshot] = useState<FlowSnapshot<TPhase>>(() => machine.getSnapshot());
 
@@ -136,13 +136,14 @@ export function FlowProvider<TPhase extends string>({
     requestSync();
   }, [requestSync]);
 
-  // Stop the clock when the provider unmounts or the machine is replaced because
-  // configuration changed, so no stale clock keeps advancing an old machine.
+  // Stop the clock when this provider instance unmounts. Applying new
+  // configuration intentionally means remounting FlowProvider with a new React
+  // key, so stale clock work must not survive that unmount/remount boundary.
   useEffect(() => {
     return () => {
       stopClock();
     };
-  }, [machine, stopClock]);
+  }, [stopClock]);
 
   const controls = useMemo<FlowControls<TPhase>>(
     () => ({

@@ -218,25 +218,29 @@ import {
 Package-root imports keep examples portable and keep your app aligned with the
 supported public surface.
 
-## Creating phase arrays inline on every render
+## Treating prop changes as live FlowProvider reconfiguration
 
-A phase list is usually intended to be a stable ordered tuple. Creating it inline
-inside a component makes a new array on every render, which can reset or churn
-provider setup in ways you did not intend.
+A mounted `FlowProvider` reads its phases and transition configuration once, when
+that provider instance mounts. Ordinary parent rerenders preserve current flow
+state, even if they pass fresh but equivalent inline arrays or option objects.
+Changing configuration props alone does not reconfigure the mounted machine.
 
 ### Mistake
 
 ```tsx
 import { FlowProvider } from "r3f-interactive-flow";
 
-export function App() {
+export function App({ phases, transitionDuration }: Props) {
   return (
-    <FlowProvider phases={["intro", "work", "contact"]}>
+    <FlowProvider phases={phases} transition={{ duration: transitionDuration }}>
       <Experience />
     </FlowProvider>
   );
 }
 ```
+
+Updating `phases` or `transitionDuration` on the same provider position will not
+apply a new machine configuration.
 
 ### Better
 
@@ -248,16 +252,23 @@ type Phase = (typeof phases)[number];
 
 export function App() {
   return (
-    <FlowProvider phases={phases} initialPhase="intro">
+    <FlowProvider
+      key={flowConfigurationVersion}
+      phases={phases}
+      initialPhase="intro"
+      transition={transition}
+    >
       <Experience />
     </FlowProvider>
   );
 }
 ```
 
-Define static phases at module scope. If phases are derived from runtime data,
-use normal React memoization so the array identity changes only when the actual
-phase set changes.
+Define static phases at module scope for TypeScript inference, readability, and
+a clear phase type. If phases or timing are derived from runtime data, change the
+provider element's React `key` when you intentionally want React to unmount the
+old provider and mount a new machine with that configuration. `key` is React's
+remount mechanism, not a `FlowProvider` API prop.
 
 ## Copying high-frequency frame values into React state
 
@@ -418,6 +429,6 @@ and templates only where those concerns belong in your app.
 - Call `useFlowFrame` only inside Canvas-rendered components.
 - Keep R3F hooks out of DOM components.
 - Keep browser input hooks in a DOM/input layer by default.
-- Keep phase arrays stable when they represent a fixed ordered tuple.
+- Hoist phase arrays for type inference and readability when they represent a fixed ordered tuple.
 - Avoid React state writes for per-frame values.
 - Keep the library's role focused: predictable phase flow, not a full framework.

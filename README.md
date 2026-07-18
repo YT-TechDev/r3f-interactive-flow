@@ -128,7 +128,7 @@ export function App() {
 }
 ```
 
-`FlowProvider` should receive stable `phases` and configuration props. Define phase tuples outside components or memoize derived configuration.
+`FlowProvider` reads its configuration when that provider instance mounts. Ordinary parent rerenders, including fresh equivalent inline arrays or objects, preserve the current flow state; changing configuration props alone does not reconfigure the mounted machine. To intentionally reset state or apply new phases, timing, cooldown, or easing, change the provider element's React `key` so React remounts it. Hoist phase tuples for TypeScript inference, readability, and a clear phase type—not merely to prevent rerender resets. `key` is React's remount mechanism, not a `FlowProvider` API prop.
 
 ## Focused usage recipes
 

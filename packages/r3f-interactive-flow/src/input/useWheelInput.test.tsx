@@ -154,7 +154,8 @@ describe("useWheelInput", () => {
         <WheelInputProbe options={{ threshold: 40 }} />
         <ControlsProbe onRender={(controls) => (latestControls = controls)} />
       </>,
-      "work"
+      "work",
+      { providerKey: "line-mode", transition: { duration: 0 } }
     );
 
     dispatchWheel(3, windowTarget, { deltaMode: WheelEvent.DOM_DELTA_LINE });
@@ -164,7 +165,9 @@ describe("useWheelInput", () => {
       <>
         <WheelInputProbe options={{ threshold: 799 }} />
         <ControlsProbe onRender={(controls) => (latestControls = controls)} />
-      </>
+      </>,
+      undefined,
+      { providerKey: "page-mode", transition: { duration: 0 } }
     );
 
     dispatchWheel(1, windowTarget, { deltaMode: WheelEvent.DOM_DELTA_PAGE });
@@ -174,7 +177,9 @@ describe("useWheelInput", () => {
       <>
         <WheelInputProbe options={{ threshold: 40 }} />
         <ControlsProbe onRender={(controls) => (latestControls = controls)} />
-      </>
+      </>,
+      undefined,
+      { providerKey: "unknown-mode", transition: { duration: 0 } }
     );
 
     dispatchWheel(41, windowTarget, { deltaMode: 99 });
