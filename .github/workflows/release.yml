@@ -40,9 +40,6 @@ jobs:
           cache: pnpm
           registry-url: https://registry.npmjs.org
 
-      - name: Install exact npm CLI for Trusted Publishing
-        run: npm install --global npm@12.0.0
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -51,6 +48,9 @@ jobs:
 
       - name: Safe release verification
         run: pnpm release:check
+
+      - name: Install exact npm CLI for Trusted Publishing
+        run: npm install --global npm@12.0.0
 
       - name: Publish with npm Trusted Publishing
         run: npm publish ./packages/r3f-interactive-flow --access public
