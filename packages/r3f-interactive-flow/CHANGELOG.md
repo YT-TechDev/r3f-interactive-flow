@@ -1,5 +1,41 @@
 # r3f-interactive-flow
 
+## 2.4.0
+
+`r3f-interactive-flow@2.4.0` improves runtime correctness, React integration performance, cross-device browser input behavior, and release supply-chain security while preserving the existing public API and root-only package boundary.
+
+### Fixed
+
+- Start provider cooldown at the actual transition-completion boundary instead of consuming it concurrently with the transition.
+- Support zero-duration transitions as immediate completions that enter their configured cooldown synchronously.
+- Prevent explicitly supplied but unresolved input refs from silently falling back to `window`.
+- Consume wheel, keyboard, and touch browser events only after flow navigation is accepted.
+- Preserve native browser behavior for rejected input, phase boundaries, locks, cooldowns, active transitions, editable elements, and actionable controls.
+- Normalize wheel `deltaMode` values and accumulate high-resolution trackpad deltas into deterministic, one-navigation-per-burst input.
+- Preserve `FlowProvider` state across semantically equivalent parent renders and use React `key` remounting as the explicit reconfiguration mechanism.
+
+### Performance
+
+- Separate stable flow-machine access from reactive snapshot subscriptions so `useFlowFrame()` and stable-machine consumers do not re-render on every transition frame.
+- Preserve continuous reactive progress updates for `useFlow()` and `useFlowProgress()` consumers.
+
+### Hardened
+
+- Add regression coverage for provider render boundaries, mount-scoped configuration, post-transition cooldowns, zero-duration transitions, input target resolution, accepted-navigation event consumption, actionable controls, touch commitment, and wheel normalization and accumulation.
+- Add a blocking production dependency audit to CI.
+- Pin third-party GitHub Actions to reviewed full commit SHAs and use explicit least-privilege permissions.
+- Add a manually dispatched npm Trusted Publishing workflow using GitHub Actions OIDC and automatic provenance.
+- Make the pnpm minimum release-age policy explicit while preserving the workspace and build policies.
+- Document the remaining Low development-only `esbuild` advisory and its follow-up decision.
+
+### Compatibility
+
+- No public exports or hook signatures are added or removed.
+- No runtime dependencies are added.
+- Peer dependency ranges are unchanged.
+- The root-only package export boundary is unchanged.
+- Cooldown timing, browser input consumption, wheel gesture handling, and provider reconfiguration behavior are intentional user-visible corrections in this minor release.
+
 ## 2.3.1
 
 `r3f-interactive-flow@2.3.1` is a focused maintenance release that corrects transition clock ownership and React progress synchronization while strengthening packed-package and supported-peer compatibility validation.
