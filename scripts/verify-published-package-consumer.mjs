@@ -60,37 +60,62 @@ function assertRegistryResolution({ resolvedPackagePath, tempConsumer, installed
   }
 }
 
-async function assertLockfileRegistryEvidence(tempConsumer) {
-  const lockfile = await readFile(join(tempConsumer, "pnpm-lock.yaml"), "utf8");
+function getLockfileImporterDependencyBlock(lockfile) {
   const lines = lockfile.split(/\r?\n/);
-  const dependencyLineIndex = lines.findIndex((line) =>
-    /^\s{4}r3f-interactive-flow:\s*$/.test(line)
+  const importersIndex = lines.findIndex((line) => line.trim() === "importers:");
+
+  if (importersIndex === -1) {
+    throw new Error("pnpm lockfile is missing the importers section.");
+  }
+
+  const nextTopLevelSectionIndex = lines.findIndex(
+    (line, index) => index > importersIndex && /^\S[^:]*:\s*$/.test(line)
+  );
+  const importerLines = lines.slice(
+    importersIndex + 1,
+    nextTopLevelSectionIndex === -1 ? lines.length : nextTopLevelSectionIndex
+  );
+  const dependencyLineIndex = importerLines.findIndex(
+    (line) => line.trim() === "r3f-interactive-flow:"
   );
 
   if (dependencyLineIndex === -1) {
-    throw new Error("pnpm lockfile is missing the r3f-interactive-flow dependency entry.");
+    throw new Error("pnpm lockfile is missing the r3f-interactive-flow importer dependency entry.");
   }
 
+  const dependencyLine = importerLines[dependencyLineIndex];
+  const dependencyIndent = dependencyLine.match(/^\s*/)?.[0].length ?? 0;
   const dependencyBlock = [];
 
-  for (const line of lines.slice(dependencyLineIndex + 1)) {
-    if (/^\s{4}\S/.test(line)) {
+  for (const line of importerLines.slice(dependencyLineIndex + 1)) {
+    if (line.trim() === "") {
+      dependencyBlock.push(line);
+      continue;
+    }
+
+    const indent = line.match(/^\s*/)?.[0].length ?? 0;
+
+    if (indent <= dependencyIndent) {
       break;
     }
 
     dependencyBlock.push(line);
   }
 
-  const hasExactSpecifier = dependencyBlock.some((line) =>
-    /^\s{6}specifier:\s+2\.4\.0\s*$/.test(line)
-  );
-  const versionLine = dependencyBlock.find((line) => /^\s{6}version:\s+/.test(line));
+  return dependencyBlock;
+}
+
+function assertLockfileRegistryEvidenceText(lockfile) {
+  const dependencyBlock = getLockfileImporterDependencyBlock(lockfile);
+  const normalizedBlock = dependencyBlock.map((line) => line.trim());
+  const hasExactSpecifier = normalizedBlock.includes("specifier: 2.4.0");
+  const versionLine = normalizedBlock.find((line) => line.startsWith("version:"));
 
   if (!hasExactSpecifier) {
     throw new Error("pnpm lockfile does not record specifier: 2.4.0 for r3f-interactive-flow.");
   }
 
-  if (versionLine === undefined || !/^\s{6}version:\s+2\.4\.0(?:\(|\s*$)/.test(versionLine)) {
+  if (versionLine === undefined || !/^version:\s+2\.4\.0(?:\(|\s*$)/.test(versionLine)) {
     throw new Error("pnpm lockfile does not record version: 2.4.0 for r3f-interactive-flow.");
   }
 
@@ -99,7 +124,60 @@ async function assertLockfileRegistryEvidence(tempConsumer) {
   }
 }
 
+function runLockfileParserSelfCheck() {
+  const validRegistryImporter = `importers:
+
+  .:
+    dependencies:
+      r3f-interactive-flow:
+        specifier: 2.4.0
+        version: 2.4.0(@react-three/fiber@9.6.1)
+`;
+  const workspaceImporter = `importers:
+
+  .:
+    dependencies:
+      r3f-interactive-flow:
+        specifier: workspace:*
+        version: link:../../packages/r3f-interactive-flow
+`;
+  const boundedImporter = `importers:
+
+  .:
+    dependencies:
+      r3f-interactive-flow:
+        specifier: 2.4.0
+        version: 2.4.0
+
+packages:
+  unrelated:
+    resolution:
+      tarball: file:../not-the-importer.tgz
+    repository: git+https://example.invalid/unrelated.git
+`;
+
+  assertLockfileRegistryEvidenceText(validRegistryImporter);
+  assertLockfileRegistryEvidenceText(boundedImporter);
+
+  try {
+    assertLockfileRegistryEvidenceText(workspaceImporter);
+  } catch {
+    console.log("published consumer: lockfile parser self-check passed");
+    return;
+  }
+
+  throw new Error("pnpm lockfile parser accepted a local workspace dependency fixture.");
+}
+
+async function assertLockfileRegistryEvidence(tempConsumer) {
+  const lockfile = await readFile(join(tempConsumer, "pnpm-lock.yaml"), "utf8");
+
+  assertLockfileRegistryEvidenceText(lockfile);
+}
+
 async function main() {
+  runLockfileParserSelfCheck();
+
   const tempRoot = await mkdtemp(join(tmpdir(), "r3f-flow-published-consumer-"));
   const tempConsumer = join(tempRoot, "vite-published-package");
 
