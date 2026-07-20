@@ -18,6 +18,11 @@ type Phase = (typeof phases)[number];
 
 const inputIgnore = ["[data-flow-ignore]"] as const;
 
+const keyboardKeys = {
+  next: ["ArrowDown", "ArrowRight", "PageDown"],
+  prev: ["ArrowUp", "ArrowLeft", "PageUp"]
+} as const;
+
 type MotionMode = "normal" | "reduced";
 
 const transitionMs: Record<MotionMode, number> = {
@@ -26,9 +31,21 @@ const transitionMs: Record<MotionMode, number> = {
 };
 
 function FlowInputs() {
-  useWheelInput<Phase>({ ignore: inputIgnore, threshold: 48, cooldown: 250 });
-  useTouchInput<Phase>({ ignore: inputIgnore, threshold: 44, cooldown: 250 });
-  useKeyboardInput<Phase>({ ignore: inputIgnore, cooldown: 250 });
+  useWheelInput<Phase>({
+    ignore: inputIgnore,
+    threshold: 48,
+    cooldown: 250
+  });
+  useTouchInput<Phase>({
+    ignore: inputIgnore,
+    threshold: 44,
+    cooldown: 250
+  });
+  useKeyboardInput<Phase>({
+    keys: keyboardKeys,
+    cooldown: 250,
+    ignoreWhenTyping: true
+  });
 
   return null;
 }

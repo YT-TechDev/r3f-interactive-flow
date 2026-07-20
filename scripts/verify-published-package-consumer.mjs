@@ -61,6 +61,8 @@ async function main() {
   try {
     await cp(consumerSource, tempConsumer, { recursive: true });
 
+    console.log("published consumer: validating manifest");
+
     const consumerManifestPath = join(tempConsumer, "package.json");
     const consumerManifest = JSON.parse(await readFile(consumerManifestPath, "utf8"));
     const declaredVersion = consumerManifest.dependencies?.["r3f-interactive-flow"];
@@ -71,7 +73,10 @@ async function main() {
       );
     }
 
+    console.log("published consumer: installing standalone dependencies");
     await run("pnpm", ["install"], { cwd: tempConsumer });
+
+    console.log("published consumer: verifying registry package resolution");
 
     const requireFromConsumer = createRequire(pathToFileURL(consumerManifestPath));
     const resolvedEntrypoint = requireFromConsumer.resolve("r3f-interactive-flow");
@@ -86,6 +91,8 @@ async function main() {
     }
 
     assertNotLocalResolution(resolvedPackagePath, installedManifest);
+
+    console.log("published consumer: building standalone consumer");
     await run("pnpm", ["build"], { cwd: tempConsumer });
 
     console.log(`installed package version: ${installedManifest.version}`);

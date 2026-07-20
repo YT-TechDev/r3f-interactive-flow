@@ -31,6 +31,7 @@ The consumer also includes a local `pnpm-workspace.yaml` with only `allowBuilds.
 
 - Public API coverage: `FlowProvider`, `useFlow`, `useFlowProgress`, `useFlowFrame`, `useWheelInput`, `useTouchInput`, and `useKeyboardInput`.
 - DOM and input logic remain outside Canvas; `useFlowFrame` is used only by Canvas-bound observer components.
+- `data-flow-ignore` is passed to the wheel and touch hooks for the explicit nested-scroll region. Keyboard input uses the public `keys` and `ignoreWhenTyping` options, so native form typing is preserved without claiming `useKeyboardInput` supports ignore selectors.
 - Native actionable controls include a text input, textarea, select, checkbox, regular button, and regular anchor outside the broad ignored region.
 - A separate `data-flow-ignore` nested scroll region has constrained height and enough content to scroll independently.
 - Normal and reduced motion are application-owned modes. Switching modes intentionally changes the provider key, remounts `FlowProvider`, and resets flow state; this does not claim a complete library-level reduced-motion policy.
