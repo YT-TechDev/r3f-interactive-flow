@@ -67,3 +67,6 @@ jobs:
 
       - name: Package dry run
         run: pnpm pack:dry-run
+
+      - name: Published package usage consumer
+        run: pnpm consumer:published:verify
