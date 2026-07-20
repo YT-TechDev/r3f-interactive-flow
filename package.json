@@ -17,7 +17,8 @@
     "version-packages": "changeset version",
     "release:check": "pnpm build && pnpm package:verify && pnpm package:smoke && pnpm package:compat && pnpm typecheck && pnpm test && pnpm lint && pnpm format && pnpm --filter vite-basic build && pnpm pack:dry-run",
     "release": "pnpm release:check && changeset publish",
-    "pack:dry-run": "pnpm --filter r3f-interactive-flow pack:dry-run"
+    "pack:dry-run": "pnpm --filter r3f-interactive-flow pack:dry-run",
+    "consumer:published:verify": "node scripts/verify-published-package-consumer.mjs"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.1",
