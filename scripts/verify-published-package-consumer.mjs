@@ -24,33 +24,78 @@ function run(command, args, options) {
   });
 }
 
-function assertNotLocalResolution(resolvedPackagePath, manifest) {
-  const normalized = resolvedPackagePath.replaceAll("\\\\", "/");
-  const disallowedHints = ["workspace:", "file:", "link:", "git+", ".tgz"];
+function normalizePath(path) {
+  return path.replaceAll("\\", "/");
+}
 
-  if (resolvedPackagePath.startsWith(workspacePackage)) {
-    throw new Error(`resolved package points at local workspace package: ${resolvedPackagePath}`);
-  }
+function assertRegistryResolution({ resolvedPackagePath, tempConsumer, installedManifest }) {
+  const normalizedResolved = normalizePath(resolvedPackagePath);
+  const normalizedWorkspace = normalizePath(workspacePackage);
+  const normalizedConsumer = normalizePath(tempConsumer);
 
-  if (
-    normalized.includes("/packages/r3f-interactive-flow/") ||
-    normalized.endsWith("/packages/r3f-interactive-flow")
-  ) {
-    throw new Error(`resolved package path resembles repository source: ${resolvedPackagePath}`);
-  }
-
-  if (normalized.includes("/dist/") && normalized.includes("r3f-interactive-flow")) {
+  if (installedManifest.version !== expectedVersion) {
     throw new Error(
-      `resolved package path resembles a local dist directory: ${resolvedPackagePath}`
+      `expected r3f-interactive-flow ${expectedVersion}, found ${installedManifest.version}`
     );
   }
 
-  for (const hint of disallowedHints) {
-    if (normalized.includes(hint) || JSON.stringify(manifest).includes(hint)) {
-      throw new Error(
-        `resolved package contains local or non-registry hint ${hint}: ${resolvedPackagePath}`
-      );
+  if (
+    normalizedResolved === normalizedWorkspace ||
+    normalizedResolved.startsWith(`${normalizedWorkspace}/`)
+  ) {
+    throw new Error(`resolved package points at local workspace package: ${resolvedPackagePath}`);
+  }
+
+  if (!normalizedResolved.startsWith(`${normalizedConsumer}/node_modules/`)) {
+    throw new Error(
+      `resolved package is outside the standalone consumer node_modules: ${resolvedPackagePath}`
+    );
+  }
+
+  if (
+    normalizedResolved.includes("/packages/r3f-interactive-flow/") ||
+    normalizedResolved.endsWith("/packages/r3f-interactive-flow")
+  ) {
+    throw new Error(`resolved package path resembles repository source: ${resolvedPackagePath}`);
+  }
+}
+
+async function assertLockfileRegistryEvidence(tempConsumer) {
+  const lockfile = await readFile(join(tempConsumer, "pnpm-lock.yaml"), "utf8");
+  const lines = lockfile.split(/\r?\n/);
+  const dependencyLineIndex = lines.findIndex((line) =>
+    /^\s{4}r3f-interactive-flow:\s*$/.test(line)
+  );
+
+  if (dependencyLineIndex === -1) {
+    throw new Error("pnpm lockfile is missing the r3f-interactive-flow dependency entry.");
+  }
+
+  const dependencyBlock = [];
+
+  for (const line of lines.slice(dependencyLineIndex + 1)) {
+    if (/^\s{4}\S/.test(line)) {
+      break;
     }
+
+    dependencyBlock.push(line);
+  }
+
+  const hasExactSpecifier = dependencyBlock.some((line) =>
+    /^\s{6}specifier:\s+2\.4\.0\s*$/.test(line)
+  );
+  const versionLine = dependencyBlock.find((line) => /^\s{6}version:\s+/.test(line));
+
+  if (!hasExactSpecifier) {
+    throw new Error("pnpm lockfile does not record specifier: 2.4.0 for r3f-interactive-flow.");
+  }
+
+  if (versionLine === undefined || !/^\s{6}version:\s+2\.4\.0(?:\(|\s*$)/.test(versionLine)) {
+    throw new Error("pnpm lockfile does not record version: 2.4.0 for r3f-interactive-flow.");
+  }
+
+  if (/\b(?:link|file|workspace):/.test(dependencyBlock.join("\n"))) {
+    throw new Error("pnpm lockfile resolved r3f-interactive-flow from a local dependency source.");
   }
 }
 
@@ -65,11 +110,11 @@ async function main() {
 
     const consumerManifestPath = join(tempConsumer, "package.json");
     const consumerManifest = JSON.parse(await readFile(consumerManifestPath, "utf8"));
-    const declaredVersion = consumerManifest.dependencies?.["r3f-interactive-flow"];
+    const dependencySpec = consumerManifest.dependencies?.["r3f-interactive-flow"];
 
-    if (declaredVersion !== expectedVersion) {
+    if (dependencySpec !== expectedVersion) {
       throw new Error(
-        `expected consumer dependency r3f-interactive-flow ${expectedVersion}, found ${declaredVersion ?? "missing"}`
+        `expected consumer dependency r3f-interactive-flow ${expectedVersion}, found ${dependencySpec ?? "missing"}`
       );
     }
 
@@ -81,22 +126,24 @@ async function main() {
     const requireFromConsumer = createRequire(pathToFileURL(consumerManifestPath));
     const resolvedEntrypoint = requireFromConsumer.resolve("r3f-interactive-flow");
     const resolvedPackagePath = await realpath(resolve(dirname(resolvedEntrypoint), ".."));
+    const resolvedConsumerPath = await realpath(tempConsumer);
     const resolvedManifestPath = join(resolvedPackagePath, "package.json");
     const installedManifest = JSON.parse(await readFile(resolvedManifestPath, "utf8"));
 
-    if (installedManifest.version !== expectedVersion) {
-      throw new Error(
-        `expected r3f-interactive-flow ${expectedVersion}, found ${installedManifest.version}`
-      );
-    }
+    assertRegistryResolution({
+      resolvedPackagePath,
+      tempConsumer: resolvedConsumerPath,
+      installedManifest
+    });
+    await assertLockfileRegistryEvidence(tempConsumer);
 
-    assertNotLocalResolution(resolvedPackagePath, installedManifest);
+    console.log(`declared package version: ${dependencySpec}`);
+    console.log(`installed package version: ${installedManifest.version}`);
+    console.log(`resolved package path: ${resolvedPackagePath}`);
 
     console.log("published consumer: building standalone consumer");
     await run("pnpm", ["build"], { cwd: tempConsumer });
 
-    console.log(`installed package version: ${installedManifest.version}`);
-    console.log(`resolved package path: ${resolvedPackagePath}`);
     console.log("build result: passed");
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
