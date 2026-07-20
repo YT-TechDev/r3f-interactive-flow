@@ -25,6 +25,8 @@ pnpm consumer:published:verify
 
 That root command copies this consumer to a temporary directory outside the repository, installs fresh dependencies, verifies that `r3f-interactive-flow` resolves to npm version `2.4.0` instead of a local workspace path, then runs the production build.
 
+The consumer also includes a local `pnpm-workspace.yaml` with only `allowBuilds.esbuild` enabled. That narrow pnpm 11 policy makes the standalone Vite install self-contained without inheriting the repository workspace package or permitting arbitrary dependency lifecycle scripts.
+
 ## Validation surfaces
 
 - Public API coverage: `FlowProvider`, `useFlow`, `useFlowProgress`, `useFlowFrame`, `useWheelInput`, `useTouchInput`, and `useKeyboardInput`.

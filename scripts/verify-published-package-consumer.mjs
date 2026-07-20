@@ -60,12 +60,20 @@ async function main() {
 
   try {
     await cp(consumerSource, tempConsumer, { recursive: true });
-    await run("pnpm", ["install"], { cwd: tempConsumer });
-    await run("pnpm", ["install", `r3f-interactive-flow@${expectedVersion}`, "--save-exact"], {
-      cwd: tempConsumer
-    });
 
-    const requireFromConsumer = createRequire(pathToFileURL(join(tempConsumer, "package.json")));
+    const consumerManifestPath = join(tempConsumer, "package.json");
+    const consumerManifest = JSON.parse(await readFile(consumerManifestPath, "utf8"));
+    const declaredVersion = consumerManifest.dependencies?.["r3f-interactive-flow"];
+
+    if (declaredVersion !== expectedVersion) {
+      throw new Error(
+        `expected consumer dependency r3f-interactive-flow ${expectedVersion}, found ${declaredVersion ?? "missing"}`
+      );
+    }
+
+    await run("pnpm", ["install"], { cwd: tempConsumer });
+
+    const requireFromConsumer = createRequire(pathToFileURL(consumerManifestPath));
     const resolvedEntrypoint = requireFromConsumer.resolve("r3f-interactive-flow");
     const resolvedPackagePath = await realpath(resolve(dirname(resolvedEntrypoint), ".."));
     const resolvedManifestPath = join(resolvedPackagePath, "package.json");

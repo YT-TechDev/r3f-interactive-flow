@@ -50,9 +50,6 @@ jobs:
       - name: Supported peer compatibility
         run: pnpm package:compat
 
-      - name: Published package usage consumer
-        run: pnpm consumer:published:verify
-
       - name: Typecheck
         run: pnpm typecheck
 
@@ -70,3 +67,6 @@ jobs:
 
       - name: Package dry run
         run: pnpm pack:dry-run
+
+      - name: Published package usage consumer
+        run: pnpm consumer:published:verify
