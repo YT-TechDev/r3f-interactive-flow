@@ -1304,6 +1304,198 @@ describe("useKeyboardInput", () => {
     expect(latestControls?.direction).toBe("next");
   });
 
+  it("keeps the keydown listener across fresh outer options rerenders with stable dependencies", () => {
+    const target = document.createElement("div") as unknown as MinimalElement;
+    const addEventListenerSpy = vi.spyOn(target, "addEventListener");
+    const removeEventListenerSpy = vi.spyOn(target, "removeEventListener");
+    const keys = { next: ["n"], prev: ["p"] };
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    function FreshOptionsProbe({ tick }: { tick: number }) {
+      void tick;
+      useKeyboardInput<TestPhase>({
+        cooldown: 0,
+        enabled: true,
+        ignoreWhenTyping: true,
+        keys,
+        preventDefault: true,
+        target: target as unknown as HTMLElement
+      });
+
+      return <ControlsProbe onRender={(controls) => (latestControls = controls)} />;
+    }
+
+    renderFlow(<FreshOptionsProbe tick={0} />, undefined, {
+      transitionDurationMs: 0,
+      cooldownMs: 0
+    });
+
+    expect(target.listenerCount("keydown")).toBe(1);
+    expect(addEventListenerSpy).toHaveBeenCalledTimes(1);
+
+    renderFlow(<FreshOptionsProbe tick={1} />, undefined, {
+      transitionDurationMs: 0,
+      cooldownMs: 0
+    });
+
+    expect(target.listenerCount("keydown")).toBe(1);
+    expect(addEventListenerSpy).toHaveBeenCalledTimes(1);
+    expect(removeEventListenerSpy).not.toHaveBeenCalled();
+
+    const accepted = dispatchKeyDown("n", {}, target);
+
+    expect(accepted.defaultPrevented).toBe(true);
+    expect(latestControls?.phase).toBe("work");
+  });
+
+  it.each([
+    {
+      label: "grouped keys",
+      createOptions: () => ({ keys: { next: ["n"], prev: ["p"] } })
+    },
+    {
+      label: "legacy key arrays",
+      createOptions: () => ({ nextKeys: ["n"], prevKeys: ["p"] })
+    }
+  ] satisfies Array<{
+    label: string;
+    createOptions: () => Pick<UseKeyboardInputOptions, "keys" | "nextKeys" | "prevKeys">;
+  }>)(
+    "preserves hook-local cooldown across equivalent inline $label rerenders",
+    ({ createOptions }) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(0);
+      const addEventListenerSpy = vi.spyOn(globalThis, "addEventListener");
+      const removeEventListenerSpy = vi.spyOn(globalThis, "removeEventListener");
+      let latestControls: FlowControls<TestPhase> | undefined;
+
+      function InlineKeysProbe({ tick }: { tick: number }) {
+        void tick;
+        useKeyboardInput<TestPhase>({
+          ...createOptions(),
+          cooldown: 500
+        });
+
+        return <ControlsProbe onRender={(controls) => (latestControls = controls)} />;
+      }
+
+      try {
+        renderFlow(<InlineKeysProbe tick={0} />, undefined, {
+          transitionDurationMs: 0,
+          cooldownMs: 0
+        });
+
+        const acceptedAtZero = dispatchKeyDown("n");
+
+        expect(acceptedAtZero.defaultPrevented).toBe(true);
+        expect(latestControls?.phase).toBe("work");
+        expect(windowTarget.listenerCount("keydown")).toBe(1);
+        const addKeydownCallsBeforeRerender = addEventListenerSpy.mock.calls.filter(
+          ([type]) => type === "keydown"
+        ).length;
+        const removeKeydownCallsBeforeRerender = removeEventListenerSpy.mock.calls.filter(
+          ([type]) => type === "keydown"
+        ).length;
+
+        renderFlow(<InlineKeysProbe tick={1} />, undefined, {
+          transitionDurationMs: 0,
+          cooldownMs: 0
+        });
+
+        expect(windowTarget.listenerCount("keydown")).toBe(1);
+        expect(addEventListenerSpy.mock.calls.filter(([type]) => type === "keydown")).toHaveLength(
+          addKeydownCallsBeforeRerender + 1
+        );
+        expect(
+          removeEventListenerSpy.mock.calls.filter(([type]) => type === "keydown")
+        ).toHaveLength(removeKeydownCallsBeforeRerender + 1);
+
+        vi.advanceTimersByTime(499);
+        const cooldownEvent = dispatchKeyDown("n");
+
+        expect(cooldownEvent.defaultPrevented).toBe(false);
+        expect(latestControls?.phase).toBe("work");
+
+        vi.advanceTimersByTime(1);
+        const acceptedAtCooldown = dispatchKeyDown("n");
+
+        expect(acceptedAtCooldown.defaultPrevented).toBe(true);
+        expect(latestControls?.phase).toBe("contact");
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
+
+  it("does not resample a mutable target ref without an actual effect dependency change", () => {
+    const firstTarget = document.createElement("div") as unknown as MinimalElement;
+    const secondTarget = document.createElement("div") as unknown as MinimalElement;
+    const targetRef = { current: firstTarget as unknown as HTMLElement };
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    function RefTargetProbe({ tick }: { tick: number }) {
+      void tick;
+      useKeyboardInput<TestPhase>({ target: targetRef });
+
+      return <ControlsProbe onRender={(controls) => (latestControls = controls)} />;
+    }
+
+    renderFlow(<RefTargetProbe tick={0} />, undefined, {
+      transitionDurationMs: 0,
+      cooldownMs: 0
+    });
+
+    expect(firstTarget.listenerCount("keydown")).toBe(1);
+    expect(secondTarget.listenerCount("keydown")).toBe(0);
+
+    targetRef.current = secondTarget as unknown as HTMLElement;
+    renderFlow(<RefTargetProbe tick={1} />, undefined, {
+      transitionDurationMs: 0,
+      cooldownMs: 0
+    });
+
+    expect(firstTarget.listenerCount("keydown")).toBe(1);
+    expect(secondTarget.listenerCount("keydown")).toBe(0);
+
+    dispatchKeyDown("ArrowDown", {}, secondTarget);
+    expect(latestControls?.phase).toBe("intro");
+
+    dispatchKeyDown("ArrowDown", {}, firstTarget);
+    expect(latestControls?.phase).toBe("work");
+  });
+
+  it("keeps direct-target keydown listeners after DOM detachment until effect cleanup", () => {
+    const parent = document.createElement("div") as unknown as MinimalElement;
+    const target = document.createElement("div") as unknown as MinimalElement;
+    let latestControls: FlowControls<TestPhase> | undefined;
+    parent.appendChild(target);
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ target: target as unknown as HTMLElement }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>,
+      undefined,
+      { transitionDurationMs: 0, cooldownMs: 0 }
+    );
+
+    expect(target.listenerCount("keydown")).toBe(1);
+
+    parent.removeChild(target);
+
+    expect(target.listenerCount("keydown")).toBe(1);
+
+    dispatchKeyDown("ArrowDown", {}, target);
+
+    expect(latestControls?.phase).toBe("work");
+
+    act(() => {
+      getRoot()?.unmount();
+    });
+
+    expect(target.listenerCount("keydown")).toBe(0);
+  });
+
   it.each([Number.NaN, Number.POSITIVE_INFINITY, -1])(
     "throws a clear error for invalid cooldown %s",
     (cooldown) => {
