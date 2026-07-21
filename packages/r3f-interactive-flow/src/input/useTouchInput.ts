@@ -59,6 +59,7 @@ export function useTouchInput<TPhase extends string>(options: UseTouchInputOptio
   const gestureIgnoredRef = useRef(false);
   const gestureCommittedRef = useRef(false);
   const lastNavigationAtRef = useRef<number | null>(null);
+  const ignoreSignature = JSON.stringify(options.ignore ?? []);
   useEffect(() => {
     flowRef.current = typedFlow;
     machineRef.current = machine;
@@ -234,7 +235,7 @@ export function useTouchInput<TPhase extends string>(options: UseTouchInputOptio
     options.axis,
     options.cooldown,
     options.enabled,
-    options.ignore,
+    ignoreSignature,
     options.preventDefault,
     options.target,
     options.threshold
