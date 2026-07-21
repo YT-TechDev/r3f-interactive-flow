@@ -1303,15 +1303,46 @@ describe("useTouchInput", () => {
       syncSnapshot?.();
     });
 
-    vi.setSystemTime(250);
+    vi.advanceTimersByTime(250);
     const cooldownEvent = swipe(100, 49);
 
     expect(cooldownEvent.defaultPrevented).toBe(false);
     expect(latestControls?.phase).toBe("work");
 
-    vi.setSystemTime(500);
+    vi.advanceTimersByTime(250);
     swipe(100, 49);
 
+    expect(latestControls?.phase).toBe("contact");
+    vi.useRealTimers();
+  });
+
+  it("uses monotonic elapsed time for touch cooldown across wall-clock jumps", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ cooldown: 500, threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>,
+      undefined,
+      { transitionDurationMs: 0, cooldownMs: 0 }
+    );
+
+    const accepted = swipe(100, 59);
+    expect(accepted.defaultPrevented).toBe(true);
+    expect(latestControls?.phase).toBe("work");
+
+    vi.setSystemTime(1_000_000);
+    const forwardJumpEvent = swipe(100, 59);
+    expect(forwardJumpEvent.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("work");
+
+    vi.setSystemTime(0);
+    vi.advanceTimersByTime(500);
+    const boundaryEvent = swipe(100, 59);
+    expect(boundaryEvent.defaultPrevented).toBe(true);
     expect(latestControls?.phase).toBe("contact");
     vi.useRealTimers();
   });
@@ -1336,13 +1367,13 @@ describe("useTouchInput", () => {
     });
     swipe(100, 59);
 
-    vi.setSystemTime(100);
+    vi.advanceTimersByTime(100);
     act(() => {
       latestControls?.unlock();
     });
     swipe(100, 60);
 
-    vi.setSystemTime(250);
+    vi.advanceTimersByTime(150);
     swipe(100, 0, minimalIgnored);
     swipe(100, 59);
 
@@ -1374,7 +1405,7 @@ describe("useTouchInput", () => {
       isLocked: false
     });
 
-    vi.setSystemTime(250);
+    vi.advanceTimersByTime(250);
     swipe(100, 59);
 
     expect(latestControls).toMatchObject({
@@ -1425,7 +1456,7 @@ describe("useTouchInput", () => {
       isTransitioning: false,
       isLocked: false
     });
-    vi.setSystemTime(250);
+    vi.advanceTimersByTime(250);
     swipe(100, 141);
 
     expect(latestControls).toMatchObject({
@@ -1459,17 +1490,21 @@ describe("useTouchInput", () => {
 
     swipe(100, 59);
 
-    vi.setSystemTime(1_400);
-    swipe(100, 59);
+    vi.advanceTimersByTime(400);
+    const transitionEvent = swipe(100, 59);
+
+    expect(transitionEvent.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("work");
 
     act(() => {
       machine?.update(1_000);
       syncSnapshot?.();
     });
 
-    vi.setSystemTime(1_500);
-    swipe(100, 59);
+    vi.advanceTimersByTime(100);
+    const boundaryEvent = swipe(100, 59);
 
+    expect(boundaryEvent.defaultPrevented).toBe(true);
     expect(latestControls?.phase).toBe("contact");
     expect(latestControls?.direction).toBe("next");
     vi.useRealTimers();

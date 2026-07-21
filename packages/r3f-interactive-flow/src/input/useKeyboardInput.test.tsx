@@ -1044,7 +1044,8 @@ describe("useKeyboardInput", () => {
   it("blocks rapid repeated keyboard navigation with hook-local cooldown", () => {
     let latestControls: FlowControls<TestPhase> | undefined;
 
-    vi.spyOn(Date, "now").mockReturnValueOnce(1_000).mockReturnValueOnce(1_050);
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
 
     renderFlow(
       <>
@@ -1054,10 +1055,43 @@ describe("useKeyboardInput", () => {
     );
 
     dispatchKeyDown("ArrowDown");
+    vi.advanceTimersByTime(50);
     const cooldownEvent = dispatchKeyDown("ArrowRight");
 
     expect(cooldownEvent.defaultPrevented).toBe(false);
     expect(latestControls?.phase).toBe("work");
+    vi.useRealTimers();
+  });
+
+  it("uses monotonic elapsed time for keyboard cooldown across wall-clock jumps", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ cooldown: 500 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>,
+      undefined,
+      { transitionDurationMs: 0, cooldownMs: 0 }
+    );
+
+    const accepted = dispatchKeyDown("ArrowDown");
+    expect(accepted.defaultPrevented).toBe(true);
+    expect(latestControls?.phase).toBe("work");
+
+    vi.setSystemTime(1_000_000);
+    const forwardJumpEvent = dispatchKeyDown("ArrowDown");
+    expect(forwardJumpEvent.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("work");
+
+    vi.setSystemTime(0);
+    vi.advanceTimersByTime(500);
+    const boundaryEvent = dispatchKeyDown("ArrowDown");
+    expect(boundaryEvent.defaultPrevented).toBe(true);
+    expect(latestControls?.phase).toBe("contact");
+    vi.useRealTimers();
   });
 
   it("does not consume hook-local cooldown for locked, repeated, or typing-target key events", () => {
@@ -1078,13 +1112,13 @@ describe("useKeyboardInput", () => {
     });
     const lockedEvent = dispatchKeyDown("ArrowDown");
 
-    vi.setSystemTime(100);
+    vi.advanceTimersByTime(100);
     act(() => {
       latestControls?.unlock();
     });
     const repeatEvent = dispatchKeyDown("ArrowDown", { repeat: true });
 
-    vi.setSystemTime(250);
+    vi.advanceTimersByTime(150);
     const typingEvent = dispatchKeyDown("ArrowDown", { target: input });
     dispatchKeyDown("ArrowDown");
 
@@ -1119,7 +1153,7 @@ describe("useKeyboardInput", () => {
       isLocked: false
     });
 
-    vi.setSystemTime(250);
+    vi.advanceTimersByTime(250);
     dispatchKeyDown("ArrowDown");
 
     expect(latestControls).toMatchObject({
@@ -1170,7 +1204,7 @@ describe("useKeyboardInput", () => {
       isTransitioning: false,
       isLocked: false
     });
-    vi.setSystemTime(250);
+    vi.advanceTimersByTime(250);
     dispatchKeyDown("ArrowUp");
 
     expect(latestControls).toMatchObject({
@@ -1204,17 +1238,21 @@ describe("useKeyboardInput", () => {
 
     dispatchKeyDown("ArrowDown");
 
-    vi.setSystemTime(1_400);
-    dispatchKeyDown("ArrowDown");
+    vi.advanceTimersByTime(400);
+    const transitionEvent = dispatchKeyDown("ArrowDown");
+
+    expect(transitionEvent.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("work");
 
     act(() => {
       machine?.update(1_000);
       syncSnapshot?.();
     });
 
-    vi.setSystemTime(1_500);
-    dispatchKeyDown("ArrowDown");
+    vi.advanceTimersByTime(100);
+    const boundaryEvent = dispatchKeyDown("ArrowDown");
 
+    expect(boundaryEvent.defaultPrevented).toBe(true);
     expect(latestControls?.phase).toBe("contact");
     expect(latestControls?.direction).toBe("next");
     vi.useRealTimers();

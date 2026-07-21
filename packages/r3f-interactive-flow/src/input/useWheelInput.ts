@@ -145,7 +145,7 @@ export function useWheelInput<TPhase extends string>(options: UseWheelInputOptio
         return;
       }
 
-      const now = Date.now();
+      const now = performance.now();
       const direction = delta > 0 ? "next" : "prev";
       const eventTarget = wheelEvent.target;
 

@@ -106,7 +106,7 @@ export function useTouchInput<TPhase extends string>(options: UseTouchInputOptio
         return false;
       }
 
-      const now = Date.now();
+      const now = performance.now();
 
       if (lastNavigationAtRef.current !== null && now - lastNavigationAtRef.current < cooldown) {
         return false;
