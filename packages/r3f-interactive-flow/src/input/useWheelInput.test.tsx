@@ -1127,7 +1127,7 @@ describe("useWheelInput", () => {
     });
     dispatchWheel(40);
 
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(150);
     dispatchWheel(41, windowTarget, { target: ignored as unknown as EventTarget });
     dispatchWheel(41);
 
@@ -1244,17 +1244,21 @@ describe("useWheelInput", () => {
 
     dispatchWheel(41);
 
-    vi.advanceTimersByTime(1_400);
-    dispatchWheel(41);
+    vi.advanceTimersByTime(400);
+    const transitionEvent = dispatchWheel(41);
+
+    expect(transitionEvent.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("work");
 
     act(() => {
       machine?.update(1_000);
       syncSnapshot?.();
     });
 
-    vi.advanceTimersByTime(1_500);
-    dispatchWheel(41);
+    vi.advanceTimersByTime(100);
+    const boundaryEvent = dispatchWheel(41);
 
+    expect(boundaryEvent.defaultPrevented).toBe(true);
     expect(latestControls?.phase).toBe("contact");
     expect(latestControls?.direction).toBe("next");
     vi.useRealTimers();

@@ -1373,7 +1373,7 @@ describe("useTouchInput", () => {
     });
     swipe(100, 60);
 
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(150);
     swipe(100, 0, minimalIgnored);
     swipe(100, 59);
 
@@ -1490,17 +1490,21 @@ describe("useTouchInput", () => {
 
     swipe(100, 59);
 
-    vi.advanceTimersByTime(1_400);
-    swipe(100, 59);
+    vi.advanceTimersByTime(400);
+    const transitionEvent = swipe(100, 59);
+
+    expect(transitionEvent.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("work");
 
     act(() => {
       machine?.update(1_000);
       syncSnapshot?.();
     });
 
-    vi.advanceTimersByTime(1_500);
-    swipe(100, 59);
+    vi.advanceTimersByTime(100);
+    const boundaryEvent = swipe(100, 59);
 
+    expect(boundaryEvent.defaultPrevented).toBe(true);
     expect(latestControls?.phase).toBe("contact");
     expect(latestControls?.direction).toBe("next");
     vi.useRealTimers();

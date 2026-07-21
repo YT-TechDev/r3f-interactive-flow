@@ -1055,6 +1055,7 @@ describe("useKeyboardInput", () => {
     );
 
     dispatchKeyDown("ArrowDown");
+    vi.advanceTimersByTime(50);
     const cooldownEvent = dispatchKeyDown("ArrowRight");
 
     expect(cooldownEvent.defaultPrevented).toBe(false);
@@ -1117,7 +1118,7 @@ describe("useKeyboardInput", () => {
     });
     const repeatEvent = dispatchKeyDown("ArrowDown", { repeat: true });
 
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(150);
     const typingEvent = dispatchKeyDown("ArrowDown", { target: input });
     dispatchKeyDown("ArrowDown");
 
@@ -1237,17 +1238,21 @@ describe("useKeyboardInput", () => {
 
     dispatchKeyDown("ArrowDown");
 
-    vi.advanceTimersByTime(1_400);
-    dispatchKeyDown("ArrowDown");
+    vi.advanceTimersByTime(400);
+    const transitionEvent = dispatchKeyDown("ArrowDown");
+
+    expect(transitionEvent.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("work");
 
     act(() => {
       machine?.update(1_000);
       syncSnapshot?.();
     });
 
-    vi.advanceTimersByTime(1_500);
-    dispatchKeyDown("ArrowDown");
+    vi.advanceTimersByTime(100);
+    const boundaryEvent = dispatchKeyDown("ArrowDown");
 
+    expect(boundaryEvent.defaultPrevented).toBe(true);
     expect(latestControls?.phase).toBe("contact");
     expect(latestControls?.direction).toBe("next");
     vi.useRealTimers();
