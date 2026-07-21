@@ -14,7 +14,7 @@ From this directory after a standalone install:
 pnpm install
 pnpm dev
 pnpm build
-pnpm preview
+pnpm preview --host 127.0.0.1
 ```
 
 From the repository root, the network-backed verification command is:
@@ -29,17 +29,21 @@ The consumer also includes a local `pnpm-workspace.yaml` with only `allowBuilds.
 
 ## Validation surfaces
 
-- Public API coverage: `FlowProvider`, `useFlow`, `useFlowProgress`, `useFlowFrame`, `useWheelInput`, `useTouchInput`, and `useKeyboardInput`.
-- DOM and input logic remain outside Canvas; `useFlowFrame` is used only by Canvas-bound observer components.
+- Public API coverage: `FlowProvider`, `useFlow`, `useFlowProgress`, `useFlowFrame`, `useWheelInput`, `useTouchInput`, and `useKeyboardInput` from the package root.
+- Lock/unlock controls call the existing `useFlow()` `lock()` and `unlock()` controls and display `isLocked` status.
+- A visible input-target toggle switches between normal window input and an explicit unresolved `useRef<HTMLElement>(null)` target passed to wheel, touch, and keyboard hooks.
+- The event trace listens for `wheel`, `touchmove`, `touchend`, and `keydown`, captures event type and target immediately, and reads the final `defaultPrevented` value in a queued microtask after synchronous event propagation finishes.
+- Native actionable and editable controls include a text input, textarea, select, checkbox, regular button, regular anchor, and `contenteditable` region.
 - `data-flow-ignore` is passed to the wheel and touch hooks for the explicit nested-scroll region. Keyboard input uses the public `keys` and `ignoreWhenTyping` options, so native form typing is preserved without claiming `useKeyboardInput` supports ignore selectors.
-- Native actionable controls include a text input, textarea, select, checkbox, regular button, and regular anchor outside the broad ignored region.
-- A separate `data-flow-ignore` nested scroll region has constrained height and enough content to scroll independently.
-- Normal and reduced motion are application-owned modes. Switching modes intentionally changes the provider key, remounts `FlowProvider`, and resets flow state; this does not claim a complete library-level reduced-motion policy.
+- Two independent Canvas-bound `useFlowFrame` observers write read-only frame samples to DOM outputs without React state writes, navigation calls, transition timing changes, or extra clocks.
 - The Canvas mount/unmount control removes and restores the Canvas subtree without unmounting `FlowProvider`, leaving DOM phase state and `useFlowProgress` mounted.
-- The layout is mobile-responsive for browser validation.
+- Normal and reduced motion are application-owned modes. Switching modes intentionally changes the provider key, remounts `FlowProvider`, and resets flow state; this does not claim a complete library-level reduced-motion policy.
+- The layout is mobile-responsive for owner-assisted browser validation.
 
-Issue #379 is responsible for browser-level validation against this surface.
+## Owner-assisted browser validation purpose
+
+Issue #379 uses this fixture to collect browser and device evidence. Synthetic input can support acceptance and `defaultPrevented` checks, but it is not physical mouse, trackpad, keyboard, or touch evidence. Owner-assisted physical-device results should be recorded in the validation report before the PR is merged.
 
 ## Non-goals
 
-This fixture does not add runtime dependencies, workspace links, local tarballs, source-path imports, shaders, particle systems, camera presets, GSAP, Framer Motion, Zustand, routing, release automation, package publishing, tags, or changes to library runtime behavior.
+This fixture does not add runtime dependencies, workspace links, local tarballs, source-path imports, shaders, particle systems, camera presets, GSAP, Framer Motion, Zustand, routing, release automation, package publishing, tags, or changes to library runtime behavior. It is not a portfolio starter, visual-effects package, browser certification suite, or full accessibility solution.

@@ -1,5 +1,5 @@
 import { Canvas } from "@react-three/fiber";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { Mesh } from "three";
 import {
@@ -30,24 +30,92 @@ const transitionMs: Record<MotionMode, number> = {
   reduced: 180
 };
 
-function FlowInputs() {
+function FlowInputs({ useUnresolvedTarget }: { useUnresolvedTarget: boolean }) {
+  const unresolvedTarget = useRef<HTMLElement>(null);
+  const target = useUnresolvedTarget ? unresolvedTarget : undefined;
+
   useWheelInput<Phase>({
+    target,
     ignore: inputIgnore,
     threshold: 48,
     cooldown: 250
   });
   useTouchInput<Phase>({
+    target,
     ignore: inputIgnore,
     threshold: 44,
     cooldown: 250
   });
   useKeyboardInput<Phase>({
+    target,
     keys: keyboardKeys,
     cooldown: 250,
     ignoreWhenTyping: true
   });
 
   return null;
+}
+
+type InputTrace = {
+  type: string;
+  defaultPrevented: boolean;
+  target: string;
+};
+
+function InputEventTrace() {
+  const [trace, setTrace] = useState<InputTrace | null>(null);
+
+  useEffect(() => {
+    const recordEvent = (event: Event): void => {
+      const type = event.type;
+      const target = event.target;
+      const targetName = target instanceof Element ? target.tagName.toLowerCase() : "non-element";
+
+      queueMicrotask(() => {
+        setTrace({
+          type,
+          defaultPrevented: event.defaultPrevented,
+          target: targetName
+        });
+      });
+    };
+
+    window.addEventListener("wheel", recordEvent);
+    window.addEventListener("touchmove", recordEvent);
+    window.addEventListener("touchend", recordEvent);
+    window.addEventListener("keydown", recordEvent);
+
+    return () => {
+      window.removeEventListener("wheel", recordEvent);
+      window.removeEventListener("touchmove", recordEvent);
+      window.removeEventListener("touchend", recordEvent);
+      window.removeEventListener("keydown", recordEvent);
+    };
+  }, []);
+
+  return (
+    <div className="trace-output" aria-live="polite">
+      <strong>Last input event trace</strong>
+      {trace ? (
+        <dl>
+          <div>
+            <dt>Type</dt>
+            <dd>{trace.type}</dd>
+          </div>
+          <div>
+            <dt>Target</dt>
+            <dd>{trace.target}</dd>
+          </div>
+          <div>
+            <dt>Final defaultPrevented</dt>
+            <dd>{String(trace.defaultPrevented)}</dd>
+          </div>
+        </dl>
+      ) : (
+        <p>No wheel, touchmove, touchend, or keydown event observed yet.</p>
+      )}
+    </div>
+  );
 }
 
 function FlowDashboard() {
@@ -90,6 +158,10 @@ function FlowDashboard() {
           <dt>Status</dt>
           <dd>{flow.isTransitioning ? "transitioning" : "idle"}</dd>
         </div>
+        <div>
+          <dt>Locked</dt>
+          <dd>{flow.isLocked ? "locked" : "unlocked"}</dd>
+        </div>
       </dl>
 
       <div className="button-row" aria-label="Sequential navigation">
@@ -114,6 +186,21 @@ function FlowDashboard() {
         ))}
       </div>
     </section>
+  );
+}
+
+function FlowLockControls() {
+  const flow = useFlow<Phase>();
+
+  return (
+    <>
+      <button type="button" onClick={flow.lock} disabled={flow.isLocked}>
+        Lock
+      </button>
+      <button type="button" onClick={flow.unlock} disabled={!flow.isLocked}>
+        Unlock
+      </button>
+    </>
   );
 }
 
@@ -149,6 +236,9 @@ function NativeControls() {
         </label>
         <button type="button">Regular button</button>
         <a href="https://github.com/YT-TechDev/r3f-interactive-flow">Regular anchor</a>
+        <div className="editable-region" contentEditable suppressContentEditableWarning>
+          Contenteditable region: edit this text without changing phase.
+        </div>
       </div>
     </section>
   );
@@ -208,6 +298,25 @@ function PhaseSphere({ motionMode }: { motionMode: MotionMode }) {
   );
 }
 
+function FrameObserverBridge({ id }: { id: string }) {
+  useFlowFrame<Phase>(({ phase, phaseIndex, progress, direction, isTransitioning }, delta) => {
+    const output = document.querySelector<HTMLOutputElement>(`[data-observer-output="${id}"]`);
+    if (!output) return;
+
+    output.value = JSON.stringify({
+      observer: id,
+      phase,
+      phaseIndex,
+      progress: Number(progress.toFixed(3)),
+      direction,
+      isTransitioning,
+      delta: Number(delta.toFixed(4))
+    });
+  });
+
+  return null;
+}
+
 function Scene({ motionMode }: { motionMode: MotionMode }) {
   return (
     <Canvas className="canvas" camera={{ position: [0, 0, 4], fov: 50 }}>
@@ -215,12 +324,15 @@ function Scene({ motionMode }: { motionMode: MotionMode }) {
       <directionalLight position={[2, 2, 3]} intensity={1.2} />
       <PhaseCube motionMode={motionMode} />
       <PhaseSphere motionMode={motionMode} />
+      <FrameObserverBridge id="observer-a" />
+      <FrameObserverBridge id="observer-b" />
     </Canvas>
   );
 }
 
 function Experience({ motionMode }: { motionMode: MotionMode }) {
   const [canvasMounted, setCanvasMounted] = useState(true);
+  const [useUnresolvedTarget, setUseUnresolvedTarget] = useState(false);
 
   return (
     <FlowProvider
@@ -229,14 +341,26 @@ function Experience({ motionMode }: { motionMode: MotionMode }) {
       transitionDurationMs={transitionMs[motionMode]}
       cooldownMs={240}
     >
-      <FlowInputs />
+      <FlowInputs useUnresolvedTarget={useUnresolvedTarget} />
+      <InputEventTrace />
       <main className="app-shell">
         <FlowDashboard />
         <section className="panel controls-panel" aria-labelledby="runtime-heading">
           <h2 id="runtime-heading">Runtime validation controls</h2>
-          <button type="button" onClick={() => setCanvasMounted((mounted) => !mounted)}>
-            {canvasMounted ? "Unmount Canvas" : "Remount Canvas"}
-          </button>
+          <div className="button-row">
+            <button type="button" onClick={() => setCanvasMounted((mounted) => !mounted)}>
+              {canvasMounted ? "Unmount Canvas" : "Remount Canvas"}
+            </button>
+            <FlowLockControls />
+            <button
+              type="button"
+              aria-pressed={useUnresolvedTarget}
+              onClick={() => setUseUnresolvedTarget((enabled) => !enabled)}
+            >
+              {useUnresolvedTarget ? "Use normal window input" : "Use unresolved explicit ref"}
+            </button>
+          </div>
+          <p>Input target mode: {useUnresolvedTarget ? "unresolved explicit ref" : "window"}</p>
           <p>
             Canvas can unmount without unmounting FlowProvider; DOM phase state and useFlowProgress
             remain visible while no useFlowFrame consumer is mounted.
@@ -248,6 +372,19 @@ function Experience({ motionMode }: { motionMode: MotionMode }) {
         </section>
         <NativeControls />
         <IgnoredScrollRegion />
+        <section className="panel observer-panel" aria-labelledby="observer-heading">
+          <h2 id="observer-heading">Read-only Canvas observer samples</h2>
+          <output
+            data-observer-output="observer-a"
+            className="observer-output"
+            aria-label="observer-a frame sample"
+          />
+          <output
+            data-observer-output="observer-b"
+            className="observer-output"
+            aria-label="observer-b frame sample"
+          />
+        </section>
         <section className="scene-panel" aria-label="Canvas validation surface">
           {canvasMounted ? (
             <Scene motionMode={motionMode} />
