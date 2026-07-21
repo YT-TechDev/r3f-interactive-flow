@@ -698,6 +698,69 @@ describe("useTouchInput", () => {
     expect(latestControls?.direction).toBe("none");
   });
 
+  it("preserves a committed gesture across equivalent inline ignore rerenders", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let machine: FlowMachine<TestPhase> | undefined;
+
+    function InlineIgnoreProbe() {
+      useTouchInput<TestPhase>({
+        threshold: 40,
+        preventDefault: true,
+        ignore: ["[data-flow-ignore]"]
+      });
+
+      return (
+        <>
+          <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+          <MachineProbe onRender={(renderedMachine) => (machine = renderedMachine)} />
+        </>
+      );
+    }
+
+    renderFlow(<InlineIgnoreProbe />);
+
+    const nextSpy = machine ? vi.spyOn(machine, "next") : undefined;
+
+    dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] });
+    const commitEvent = dispatchTouch("touchmove", { touches: [{ clientX: 0, clientY: 50 }] });
+
+    expect(commitEvent.defaultPrevented).toBe(true);
+    expect(nextSpy).toHaveBeenCalledTimes(1);
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+
+    const laterMoveEvent = dispatchTouch("touchmove", { touches: [{ clientX: 0, clientY: 0 }] });
+
+    expect(laterMoveEvent.defaultPrevented).toBe(true);
+    expect(nextSpy).toHaveBeenCalledTimes(1);
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+
+    dispatchTouch("touchcancel");
+  });
+
+  it("resets pending gesture state when ignore selector contents change", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    function InlineIgnoreProbe({ selector }: { selector: string }) {
+      useTouchInput<TestPhase>({ threshold: 40, ignore: [selector] });
+
+      return <ControlsProbe onRender={(controls) => (latestControls = controls)} />;
+    }
+
+    renderFlow(<InlineIgnoreProbe selector="[data-flow-ignore]" />);
+
+    dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] });
+
+    renderFlow(<InlineIgnoreProbe selector="[data-flow-ignore-updated]" />);
+
+    const endEvent = dispatchTouch("touchend", { changedTouches: [{ clientX: 0, clientY: 49 }] });
+
+    expect(endEvent.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+  });
+
   it("does not navigate again on a later touchmove or touchend after a gesture commits", () => {
     let latestControls: FlowControls<TestPhase> | undefined;
     let machine: FlowMachine<TestPhase> | undefined;
