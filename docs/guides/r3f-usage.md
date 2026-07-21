@@ -132,7 +132,9 @@ For per-frame scene work, use `useFlowFrame`. It delivers the same transition
 snapshot inside the React Three Fiber frame loop, alongside the frame `delta`. It
 is a read-only observer: it reads the provider-owned machine each frame and never
 advances it, so the transition is driven by the provider clock whether or not any
-`useFlowFrame` consumer is mounted.
+`useFlowFrame` consumer is mounted. DOM controls and `useFlowProgress` continue
+while every Canvas-bound observer is unmounted; when Canvas is mounted again,
+`useFlowFrame` resumes observing the current provider-owned flow.
 
 `useFlowFrame` follows the React Three Fiber `useFrame` rule: it must only be
 called from a component that is rendered inside `<Canvas>`. It also requires

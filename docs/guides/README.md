@@ -56,14 +56,14 @@ not public package exports.
 
 ## Guides
 
-| Guide                                     | Covers                                                |
-| ----------------------------------------- | ----------------------------------------------------- |
-| [Getting started](./getting-started.md)   | Install, peer dependencies, first phase flow.         |
-| [Core concepts](./core-concepts.md)       | Phases, transitions, progress, locks, cooldowns.      |
-| [React Three Fiber usage](./r3f-usage.md) | `useFlowFrame`, Canvas boundaries, frame updates.     |
-| [Input handling](./input-handling.md)     | `useWheelInput`, `useTouchInput`, `useKeyboardInput`. |
-| [Next.js usage](./nextjs-usage.md)        | Client Component boundaries in the App Router.        |
-| [Common mistakes](./common-mistakes.md)   | Anti-patterns and their fixes.                        |
+| Guide                                     | Covers                                                                     |
+| ----------------------------------------- | -------------------------------------------------------------------------- |
+| [Getting started](./getting-started.md)   | Install, peer dependencies, first phase flow.                              |
+| [Core concepts](./core-concepts.md)       | Phases, transitions, progress, locks, cooldowns, reduced-motion ownership. |
+| [React Three Fiber usage](./r3f-usage.md) | `useFlowFrame`, Canvas boundaries, frame updates.                          |
+| [Input handling](./input-handling.md)     | `useWheelInput`, `useTouchInput`, `useKeyboardInput`.                      |
+| [Next.js usage](./nextjs-usage.md)        | Client Component boundaries in the App Router.                             |
+| [Common mistakes](./common-mistakes.md)   | Anti-patterns and their fixes.                                             |
 
 ## How the documentation is organized
 
