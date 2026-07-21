@@ -69,6 +69,22 @@ Changing configuration props alone does not reconfigure an already mounted provi
 
 `key` is React's remount mechanism; it is not a `FlowProvider` API prop.
 
+### Reduced motion is application policy
+
+The library does not expose a separate reduced-motion API or automatically choose a reduced-motion mode. If your app needs reduced motion, choose the transition timing in application code. To intentionally apply a changed provider configuration, change the provider element's React `key`; that remounts `FlowProvider` and resets its flow state.
+
+```tsx
+<FlowProvider
+  key={reducedMotion ? "reduced" : "normal"}
+  phases={phases}
+  transition={reducedMotion ? { duration: 0, cooldown: 0 } : { duration: 700, cooldown: 250 }}
+>
+  <Experience />
+</FlowProvider>
+```
+
+Use `duration: 0` only if an immediate transition is right for your app; a short non-zero duration is also valid.
+
 ## Phase index
 
 Every phase has a position in the tuple, exposed as `phaseIndex` (zero-based).

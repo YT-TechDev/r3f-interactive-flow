@@ -40,9 +40,11 @@ The consumer also includes a local `pnpm-workspace.yaml` with only `allowBuilds.
 - Normal and reduced motion are application-owned modes. Switching modes intentionally changes the provider key, remounts `FlowProvider`, and resets flow state; this does not claim a complete library-level reduced-motion policy.
 - The layout is mobile-responsive for owner-assisted browser validation.
 
-## Owner-assisted browser validation purpose
+## Owner-assisted browser validation results
 
-Issue #379 uses this fixture to collect browser and device evidence. Synthetic input can support acceptance and `defaultPrevented` checks, but it is not physical mouse, trackpad, keyboard, or touch evidence. Owner-assisted physical-device results should be recorded in the validation report before the PR is merged.
+Issue #379 validation is complete. This fixture was used for desktop browser validation, responsive and touch emulation, and physical mobile validation while consuming `r3f-interactive-flow@2.4.0` from npm rather than a workspace link.
+
+Physical mouse, high-resolution trackpad, keyboard, and iPhone Safari touch evidence passed. The optional physical tablet lane remains unverified because no physical tablet was available. Detailed evidence is stored in [`docs/releases/v2.5.0-real-world-browser-validation-report.md`](../../docs/releases/v2.5.0-real-world-browser-validation-report.md).
 
 ## Non-goals
 

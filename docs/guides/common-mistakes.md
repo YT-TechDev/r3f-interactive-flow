@@ -270,6 +270,22 @@ provider element's React `key` when you intentionally want React to unmount the
 old provider and mount a new machine with that configuration. `key` is React's
 remount mechanism, not a `FlowProvider` API prop.
 
+## Treating reduced motion as a built-in provider mode
+
+Reduced motion is application policy. The library does not expose a separate reduced-motion hook, provider prop, or automatic media-query behavior. Choose the normal or reduced transition options in your app, and change the provider element's React `key` only when you intentionally want to remount the provider and reset flow state.
+
+```tsx
+<FlowProvider
+  key={reducedMotion ? "reduced" : "normal"}
+  phases={phases}
+  transition={reducedMotion ? { duration: 0, cooldown: 0 } : { duration: 700, cooldown: 250 }}
+>
+  <Experience />
+</FlowProvider>
+```
+
+`duration: 0` is one valid app choice, not a requirement; a short non-zero duration may be more appropriate.
+
 ## Copying high-frequency frame values into React state
 
 Transition progress changes frequently during a transition. Copying every frame

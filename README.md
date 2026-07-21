@@ -64,6 +64,14 @@ Do not import from internal package paths such as `r3f-interactive-flow/react`, 
 
 Supported imports are package-root imports only. Internal source, build, or responsibility-specific paths are not public API, including `r3f-interactive-flow/src/*`, `r3f-interactive-flow/dist/*`, `r3f-interactive-flow/react`, `r3f-interactive-flow/r3f`, and `r3f-interactive-flow/input`.
 
+## Validated integration behavior
+
+The v2.5.0 real-world usage validation used the published-package consumer and package-root imports from `"r3f-interactive-flow"` only. It confirmed that `next()`, `prev()`, and direct `goTo()` use the same provider-owned flow machine; rejected navigation from boundaries, locks, active transitions, or cooldowns does not queue a stale later navigation.
+
+DOM controls, input helpers, progress UI, and the Canvas subtree can share one `FlowProvider`. `useFlow` and `useFlowProgress` continue working with no Canvas mounted, while remounting Canvas lets `useFlowFrame` resume read-only observation of the current provider-owned flow. Accepted wheel, touch, and keyboard navigation may suppress native browser behavior when `preventDefault` is enabled; rejected navigation preserves native page scroll and control behavior. Reduced-motion behavior remains application policy: choose shorter or zero-duration transition options yourself, and use a React `key` remount only when you intentionally want to apply a new provider configuration and reset flow state.
+
+Validation covered representative desktop Chrome usage with physical mouse, high-resolution trackpad, and keyboard input, plus physical iPhone Safari touch usage. It did not certify every browser or device class; optional physical tablet validation remained unverified because no tablet was available. See the detailed guides for [R3F usage](docs/guides/r3f-usage.md), [input handling](docs/guides/input-handling.md), and [common mistakes](docs/guides/common-mistakes.md), and see the evidence report at [docs/releases/v2.5.0-real-world-browser-validation-report.md](docs/releases/v2.5.0-real-world-browser-validation-report.md).
+
 ## Installation
 
 ```bash

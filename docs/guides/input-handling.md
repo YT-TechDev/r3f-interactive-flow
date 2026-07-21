@@ -11,6 +11,8 @@ framework, router, animation system, or replacement for your app's own input
 model. Use them when a page should let common browser input move through the
 same flow phases that your buttons or other controls already use.
 
+The v2.5.0 real-world usage validation confirmed this behavior with representative desktop Chrome physical mouse, high-resolution trackpad, keyboard, and physical iPhone Safari touch evidence. Treat that as integration evidence, not broad browser certification; optional physical tablet validation remained unverified because no tablet was available.
+
 ## Import contract
 
 Import hooks from the package root:
@@ -250,8 +252,8 @@ export function SidePanel() {
 }
 ```
 
-Ignored wheel and touch events return before navigation. Use ignore selectors as
-a boundary between page-level flow input and local UI controls.
+Ignored wheel and touch events return before navigation and leave native behavior available. Use ignore selectors as
+a boundary between page-level flow input and local UI controls, including custom nested-scroll regions.
 
 ## Keyboard input
 

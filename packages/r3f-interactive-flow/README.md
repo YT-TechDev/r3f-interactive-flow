@@ -51,6 +51,14 @@ Do not import from internal package paths such as `r3f-interactive-flow/react`, 
 
 Supported imports are package-root imports only. Internal source, build, or responsibility-specific paths are not public API, including `r3f-interactive-flow/src/*`, `r3f-interactive-flow/dist/*`, `r3f-interactive-flow/react`, `r3f-interactive-flow/r3f`, and `r3f-interactive-flow/input`.
 
+## Validated integration behavior
+
+Published-package validation for the v2.5.0 usage milestone exercised `r3f-interactive-flow@2.4.0` from npm through package-root imports only. The durable behavior validated for consumers is that `next()`, `prev()`, and direct `goTo()` share one `FlowProvider` machine; rejected navigation from boundaries, locks, active transitions, or cooldowns is safe and does not queue stale movement.
+
+A single `FlowProvider` can wrap DOM controls, input helpers, progress UI, and a Canvas subtree. DOM navigation and `useFlowProgress` do not require Canvas, and a remounted Canvas can observe the current provider-owned flow again through read-only `useFlowFrame` consumers. Input hooks call the existing `next` and `prev` controls. Accepted input navigation may call `preventDefault()` when enabled; rejected input preserves native page scrolling and native control behavior. Reduced motion is application-owned: pass the transition timing your app wants, and use a React `key` remount only when you intentionally want to apply a new provider configuration and reset flow state.
+
+The evidence included representative desktop Chrome validation with physical mouse, high-resolution trackpad, and keyboard input, plus physical iPhone Safari touch validation. This is not broad browser certification, and optional physical tablet validation was not completed. The repository evidence report is available at <https://github.com/YT-TechDev/r3f-interactive-flow/blob/main/docs/releases/v2.5.0-real-world-browser-validation-report.md>.
+
 ## Install
 
 ```bash
