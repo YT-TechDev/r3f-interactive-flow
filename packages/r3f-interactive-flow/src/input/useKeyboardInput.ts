@@ -138,7 +138,7 @@ export function useKeyboardInput<TPhase extends string>(
         return;
       }
 
-      const now = Date.now();
+      const now = performance.now();
 
       if (now - lastNavigationAtRef.current < cooldown) {
         return;

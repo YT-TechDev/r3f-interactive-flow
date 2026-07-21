@@ -1024,16 +1024,81 @@ describe("useWheelInput", () => {
       syncSnapshot?.();
     });
 
-    vi.setSystemTime(250);
+    vi.advanceTimersByTime(250);
     const cooldownEvent = dispatchWheel(41);
 
     expect(cooldownEvent.defaultPrevented).toBe(false);
     expect(latestControls?.phase).toBe("intro");
 
-    vi.setSystemTime(500);
+    vi.advanceTimersByTime(250);
     dispatchWheel(41);
 
     expect(latestControls?.phase).toBe("work");
+    vi.useRealTimers();
+  });
+
+  it("uses monotonic elapsed time for wheel cooldown across wall-clock jumps", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ cooldown: 500, threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>,
+      undefined,
+      { transitionDurationMs: 0, cooldownMs: 0 }
+    );
+
+    const accepted = dispatchWheel(41);
+    expect(accepted.defaultPrevented).toBe(true);
+    expect(latestControls?.phase).toBe("work");
+
+    vi.setSystemTime(1_000_000);
+    const forwardJumpEvent = dispatchWheel(41);
+    expect(forwardJumpEvent.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("work");
+
+    vi.setSystemTime(0);
+    vi.advanceTimersByTime(500);
+    const boundaryEvent = dispatchWheel(41);
+    expect(boundaryEvent.defaultPrevented).toBe(true);
+    expect(latestControls?.phase).toBe("contact");
+    vi.useRealTimers();
+  });
+
+  it("uses monotonic elapsed time for wheel burst inactivity across wall-clock jumps", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <WheelInputProbe options={{ threshold: 40, cooldown: 0 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>,
+      undefined,
+      { transitionDurationMs: 0, cooldownMs: 0 }
+    );
+
+    dispatchWheel(25);
+    vi.setSystemTime(1_000_000);
+    vi.advanceTimersByTime(200);
+    const liveBurstEvent = dispatchWheel(20);
+
+    expect(liveBurstEvent.defaultPrevented).toBe(true);
+    expect(latestControls?.phase).toBe("work");
+
+    vi.advanceTimersByTime(201);
+    vi.setSystemTime(0);
+    dispatchWheel(25);
+
+    expect(latestControls?.phase).toBe("work");
+
+    const freshBurstEvent = dispatchWheel(20);
+    expect(freshBurstEvent.defaultPrevented).toBe(true);
+    expect(latestControls?.phase).toBe("contact");
     vi.useRealTimers();
   });
 
@@ -1056,13 +1121,13 @@ describe("useWheelInput", () => {
     });
     dispatchWheel(41);
 
-    vi.setSystemTime(100);
+    vi.advanceTimersByTime(100);
     act(() => {
       latestControls?.unlock();
     });
     dispatchWheel(40);
 
-    vi.setSystemTime(250);
+    vi.advanceTimersByTime(250);
     dispatchWheel(41, windowTarget, { target: ignored as unknown as EventTarget });
     dispatchWheel(41);
 
@@ -1094,7 +1159,7 @@ describe("useWheelInput", () => {
       isLocked: false
     });
 
-    vi.setSystemTime(250);
+    vi.advanceTimersByTime(250);
     dispatchWheel(41);
 
     expect(latestControls).toMatchObject({
@@ -1145,7 +1210,7 @@ describe("useWheelInput", () => {
       isTransitioning: false,
       isLocked: false
     });
-    vi.setSystemTime(250);
+    vi.advanceTimersByTime(250);
     dispatchWheel(-41);
 
     expect(latestControls).toMatchObject({
@@ -1179,7 +1244,7 @@ describe("useWheelInput", () => {
 
     dispatchWheel(41);
 
-    vi.setSystemTime(1_400);
+    vi.advanceTimersByTime(1_400);
     dispatchWheel(41);
 
     act(() => {
@@ -1187,7 +1252,7 @@ describe("useWheelInput", () => {
       syncSnapshot?.();
     });
 
-    vi.setSystemTime(1_500);
+    vi.advanceTimersByTime(1_500);
     dispatchWheel(41);
 
     expect(latestControls?.phase).toBe("contact");
@@ -1237,7 +1302,7 @@ describe("useWheelInput", () => {
       syncSnapshot?.();
     });
 
-    vi.setSystemTime(201);
+    vi.advanceTimersByTime(201);
     dispatchWheel(41);
 
     expect(latestControls?.phase).toBe("contact");
@@ -1290,7 +1355,7 @@ describe("useWheelInput", () => {
       machine?.update(1);
       syncSnapshot?.();
     });
-    vi.setSystemTime(100);
+    vi.advanceTimersByTime(100);
     const momentum = dispatchWheel(41);
 
     expect(accepted.defaultPrevented).toBe(true);
@@ -1336,7 +1401,7 @@ describe("useWheelInput", () => {
       machine?.update(1);
       syncSnapshot?.();
     });
-    vi.setSystemTime(100);
+    vi.advanceTimersByTime(100);
     const momentum = dispatchWheel(41);
 
     expect(accepted.defaultPrevented).toBe(true);
@@ -1372,7 +1437,7 @@ describe("useWheelInput", () => {
       machine?.update(1);
       syncSnapshot?.();
     });
-    vi.setSystemTime(201);
+    vi.advanceTimersByTime(201);
     dispatchWheel(41);
 
     expect(latestControls?.phase).toBe("contact");
