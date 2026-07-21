@@ -1,5 +1,36 @@
 # r3f-interactive-flow
 
+## 2.5.0
+
+`r3f-interactive-flow@2.5.0` is a validation-and-documentation-focused minor release. It preserves the 2.4.0 runtime source, public API, public types, package exports, dependencies, and peer dependency ranges while adding evidence-backed validation records, integration documentation, and release metadata.
+
+### Validated
+
+- Added a standalone Vite + React Three Fiber consumer that resolves the exact published npm package outside the workspace.
+- Validated package-root imports and the existing public API across DOM, Canvas, wheel, trackpad, touch, keyboard, native controls, ignored regions, Canvas lifecycle, and reduced-motion application configuration.
+- Recorded 82 PASS scenarios, zero failures, zero blocked scenarios, and one optional unverified physical-tablet environment.
+- Confirmed representative physical mouse, high-resolution trackpad, physical keyboard, responsive/touch emulation, and physical iPhone Safari behavior.
+- Confirmed DOM navigation and progress remain active without Canvas and that Canvas observation resumes after remount.
+- Confirmed no reproducible package runtime or public type defect.
+
+### Documentation
+
+- Added evidence-backed integration guidance to the root README, npm package README, and user guides.
+- Clarified package-root imports, DOM/Canvas responsibility boundaries, accepted-only event suppression, native behavior preservation, ignored nested-scroll regions, and application-owned reduced motion.
+- Added durable maintainer validation records and a published-package consumer verification lane.
+
+### Compatibility
+
+- No runtime source changes from 2.4.0 are included.
+- No public API additions or removals are included.
+- No public TypeScript type changes are included.
+- No package export changes are included.
+- No runtime dependency additions are included.
+- No peer dependency range changes are included.
+- The root-only package boundary remains unchanged.
+- Optional physical-tablet validation is not claimed.
+- v2.5.0 is not broad browser certification.
+
 ## 2.4.0
 
 `r3f-interactive-flow@2.4.0` improves runtime correctness, React integration performance, cross-device browser input behavior, and release supply-chain security while preserving the existing public API and root-only package boundary.
