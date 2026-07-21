@@ -72,12 +72,17 @@ function MachineProbe({
 function dispatchTouch(
   type: string,
   eventInitDict: { changedTouches?: MinimalTouch[]; touches?: MinimalTouch[] } = {},
-  target: MinimalEventTarget = windowTarget
+  dispatchTarget: MinimalEventTarget = windowTarget,
+  eventTarget?: EventTarget | MinimalEventTarget | null
 ): MinimalTouchEvent {
   const event = new MinimalTouchEvent(type, eventInitDict);
 
+  if (eventTarget !== undefined) {
+    event.target = eventTarget;
+  }
+
   act(() => {
-    target.dispatchEvent(event);
+    dispatchTarget.dispatchEvent(event);
   });
 
   return event;
@@ -761,6 +766,144 @@ describe("useTouchInput", () => {
     expect(latestControls?.direction).toBe("none");
   });
 
+  it("preserves touchend fallback after a touchmove with no primary touch entry", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let machine: FlowMachine<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe onRender={(renderedMachine) => (machine = renderedMachine)} />
+      </>,
+      undefined,
+      { transitionDurationMs: 100, cooldownMs: 0 }
+    );
+
+    const nextSpy = machine ? vi.spyOn(machine, "next") : undefined;
+
+    dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] });
+    const missingMoveEvent = dispatchTouch("touchmove", { touches: [] });
+
+    expect(missingMoveEvent.defaultPrevented).toBe(false);
+    expect(nextSpy).toHaveBeenCalledTimes(0);
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+
+    const endEvent = dispatchTouch("touchend", {
+      changedTouches: [{ clientX: 0, clientY: 59 }]
+    });
+
+    expect(endEvent.defaultPrevented).toBe(true);
+    expect(nextSpy).toHaveBeenCalledTimes(1);
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
+  it("clears committed gesture state when touchcancel follows an accepted touchmove", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let machine: FlowMachine<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe onRender={(renderedMachine) => (machine = renderedMachine)} />
+      </>,
+      undefined,
+      { transitionDurationMs: 100, cooldownMs: 0 }
+    );
+
+    const nextSpy = machine ? vi.spyOn(machine, "next") : undefined;
+
+    dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] });
+    const commitEvent = dispatchTouch("touchmove", { touches: [{ clientX: 0, clientY: 59 }] });
+
+    expect(commitEvent.defaultPrevented).toBe(true);
+    expect(nextSpy).toHaveBeenCalledTimes(1);
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+
+    dispatchTouch("touchcancel");
+    const strayMoveEvent = dispatchTouch("touchmove", { touches: [{ clientX: 0, clientY: 20 }] });
+    const strayEndEvent = dispatchTouch("touchend", {
+      changedTouches: [{ clientX: 0, clientY: 20 }]
+    });
+
+    expect(strayMoveEvent.defaultPrevented).toBe(false);
+    expect(strayEndEvent.defaultPrevented).toBe(false);
+    expect(nextSpy).toHaveBeenCalledTimes(1);
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
+  it("does not replay an active uncommitted touch gesture after input hook unmount and remount", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let machine: FlowMachine<TestPhase> | undefined;
+
+    function ConditionalInputProbe({ mounted }: { mounted: boolean }) {
+      return (
+        <>
+          {mounted ? <TouchInputProbe options={{ threshold: 40 }} /> : null}
+          <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+          <MachineProbe onRender={(renderedMachine) => (machine = renderedMachine)} />
+        </>
+      );
+    }
+
+    renderFlow(<ConditionalInputProbe mounted />, undefined, {
+      transitionDurationMs: 100,
+      cooldownMs: 0
+    });
+
+    const nextSpy = machine ? vi.spyOn(machine, "next") : undefined;
+
+    dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] });
+
+    renderFlow(<ConditionalInputProbe mounted={false} />, undefined, {
+      transitionDurationMs: 100,
+      cooldownMs: 0
+    });
+
+    for (const type of touchEventTypes) {
+      expect(windowTarget.listenerCount(type)).toBe(0);
+    }
+
+    const absentEndEvent = dispatchTouch("touchend", {
+      changedTouches: [{ clientX: 0, clientY: 59 }]
+    });
+
+    expect(absentEndEvent.defaultPrevented).toBe(false);
+    expect(nextSpy).toHaveBeenCalledTimes(0);
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+
+    renderFlow(<ConditionalInputProbe mounted />, undefined, {
+      transitionDurationMs: 100,
+      cooldownMs: 0
+    });
+
+    for (const type of touchEventTypes) {
+      expect(windowTarget.listenerCount(type)).toBe(1);
+    }
+
+    const replayEndEvent = dispatchTouch("touchend", {
+      changedTouches: [{ clientX: 0, clientY: 59 }]
+    });
+
+    expect(replayEndEvent.defaultPrevented).toBe(false);
+    expect(nextSpy).toHaveBeenCalledTimes(0);
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+
+    const acceptedEndEvent = swipe(100, 59);
+
+    expect(acceptedEndEvent.defaultPrevented).toBe(true);
+    expect(nextSpy).toHaveBeenCalledTimes(1);
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
   it("does not navigate again on a later touchmove or touchend after a gesture commits", () => {
     let latestControls: FlowControls<TestPhase> | undefined;
     let machine: FlowMachine<TestPhase> | undefined;
@@ -1265,6 +1408,127 @@ describe("useTouchInput", () => {
     expect(latestControls?.phase).toBe("intro");
   });
 
+  it("keeps an ignored descendant touch origin protected for the gesture lifetime", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let machine: FlowMachine<TestPhase> | undefined;
+    const listenerTarget = document.createElement("div") as unknown as MinimalElement;
+    const ignoredAncestor = document.createElement("div") as unknown as MinimalElement;
+    const nestedOrigin = document.createElement("span") as unknown as MinimalElement;
+    const outsideTarget = document.createElement("div") as unknown as MinimalElement;
+
+    ignoredAncestor.setAttribute("class", "ignore-touch");
+    ignoredAncestor.append(nestedOrigin);
+    listenerTarget.append(ignoredAncestor, outsideTarget);
+
+    renderFlow(
+      <>
+        <TouchInputProbe
+          options={{
+            ignore: [".ignore-touch"],
+            target: listenerTarget as unknown as HTMLElement,
+            threshold: 40
+          }}
+        />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe onRender={(renderedMachine) => (machine = renderedMachine)} />
+      </>,
+      undefined,
+      { transitionDurationMs: 100, cooldownMs: 0 }
+    );
+
+    const nextSpy = machine ? vi.spyOn(machine, "next") : undefined;
+    const startEvent = dispatchTouch(
+      "touchstart",
+      { touches: [{ clientX: 0, clientY: 100 }] },
+      listenerTarget,
+      nestedOrigin
+    );
+    const moveEvent = dispatchTouch(
+      "touchmove",
+      { touches: [{ clientX: 0, clientY: 59 }] },
+      listenerTarget,
+      outsideTarget
+    );
+    const endEvent = dispatchTouch(
+      "touchend",
+      { changedTouches: [{ clientX: 0, clientY: 59 }] },
+      listenerTarget,
+      outsideTarget
+    );
+
+    expect(startEvent.defaultPrevented).toBe(false);
+    expect(moveEvent.defaultPrevented).toBe(false);
+    expect(endEvent.defaultPrevented).toBe(false);
+    expect(nextSpy).toHaveBeenCalledTimes(0);
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+
+    const acceptedEndEvent = swipe(100, 59, listenerTarget);
+
+    expect(acceptedEndEvent.defaultPrevented).toBe(true);
+    expect(nextSpy).toHaveBeenCalledTimes(1);
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
+  it("keeps an actionable descendant touch origin protected for the gesture lifetime", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let machine: FlowMachine<TestPhase> | undefined;
+    const listenerTarget = document.createElement("div") as unknown as MinimalElement;
+    const button = document.createElement("button") as unknown as MinimalElement;
+    const nestedOrigin = document.createElement("span") as unknown as MinimalElement;
+    const outsideTarget = document.createElement("div") as unknown as MinimalElement;
+
+    button.append(nestedOrigin);
+    listenerTarget.append(button, outsideTarget);
+
+    renderFlow(
+      <>
+        <TouchInputProbe
+          options={{ target: listenerTarget as unknown as HTMLElement, threshold: 40 }}
+        />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe onRender={(renderedMachine) => (machine = renderedMachine)} />
+      </>,
+      undefined,
+      { transitionDurationMs: 100, cooldownMs: 0 }
+    );
+
+    const nextSpy = machine ? vi.spyOn(machine, "next") : undefined;
+    const startEvent = dispatchTouch(
+      "touchstart",
+      { touches: [{ clientX: 0, clientY: 100 }] },
+      listenerTarget,
+      nestedOrigin
+    );
+    const moveEvent = dispatchTouch(
+      "touchmove",
+      { touches: [{ clientX: 0, clientY: 59 }] },
+      listenerTarget,
+      outsideTarget
+    );
+    const endEvent = dispatchTouch(
+      "touchend",
+      { changedTouches: [{ clientX: 0, clientY: 59 }] },
+      listenerTarget,
+      outsideTarget
+    );
+
+    expect(startEvent.defaultPrevented).toBe(false);
+    expect(moveEvent.defaultPrevented).toBe(false);
+    expect(endEvent.defaultPrevented).toBe(false);
+    expect(nextSpy).toHaveBeenCalledTimes(0);
+    expect(latestControls?.phase).toBe("intro");
+    expect(latestControls?.direction).toBe("none");
+
+    const acceptedEndEvent = swipe(100, 59, listenerTarget);
+
+    expect(acceptedEndEvent.defaultPrevented).toBe(true);
+    expect(nextSpy).toHaveBeenCalledTimes(1);
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
   it("keeps preventDefault enabled by default for a non-ignored accepted touchmove", () => {
     renderFlow(<TouchInputProbe options={{ ignore: [".ignore-touch"] }} />);
 
@@ -1293,7 +1557,7 @@ describe("useTouchInput", () => {
         />
       </>,
       undefined,
-      { transitionDurationMs: 100 }
+      { transitionDurationMs: 0 }
     );
 
     swipe(100, 49);
