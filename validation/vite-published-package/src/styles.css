@@ -179,3 +179,45 @@ dd {
     min-height: 18rem;
   }
 }
+.trace-output {
+  margin: 1rem;
+  border: 1px solid rgb(148 163 184 / 0.24);
+  border-radius: 1rem;
+  background: rgb(15 23 42 / 0.82);
+  padding: 1rem;
+}
+.trace-output dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0.75rem 0 0;
+}
+.editable-region,
+.observer-output {
+  display: block;
+  width: 100%;
+  min-height: 3rem;
+  border: 1px solid #475569;
+  border-radius: 0.7rem;
+  padding: 0.65rem;
+  color: #e5eefb;
+  background: #0f172a;
+}
+.editable-region:focus {
+  outline: 2px solid #67e8f9;
+  outline-offset: 2px;
+}
+.observer-panel {
+  display: grid;
+  gap: 0.75rem;
+}
+.observer-output {
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.85rem;
+}
+@media (max-width: 860px) {
+  .trace-output dl {
+    grid-template-columns: 1fr;
+  }
+}
