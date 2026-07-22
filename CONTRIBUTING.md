@@ -61,6 +61,16 @@ pnpm --filter vite-basic build
 pnpm pack:dry-run
 ```
 
+`pnpm test` remains the Node/minimal-DOM lane. The separate headless Chromium input-event semantic smoke lane assumes the package has already been built and can be run with:
+
+```bash
+pnpm exec playwright install chromium
+pnpm build
+pnpm test:browser:input
+```
+
+This browser smoke lane is Chromium-only. It is not cross-browser, physical-device, native-scroll, performance, WCAG, screen-reader, or accessibility certification evidence.
+
 Before release-related work, run:
 
 ```bash
