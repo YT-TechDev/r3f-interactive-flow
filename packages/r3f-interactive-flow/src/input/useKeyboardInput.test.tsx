@@ -1,6 +1,6 @@
 import React, { act, useContext, useEffect, useRef } from "react";
 import type { RefObject } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 
 import type { FlowControls, FlowMachine } from "../core/types";
 import { FlowMachineContext } from "../react/FlowContext";
@@ -73,6 +73,40 @@ function dispatchKeyDown(
   });
 
   return event;
+}
+
+type TestFrameClock = {
+  pendingFrameCount: () => number;
+  runFrameAt: (now: number) => void;
+};
+
+function installTestFrameClock(): TestFrameClock {
+  const frameCallbacks = new Map<number, FrameRequestCallback>();
+  let nextFrameId = 1;
+
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback): number => {
+    const id = nextFrameId++;
+    frameCallbacks.set(id, callback);
+
+    return id;
+  });
+  vi.stubGlobal("cancelAnimationFrame", (id: number): void => {
+    frameCallbacks.delete(id);
+  });
+
+  return {
+    pendingFrameCount: () => frameCallbacks.size,
+    runFrameAt: (now: number): void => {
+      const pending = [...frameCallbacks.values()];
+      frameCallbacks.clear();
+
+      act(() => {
+        for (const callback of pending) {
+          callback(now);
+        }
+      });
+    }
+  };
 }
 
 describe("useKeyboardInput", () => {
@@ -421,6 +455,70 @@ describe("useKeyboardInput", () => {
     expect(latestControls?.phase).toBe("work");
     expect(latestControls?.direction).toBe("next");
     expect(latestControls?.isLocked).toBe(false);
+  });
+
+  it("resumes keyboard navigation after one provider large delta settles transition and cooldown", () => {
+    const frameClock = installTestFrameClock();
+
+    onTestFinished(() => {
+      try {
+        expect(frameClock.pendingFrameCount()).toBe(0);
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ cooldown: 0 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>,
+      undefined,
+      { transition: { duration: 100, cooldown: 300 } }
+    );
+
+    const firstEvent = dispatchKeyDown("ArrowDown");
+
+    expect(firstEvent.defaultPrevented).toBe(true);
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      progress: 0,
+      direction: "next",
+      isTransitioning: true
+    });
+
+    const blockedEvent = dispatchKeyDown("ArrowDown");
+
+    expect(blockedEvent.defaultPrevented).toBe(false);
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      isTransitioning: true
+    });
+
+    // Provider elapsed time is synthetic RAF timestamp delta here: 100ms transition, then 300ms cooldown.
+    frameClock.runFrameAt(1000);
+    frameClock.runFrameAt(1400);
+
+    expect(frameClock.pendingFrameCount()).toBe(0);
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      progress: 1,
+      direction: "none",
+      isTransitioning: false
+    });
+
+    const resumedEvent = dispatchKeyDown("ArrowDown");
+
+    expect(resumedEvent.defaultPrevented).toBe(true);
+    expect(latestControls).toMatchObject({
+      phase: "contact",
+      progress: 0,
+      direction: "next",
+      isTransitioning: true
+    });
+    expect(frameClock.pendingFrameCount()).toBe(1);
   });
 
   it("does not navigate when the flow is transitioning", () => {

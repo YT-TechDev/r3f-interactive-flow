@@ -1220,6 +1220,49 @@ describe("createFlowMachine", () => {
     });
   });
 
+  it("spends one large caller delta on remaining transition, then cooldown, then discards excess", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 500,
+      cooldownMs: 1000
+    });
+
+    machine.next();
+    machine.update(200);
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "work",
+      progress: 0.4,
+      direction: "next",
+      isTransitioning: true
+    });
+    expect(machine.isSettling).toBe(true);
+
+    // The caller-supplied delta is spent as 300ms of transition,
+    // then 1000ms of cooldown; the remaining 100ms is discarded.
+    machine.update(1400);
+
+    expect(machine.getSnapshot()).toEqual({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 1,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+    expect(machine.isSettling).toBe(false);
+
+    machine.next();
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "contact",
+      phaseIndex: 2,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true
+    });
+  });
+
   it("allows transitionDurationMs to be zero", () => {
     const machine = createFlowMachine({
       phases: ["intro", "work"] as const,
