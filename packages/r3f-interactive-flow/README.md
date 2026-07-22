@@ -57,7 +57,7 @@ Published-package validation for the v2.5.0 usage milestone exercised `r3f-inter
 
 A single `FlowProvider` can wrap DOM controls, input helpers, progress UI, and a Canvas subtree. DOM navigation and `useFlowProgress` do not require Canvas, and a remounted Canvas can observe the current provider-owned flow again through read-only `useFlowFrame` consumers. Input hooks call the existing `next` and `prev` controls. Accepted input navigation may call `preventDefault()` when enabled; rejected input preserves native page scrolling and native control behavior. Reduced motion is application-owned: pass the transition timing your app wants, and use a React `key` remount only when you intentionally want to apply a new provider configuration and reset flow state.
 
-The evidence included representative desktop Chrome validation with physical mouse, high-resolution trackpad, and keyboard input, plus physical iPhone Safari touch validation. This is not broad browser certification, and optional physical tablet validation was not completed. The repository evidence report is available at <https://github.com/YT-TechDev/r3f-interactive-flow/blob/main/docs/releases/v2.5.0-real-world-browser-validation-report.md>.
+The evidence included representative desktop Chrome validation with physical mouse, high-resolution trackpad, and keyboard input, plus physical iPhone Safari touch validation. This is not broad browser certification, and optional physical tablet validation was not completed. v2.6.0 does not include automated Chromium browser coverage because #383 is deferred; focused Node/minimal-DOM tests prove deterministic library contracts, not physical-device or broad browser certification. The detailed input guide is available at <https://github.com/YT-TechDev/r3f-interactive-flow/blob/main/docs/guides/input-handling.md>, and the repository evidence report is available at <https://github.com/YT-TechDev/r3f-interactive-flow/blob/main/docs/releases/v2.5.0-real-world-browser-validation-report.md>.
 
 ## Install
 
@@ -261,22 +261,22 @@ Call `useFlowFrame` only from components rendered inside `<Canvas>` and under `F
 ```tsx
 import { useKeyboardInput, useTouchInput, useWheelInput } from "r3f-interactive-flow";
 
+const inputIgnore = ["[data-flow-ignore]"] as const;
+const keyboardKeys = {
+  next: ["ArrowDown", "ArrowRight", "PageDown"],
+  prev: ["ArrowUp", "ArrowLeft", "PageUp"]
+} as const;
+
 function InputLayer() {
-  useWheelInput<Phase>({ threshold: 40, cooldown: 500, ignore: ["[data-flow-ignore]"] });
-  useTouchInput<Phase>({ threshold: 50, cooldown: 500, ignore: ["[data-flow-ignore]"] });
-  useKeyboardInput<Phase>({
-    cooldown: 250,
-    keys: {
-      next: ["ArrowDown", "ArrowRight", "PageDown"],
-      prev: ["ArrowUp", "ArrowLeft", "PageUp"]
-    }
-  });
+  useWheelInput<Phase>({ threshold: 40, cooldown: 500, ignore: inputIgnore });
+  useTouchInput<Phase>({ threshold: 50, cooldown: 500, ignore: inputIgnore });
+  useKeyboardInput<Phase>({ cooldown: 250, keys: keyboardKeys });
 
   return null;
 }
 ```
 
-Mount input hooks from a client-side input layer under `FlowProvider`, outside the R3F scene tree by default. Use `ignore` selectors for wheel and touch regions that should not trigger flow navigation, such as `<div data-flow-ignore />`. Keyboard input ignores typing targets by default.
+Mount input hooks from a client-side input layer under `FlowProvider`, outside the R3F scene tree by default. Browser listeners are attached in React Effects after mount; `enabled: false` skips setup, and cleanup follows unmount or Effect replacement. An omitted target resolves to `window`, but an unresolved explicit ref attaches nowhere and never falls back to `window`. Later arbitrary `ref.current` changes are not automatically tracked; for dynamic targets, pass a resolved element through React state or intentionally reconfigure/remount the input layer. Touch support is bounded single-touch swipe behavior, not a full gesture framework. Use `ignore` selectors for wheel and touch regions that should not trigger flow navigation, such as `<div data-flow-ignore />`; keyboard input has no `ignore` selector and ignores typing targets by default.
 
 ### Lock and cooldown notes
 

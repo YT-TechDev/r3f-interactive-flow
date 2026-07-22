@@ -3,7 +3,7 @@
 `r3f-interactive-flow` includes three optional browser input hooks:
 
 - `useWheelInput` maps wheel movement to `next` and `prev`.
-- `useTouchInput` maps swipe movement to `next` and `prev`.
+- `useTouchInput` maps single-touch swipe movement to `next` and `prev`.
 - `useKeyboardInput` maps configured keys to `next` and `prev`.
 
 These hooks are small browser input helpers. They are not a full gesture
@@ -11,7 +11,15 @@ framework, router, animation system, or replacement for your app's own input
 model. Use them when a page should let common browser input move through the
 same flow phases that your buttons or other controls already use.
 
-The v2.5.0 real-world usage validation confirmed this behavior with representative desktop Chrome physical mouse, high-resolution trackpad, keyboard, and physical iPhone Safari touch evidence. Treat that as integration evidence, not broad browser certification; optional physical tablet validation remained unverified because no tablet was available.
+The v2.5.0 real-world usage validation confirmed this behavior with
+representative desktop Chrome physical mouse, high-resolution trackpad,
+keyboard, and physical iPhone Safari touch evidence. Treat that as bounded
+evidence, not broad browser certification; optional physical tablet validation
+remained unverified because no tablet was available. v2.6.0 does not add
+automated Chromium browser coverage because #383 is deferred. The focused
+Node/minimal-DOM tests prove deterministic library contracts, but they are not
+physical-device evidence, cross-browser certification, a native-scroll-feel
+promise, or a background-tab guarantee.
 
 ## Import contract
 
@@ -37,11 +45,16 @@ import { FlowProvider, useKeyboardInput, useTouchInput, useWheelInput } from "r3
 type Phase = "intro" | "details" | "outro";
 
 const phases: Phase[] = ["intro", "details", "outro"];
+const inputIgnore = ["[data-flow-ignore]"] as const;
+const keyboardKeys = {
+  next: ["ArrowDown", "ArrowRight", "PageDown"],
+  prev: ["ArrowUp", "ArrowLeft", "PageUp"]
+} as const;
 
 function FlowInputLayer() {
-  useWheelInput<Phase>();
-  useTouchInput<Phase>();
-  useKeyboardInput<Phase>();
+  useWheelInput<Phase>({ ignore: inputIgnore });
+  useTouchInput<Phase>({ ignore: inputIgnore });
+  useKeyboardInput<Phase>({ keys: keyboardKeys });
 
   return null;
 }
@@ -57,9 +70,39 @@ export function Experience() {
 ```
 
 In frameworks with server components, put the input layer behind the normal
-client boundary for React hooks and browser events. The hooks attach browser
-event listeners from effects after mount; they do not attach listeners or read
-browser globals at module import time.
+client boundary for React hooks and browser events. Browser listeners are
+attached inside React Effects after mount. The modules do not read browser
+globals or attach listeners at import time.
+
+## Listener lifecycle and target resolution
+
+`enabled: false` skips listener setup. When enabled, each hook resolves its
+target during Effect setup and cleans up listeners when that Effect is replaced
+and when the input layer unmounts. Cleanup and pending-state reset also happen
+after intentional resolved target replacement or material option changes that
+are represented by Effect dependencies. Ordinary equivalent rerenders are not
+remounts, and equivalent option values should not be treated as discarding an
+in-flight committed touch gesture. Raw browser listener identity is not a public
+API contract.
+
+The bounded target contract is:
+
+- an omitted target resolves to `window`;
+- an explicit `Window` attaches directly;
+- an explicit `HTMLElement` attaches directly;
+- an unresolved explicit ref attaches nowhere;
+- an unresolved explicit ref never falls back to `window`;
+- a normal React element ref resolved in the same commit is available before
+  Effect setup;
+- later arbitrary changes to `ref.current` are not automatically observed as
+  subscription changes;
+- mutable ref detachment/remount alone is not a target-tracking signal;
+- direct resolved element identity replacement is supported through normal
+  Effect cleanup and setup.
+
+For dynamic targets, pass a resolved element through React state or
+intentionally reconfigure/remount the input layer. The hooks do not include a
+target manager, observer, polling loop, callback-ref API, or event bus.
 
 ## How input maps to flow navigation
 
@@ -74,22 +117,17 @@ or create a separate navigation path.
 
 Because the hooks use the same controls as manual UI, the same rules apply:
 locks, active transitions, phase boundaries, provider cooldowns, and hook-local
-cooldowns can all prevent an input event from moving to another phase.
+cooldowns can all reject input without moving to another phase.
 
 ## `preventDefault` follows accepted navigation
 
-`preventDefault` defaults to `true` on every input hook, but the hooks only
-call `preventDefault()` on a browser event after that event has produced an
-accepted flow navigation (or, for touch, on later events belonging to a
-gesture that already navigated). An input event that is rejected — by a
-threshold miss, a phase boundary, a manual lock, an active transition, a
-provider cooldown, a hook-local cooldown, an ignored region, or a native
-actionable control — leaves the browser's default behavior alone, so page
-scroll, native button/link activation, and text field editing keep working
-normally.
-
-Set `preventDefault: false` on a hook to let accepted navigation happen
-without suppressing the browser's default behavior at all.
+`preventDefault` defaults to `true` on every input hook. Accepted navigation may
+call `preventDefault()` when the hook's option is true. Later events in an
+already committed touch gesture may also be prevented. Threshold misses,
+ignored/actionable/editable origins, boundaries, locks, transitions, provider
+cooldown, hook-local cooldown, repeated keys, typing targets, and other rejected
+navigation attempts remain unprevented. Set `preventDefault: false` to allow
+accepted navigation without suppressing native behavior.
 
 ## Wheel input
 
@@ -98,69 +136,59 @@ Use wheel input for scroll-like phase navigation.
 ```tsx
 import { useWheelInput } from "r3f-interactive-flow";
 
+const inputIgnore = ["[data-flow-ignore]"] as const;
+
 type Phase = "intro" | "details" | "outro";
 
 export function FlowInputLayer() {
   useWheelInput<Phase>({
     threshold: 40,
     cooldown: 500,
-    ignore: ["[data-flow-ignore]"]
+    ignore: inputIgnore
   });
 
   return null;
 }
 ```
 
-`useWheelInput` reads the wheel delta on the `y` axis by default and
-normalizes browser wheel delta modes before comparing the value with
-`threshold`. Pixel-mode deltas are used directly, line-mode deltas are scaled
-to pixel-like units, and page-mode deltas are scaled to larger page-like units.
-The conversion details stay internal; `threshold` remains the public
-configuration value in normalized internal units.
+`useWheelInput` reads the wheel delta on the `y` axis by default and normalizes
+browser wheel delta modes before comparing the value with `threshold`. Same-
+direction deltas may accumulate in one short burst. Direction reversal, target
+change, and inactivity reset pending burst intent. One burst produces at most
+one accepted navigation. Rejected input does not consume hook-local cooldown and
+does not queue later navigation. Accepted navigation may call `preventDefault()`
+when enabled; rejected navigation remains unprevented. Wheel burst inactivity
+and hook-local cooldown use monotonic elapsed time.
 
-- A positive delta greater than `threshold` calls `next`.
-- A negative delta less than `-threshold` calls `prev`.
-- A delta at or within the threshold does nothing.
-
-Small same-direction wheel deltas accumulate during a short wheel burst, which
-keeps high-resolution trackpads from missing intentional scroll gestures. A
-direction reversal, a target change, or a short period of wheel inactivity
-resets pending wheel intent, and the current event starts the new burst.
-
-One wheel burst can produce at most one accepted phase navigation. Follow-up
-momentum events in the same direction and on the same target do not advance
-through additional phases. If a threshold-crossing attempt is rejected by a
-boundary, lock, transition, provider cooldown, or hook-local cooldown, the hook
-does not call `preventDefault()` and does not queue stale intent for a later
-automatic navigation.
+Do not rely on physical trackpad uniformity across every browser or device.
 
 Useful options:
 
-- `threshold`: minimum wheel delta required before the hook requests navigation.
-  The default is `40`.
+- `threshold`: minimum normalized wheel delta required before the hook requests
+  navigation. The default is `40`.
 - `cooldown`: hook-local time in milliseconds after an accepted input-driven
   navigation. The default is `0`.
 - `ignore`: selectors for regions where wheel input should not drive flow
   navigation.
 - `enabled`: set to `false` to skip listener setup.
-- `preventDefault`: defaults to `true`. The hook only calls `preventDefault()`
-  after a wheel event has produced an accepted navigation; threshold misses,
-  boundaries, locks, transitions, cooldowns, and ignored or actionable targets
-  never suppress the native wheel event.
+- `preventDefault`: defaults to `true` and follows the accepted-navigation rule
+  above.
 - `axis`: use `"x"` instead of the default `"y"` for horizontal wheel input.
 
 `useWheelInput` also skips navigation for wheel events that target a native
-editable field (`input`, `textarea`, `select`, or a `contenteditable` region)
-or an actionable control (`button`, or `a` with an `href`), in addition to any
-selectors passed through `ignore`. These built-in targets keep their native
-wheel/scroll behavior without any extra configuration.
+editable field (`input`, `textarea`, `select`, or a `contenteditable` region) or
+an actionable control (`button`, or `a` with an `href`), in addition to any
+selectors passed through `ignore`.
 
 ## Touch input
 
-Use touch input for simple swipe-to-advance behavior.
+Use touch input for bounded single-touch swipe-to-advance behavior. It is a
+small single-touch swipe helper, not a full gesture framework.
 
 ```tsx
 import { useTouchInput } from "r3f-interactive-flow";
+
+const inputIgnore = ["[data-flow-ignore]"] as const;
 
 type Phase = "intro" | "details" | "outro";
 
@@ -168,31 +196,39 @@ export function FlowInputLayer() {
   useTouchInput<Phase>({
     threshold: 50,
     cooldown: 500,
-    ignore: ["[data-flow-ignore]"]
+    ignore: inputIgnore
   });
 
   return null;
 }
 ```
 
-`useTouchInput` tracks the start and end position on the `y` axis by default:
+`useTouchInput` tracks single-touch position on the `y` axis by default. An
+upward swipe farther than `threshold` calls `next`; a downward swipe farther
+than `threshold` calls `prev`; a short movement at or within the threshold does
+nothing. Touch gesture distance is position-based and does not use a clock.
 
-- An upward swipe farther than `threshold` calls `next`.
-- A downward swipe farther than `threshold` calls `prev`.
-- A short movement at or within the threshold does nothing.
+A gesture starts at `touchstart`. Threshold crossing during `touchmove` attempts
+navigation and, when accepted, creates a committed touch gesture. One accepted
+navigation can happen per committed touch gesture. Later `touchmove` events in
+the same committed touch gesture may remain prevented when configured, but they
+never navigate again. If a stream does not produce a qualifying `touchmove`,
+`touchend` provides a bounded fallback using the start and end positions.
+Missing `touches[0]` during `touchmove` does not invent a new gesture, and the
+later `touchend` fallback remains bounded. `touchcancel` before or after
+commitment clears gesture state. Unmount/remount during an active uncommitted
+gesture does not replay it.
 
-A touch gesture starts at `touchstart` and is committed the first time a
-`touchmove` crosses `threshold` and the flow accepts the resulting navigation.
-Once a gesture is committed:
+Ignored/actionable origin status is fixed from the gesture origin for the
+gesture lifetime, even if later event targets leave that region. Disable,
+unmount, target replacement, and material Effect replacement reset pending touch
+state. Equivalent ignore rerenders preserve a committed touch gesture after the
+#423 fix, while materially changed selectors intentionally replace the Effect
+and reset relevant pending touch state.
 
-- navigation happens exactly once for that gesture;
-- later `touchmove` events from the same gesture may still call
-  `preventDefault()` (when enabled) but never navigate again.
-
-If a gesture never produces a qualifying `touchmove` (a sparse or synthetic
-touch stream), `touchend` acts as a fallback and attempts navigation once
-using the start and end positions. `touchcancel`, and `touchend` on an
-uncommitted or ignored gesture, fully reset gesture state.
+No multi-touch identity tracking is promised. There is no pinch, rotate,
+velocity, inertia, long-press, pointer-event, or general gesture-framework
+contract.
 
 Useful options:
 
@@ -203,26 +239,18 @@ Useful options:
 - `ignore`: selectors for regions where touch gestures should not drive flow
   navigation.
 - `enabled`: set to `false` to skip listener setup.
-- `preventDefault`: defaults to `true`. The hook only calls `preventDefault()`
-  once a gesture has produced an accepted navigation (at the committing
-  `touchmove`, on later `touchmove` events in that same gesture, or at the
-  `touchend` fallback); short gestures, boundaries, locks, transitions,
-  cooldowns, and ignored or actionable gesture origins never suppress the
-  native touch event.
+- `preventDefault`: defaults to `true` and follows the accepted-navigation rule
+  above.
 - `axis`: use `"x"` instead of the default `"y"` for horizontal swipe input.
 
-`useTouchInput` also skips a gesture that starts on a native editable field
-(`input`, `textarea`, `select`, or a `contenteditable` region) or an
-actionable control (`button`, or `a` with an `href`), in addition to any
-selectors passed through `ignore`. A gesture that starts in one of these
-regions stays ignored for its whole lifetime, even if a later `touchmove`
-leaves the region.
+`useTouchInput` also skips gestures that start on native editable fields or
+actionable controls, in addition to any selectors passed through `ignore`.
 
-## Ignore selectors for interactive regions
+## Ignore selectors and equivalent options
 
 Wheel and touch input already skip native editable fields and actionable
 controls (`input`, `textarea`, `select`, `contenteditable` regions, `button`,
-and `a` with an `href`) without any configuration. Use `ignore` selectors for
+and `a` with an `href`) without configuration. Use `ignore` selectors for
 additional DOM regions where native interaction should win: scrollable panels,
 drawers, menus, and other custom controls.
 
@@ -239,21 +267,18 @@ export function FlowInputLayer() {
 }
 ```
 
-Then mark larger UI regions that should not trigger phase navigation:
+Semantically equivalent wheel/touch `ignore` selector arrays do not need to
+destroy the intended listener/gesture lifecycle. The #423 fix preserves
+committed touch gesture state across equivalent inline ignore rerenders.
+Materially changed selectors intentionally replace the Effect and reset relevant
+pending gesture/listener state. Hoisting constants is recommended for
+readability, stable intent, and avoiding unnecessary listener work; it does not
+mean every inline object is a correctness bug.
 
-```tsx
-export function SidePanel() {
-  return (
-    <aside data-flow-ignore>
-      <button type="button">Open details</button>
-      <p>This panel can handle its own scroll, touch, and controls.</p>
-    </aside>
-  );
-}
-```
-
-Ignored wheel and touch events return before navigation and leave native behavior available. Use ignore selectors as
-a boundary between page-level flow input and local UI controls, including custom nested-scroll regions.
+Keyboard has no `ignore` selector option. Fresh equivalent keyboard `keys`
+objects can still replace the keyboard listener because the keys object is an
+Effect dependency, but rejected input and hook-local cooldown behavior remain as
+described here.
 
 ## Keyboard input
 
@@ -263,25 +288,30 @@ move through phases.
 ```tsx
 import { useKeyboardInput } from "r3f-interactive-flow";
 
+const keyboardKeys = {
+  next: ["ArrowDown", "ArrowRight", "PageDown"],
+  prev: ["ArrowUp", "ArrowLeft", "PageUp"]
+} as const;
+
 type Phase = "intro" | "details" | "outro";
 
 export function FlowInputLayer() {
   useKeyboardInput<Phase>({
     cooldown: 250,
-    keys: {
-      next: ["ArrowDown", "ArrowRight", "PageDown"],
-      prev: ["ArrowUp", "ArrowLeft", "PageUp"]
-    }
+    keys: keyboardKeys
   });
 
   return null;
 }
 ```
 
-Configure keys with `keys.next` and `keys.prev`:
-
-- `keys.next` lists key values that call `next`.
-- `keys.prev` lists key values that call `prev`.
+Mapped `keydown` events call `next` or `prev`. Repeated `keydown` events from a
+held key are ignored. Typing targets are protected when `ignoreWhenTyping` is
+enabled. Space and Enter retain native activation behavior on actionable
+controls. Accepted mapped navigation may be prevented when configured. Rejected
+or protected keyboard input remains unprevented. Keyboard has no `ignore`
+selector. Hook-local cooldown uses monotonic elapsed time, and rejected input
+does not consume cooldown.
 
 If you omit `keys`, the default next keys are `ArrowDown`, `ArrowRight`,
 `PageDown`, and Space (`" "`). The default previous keys are `ArrowUp`,
@@ -294,57 +324,58 @@ Useful options:
 - `cooldown`: hook-local time in milliseconds after an accepted input-driven
   navigation. The default is `0`.
 - `enabled`: set to `false` to skip listener setup.
-- `preventDefault`: defaults to `true`. The hook only calls `preventDefault()`
-  after a mapped key has produced an accepted navigation; unmapped keys,
-  repeated keys, typing targets, boundaries, locks, transitions, and cooldowns
-  never suppress the native keydown event.
+- `preventDefault`: defaults to `true` and follows the accepted-navigation rule
+  above.
 - `ignoreWhenTyping`: defaults to `true`, so keyboard events from inputs,
   textareas, selects, and contenteditable elements are ignored.
 
-Keyboard input ignores repeated `keydown` events from a held key.
-
-Space and Enter get extra protection: when the key is Space or Enter and the
-event target is (or is nested inside) a native actionable control — `button`,
-`a` with an `href`, `input`, `textarea`, or `select` — the hook does not
-navigate and does not call `preventDefault()`, even if Space or Enter is
-mapped to `next` or `prev`. This keeps native button and link activation
-working when Space is the default next key or when Enter is mapped
-explicitly. Space and Enter still navigate normally when mapped and the event
-target is not an actionable control.
-
-## Thresholds and cooldowns
+## Thresholds, cooldowns, and clocks
 
 Thresholds filter noisy input before navigation is requested:
 
-- Wheel threshold is based on wheel delta.
+- Wheel threshold is based on normalized wheel delta.
 - Touch threshold is based on swipe distance.
 - Keyboard input has no threshold; it uses key matching instead.
 
 Cooldowns reduce accidental repeated navigation:
 
-- `transition.cooldown` on `FlowProvider` is part of the shared flow navigation
-  rules. It starts after the accepted transition completes, runs for the full
-  configured duration after completion, and blocks manual controls plus wheel,
-  touch, and keyboard hooks globally.
-- `cooldown` on an input hook is local to that hook and starts only after that
-  hook's accepted navigation request. It is separate from provider transition
-  cooldown.
+- `transition.cooldown` on `FlowProvider` is the provider cooldown. It starts
+  after the accepted transition completes, runs for the configured duration, and
+  blocks manual controls plus wheel, touch, and keyboard hooks globally.
+- `cooldown` on an input hook is hook-local cooldown and starts only after that
+  hook's accepted navigation request. Rejected input does not consume it.
 
-Use provider cooldown for global phase navigation pacing. Use hook cooldown when
-a specific browser input source, such as trackpad wheel bursts or repeated swipe
-attempts, needs extra spacing.
+The time-source inventory is intentionally bounded:
+
+- `FlowProvider` transition and provider cooldown use `requestAnimationFrame`
+  callback timestamp deltas.
+- The core machine uses the caller-supplied delta.
+- Wheel, touch, and keyboard hook-local cooldown use a monotonic event-time
+  source (`performance.now()` in the current implementation).
+- Wheel burst inactivity uses the same monotonic elapsed-time basis.
+- Touch gesture distance is position-based and does not use a clock.
+
+The first rAF callback establishes a zero-delta baseline. A later large positive
+delta may complete the remaining transition and then consume remaining provider
+cooldown in the same update. A decreasing rAF timestamp contributes zero
+elapsed time. Zero-duration transition plus positive cooldown remains supported.
+`FlowProvider` owns one clock and stops it after the machine settles. Input can
+resume after transition and provider cooldown are fully settled.
+
+No guarantee is made about whether hidden-tab, background suspension, OS sleep,
+or device sleep time must always count or never count.
 
 ## Locks, transitions, boundaries, and ignored input
 
 Input hooks are conservative. An input event may be recognized by the browser
-listener but still not change phase.
+listener but still become rejected navigation.
 
 Navigation does not happen when:
 
 - the flow is locked;
 - a transition is already active;
 - provider cooldown is still active;
-- the hook-local cooldown is still active;
+- hook-local cooldown is still active;
 - wheel or touch movement does not pass the threshold;
 - the event starts from an ignored, editable, or actionable wheel or touch
   region;
@@ -352,16 +383,10 @@ Navigation does not happen when:
 - a mapped Space or Enter key targets a native actionable control;
 - the request would move before the first phase or after the last phase.
 
-In every one of these cases the input hooks also leave `preventDefault()`
-uncalled, so the browser's native behavior for that event — page scroll,
-button/link activation, text editing — is unaffected. Only an event that
-actually produces an accepted navigation (or a later event in an
-already-accepted touch gesture) gets suppressed, and only when
-`preventDefault` is left at its default of `true`.
-
-Ignored input does not queue a future transition. Once the relevant lock,
-transition, boundary, or cooldown condition is gone, the user must provide a new
-input event.
+In every one of these rejected cases, the input hooks leave `preventDefault()`
+uncalled. Rejected input does not queue a future transition. Once the relevant
+lock, transition, boundary, or cooldown condition is gone, the user must provide
+a new input event.
 
 ## Keep input separate from scene code
 
