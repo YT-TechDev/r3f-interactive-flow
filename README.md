@@ -70,7 +70,7 @@ The v2.5.0 real-world usage validation used the published-package consumer and p
 
 DOM controls, input helpers, progress UI, and the Canvas subtree can share one `FlowProvider`. `useFlow` and `useFlowProgress` continue working with no Canvas mounted, while remounting Canvas lets `useFlowFrame` resume read-only observation of the current provider-owned flow. Accepted wheel, touch, and keyboard navigation may suppress native browser behavior when `preventDefault` is enabled; rejected navigation preserves native page scroll and control behavior. Reduced-motion behavior remains application policy: choose shorter or zero-duration transition options yourself, and use a React `key` remount only when you intentionally want to apply a new provider configuration and reset flow state.
 
-Validation covered representative desktop Chrome usage with physical mouse, high-resolution trackpad, and keyboard input, plus physical iPhone Safari touch usage. It did not certify every browser or device class; optional physical tablet validation remained unverified because no tablet was available. See the detailed guides for [R3F usage](docs/guides/r3f-usage.md), [input handling](docs/guides/input-handling.md), and [common mistakes](docs/guides/common-mistakes.md), and see the evidence report at [docs/releases/v2.5.0-real-world-browser-validation-report.md](docs/releases/v2.5.0-real-world-browser-validation-report.md).
+Validation covered representative desktop Chrome usage with physical mouse, high-resolution trackpad, and keyboard input, plus physical iPhone Safari touch usage. It did not certify every browser or device class; optional physical tablet validation remained unverified because no tablet was available. v2.6.0 does not include automated Chromium browser coverage because #383 is deferred; focused Node/minimal-DOM tests prove deterministic library contracts, not physical-device or broad browser certification. See the detailed guides for [R3F usage](docs/guides/r3f-usage.md), [input handling](docs/guides/input-handling.md), and [common mistakes](docs/guides/common-mistakes.md), and see the evidence report at [docs/releases/v2.5.0-real-world-browser-validation-report.md](docs/releases/v2.5.0-real-world-browser-validation-report.md).
 
 ## Installation
 
@@ -241,22 +241,22 @@ Call `useFlowFrame` only from components rendered inside `<Canvas>` and under `F
 ```tsx
 import { useKeyboardInput, useTouchInput, useWheelInput } from "r3f-interactive-flow";
 
+const inputIgnore = ["[data-flow-ignore]"] as const;
+const keyboardKeys = {
+  next: ["ArrowDown", "ArrowRight", "PageDown"],
+  prev: ["ArrowUp", "ArrowLeft", "PageUp"]
+} as const;
+
 function InputLayer() {
-  useWheelInput<Phase>({ threshold: 40, cooldown: 500, ignore: ["[data-flow-ignore]"] });
-  useTouchInput<Phase>({ threshold: 50, cooldown: 500, ignore: ["[data-flow-ignore]"] });
-  useKeyboardInput<Phase>({
-    cooldown: 250,
-    keys: {
-      next: ["ArrowDown", "ArrowRight", "PageDown"],
-      prev: ["ArrowUp", "ArrowLeft", "PageUp"]
-    }
-  });
+  useWheelInput<Phase>({ threshold: 40, cooldown: 500, ignore: inputIgnore });
+  useTouchInput<Phase>({ threshold: 50, cooldown: 500, ignore: inputIgnore });
+  useKeyboardInput<Phase>({ cooldown: 250, keys: keyboardKeys });
 
   return null;
 }
 ```
 
-Mount input hooks from a client-side input layer under `FlowProvider`, outside the R3F scene tree by default. Use `ignore` selectors for wheel and touch regions that should not trigger flow navigation, such as `<div data-flow-ignore />`. Keyboard input ignores typing targets by default.
+Mount input hooks from a client-side input layer under `FlowProvider`, outside the R3F scene tree by default. Browser listeners are attached in React Effects after mount; `enabled: false` skips setup, and cleanup follows unmount or Effect replacement. An omitted target resolves to `window`, but an unresolved explicit ref attaches nowhere and never falls back to `window`. Later arbitrary `ref.current` changes are not automatically tracked; for dynamic targets, pass a resolved element through React state or intentionally reconfigure/remount the input layer. Touch support is bounded single-touch swipe behavior, not a full gesture framework. Use `ignore` selectors for wheel and touch regions that should not trigger flow navigation, such as `<div data-flow-ignore />`; keyboard input has no `ignore` selector and ignores typing targets by default.
 
 ### Lock and cooldown notes
 
