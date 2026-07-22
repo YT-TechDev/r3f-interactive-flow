@@ -1074,16 +1074,20 @@ function pendingFrameCount(): number {
 
 // Advance the provider clock by one frame. The first frame after a clock start
 // only establishes the time baseline (delta 0); later frames apply deltaMs.
-function advanceClock(deltaMs: number): void {
-  frameNow += deltaMs;
+function runFrameAt(now: number): void {
+  frameNow = now;
   const pending = [...frameCallbacks.values()];
   frameCallbacks.clear();
 
   act(() => {
     for (const callback of pending) {
-      callback(frameNow);
+      callback(now);
     }
   });
+}
+
+function advanceClock(deltaMs: number): void {
+  runFrameAt(frameNow + deltaMs);
 }
 
 describe("FlowProvider provider-owned transition clock", () => {
@@ -1093,6 +1097,148 @@ describe("FlowProvider provider-owned transition clock", () => {
 
   afterEach(() => {
     uninstallFrameClock();
+  });
+
+  it("treats the first RAF timestamp as a zero-delta baseline", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(<ControlsProbe onRender={(controls) => (latestControls = controls)} />, undefined, {
+      transition: { duration: 100 }
+    });
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    expect(pendingFrameCount()).toBe(1);
+
+    // Provider transition and cooldown time comes from RAF timestamp differences; the first timestamp is only the baseline.
+    runFrameAt(1000);
+
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      progress: 0,
+      direction: "next",
+      isTransitioning: true
+    });
+    expect(pendingFrameCount()).toBe(1);
+
+    runFrameAt(1050);
+
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      progress: 0.5,
+      direction: "next",
+      isTransitioning: true
+    });
+  });
+
+  it("settles transition and cooldown from one later large RAF delta", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(<ControlsProbe onRender={(controls) => (latestControls = controls)} />, undefined, {
+      transition: { duration: 100, cooldown: 300 }
+    });
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    expect(pendingFrameCount()).toBe(1);
+
+    runFrameAt(1000);
+    expect(pendingFrameCount()).toBe(1);
+
+    // The single 400ms RAF delta spends 100ms on transition, then 300ms on cooldown.
+    runFrameAt(1400);
+
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      progress: 1,
+      direction: "none",
+      isTransitioning: false
+    });
+    expect(pendingFrameCount()).toBe(0);
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    expect(latestControls).toMatchObject({
+      phase: "contact",
+      progress: 0,
+      direction: "next",
+      isTransitioning: true
+    });
+    expect(pendingFrameCount()).toBe(1);
+  });
+
+  it("treats a decreasing RAF timestamp difference as zero delta", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(<ControlsProbe onRender={(controls) => (latestControls = controls)} />, undefined, {
+      transition: { duration: 100 }
+    });
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    runFrameAt(1000);
+    runFrameAt(900);
+
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      progress: 0,
+      direction: "next",
+      isTransitioning: true
+    });
+    expect(pendingFrameCount()).toBe(1);
+  });
+
+  it("keeps zero-duration transitions settled while provider cooldown remains clocked", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(<ControlsProbe onRender={(controls) => (latestControls = controls)} />, undefined, {
+      transition: { duration: 0, cooldown: 300 }
+    });
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      progress: 1,
+      direction: "none",
+      isTransitioning: false
+    });
+    expect(pendingFrameCount()).toBe(1);
+
+    runFrameAt(1000);
+    runFrameAt(1299);
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    expect(latestControls).toMatchObject({ phase: "work", isTransitioning: false });
+    expect(pendingFrameCount()).toBe(1);
+
+    runFrameAt(1300);
+
+    expect(pendingFrameCount()).toBe(0);
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    expect(latestControls).toMatchObject({
+      phase: "contact",
+      progress: 1,
+      direction: "none",
+      isTransitioning: false
+    });
   });
 
   it("advances React progress continuously through a Canvas-free navigation", () => {
