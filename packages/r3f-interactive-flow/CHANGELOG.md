@@ -1,5 +1,37 @@
 # r3f-interactive-flow
 
+## 2.6.0
+
+`r3f-interactive-flow@2.6.0` is a focused browser lifecycle and input hardening minor release. It preserves the existing public API, public types, package exports, dependencies, peer dependency ranges, and root-only package boundary while correcting two input timing and touch lifecycle behaviors and documenting the proven browser boundaries.
+
+### Fixed
+
+- Preserve committed touch gesture state across rerenders that provide semantically equivalent `ignore` selector arrays, including fresh equivalent inline arrays whose identity changes. Materially changed selectors still replace the relevant Effect and reset pending gesture/listener state as intended.
+- Use monotonic elapsed time for wheel burst inactivity and wheel, touch, and keyboard hook-local cooldowns. The current implementation uses `performance.now()`, so wall-clock changes no longer distort these elapsed-time decisions without making universal hidden-tab, OS-sleep, or background-time guarantees.
+
+### Hardened
+
+- Strengthened deterministic regression coverage for input rerender and target-resolution contracts, including unresolved explicit refs never falling back to `window`, same-commit ref resolution, dynamic target replacement boundaries, and equivalent versus material option changes.
+- Completed focused touch interruption coverage for commitment, missing `touches[0]`, `touchcancel`, and unmount/remount interruption behavior.
+- Locked provider timing contracts for the first-frame rAF baseline, non-negative handling for decreasing rAF timestamps, large positive deltas that complete transitions and consume remaining provider cooldown in the same update, zero-duration transitions plus cooldown, and monotonic hook-local elapsed-time behavior.
+
+### Documentation
+
+- Updated the input guide and README files to document listener Effect setup and cleanup, target-resolution boundaries, unresolved explicit ref behavior, the absence of automatic mutable-ref tracking, dynamic target application responsibility, and accepted/rejected `preventDefault()` behavior.
+- Documented nested ignored/editable/actionable ancestor protection, wheel burst behavior, bounded single-touch semantics, keyboard input's lack of an `ignore` selector, provider and hook time-source inventory, bounded browser/background claims, and hoisted input option constants in examples.
+
+### Compatibility
+
+- No public API additions or removals are included.
+- No public TypeScript type changes are included.
+- No package export changes or new package subpaths are included.
+- No runtime dependency additions are included.
+- No peer dependency range changes are included.
+- The root-only package boundary remains unchanged.
+- The touch-ignore rerender and monotonic elapsed-time fixes are behavioral corrections within the existing API.
+- No generalized gesture framework, E2E framework, or automated browser harness was added.
+- v2.6.0 deterministic focused tests validate library contracts; they are not automated real-browser or physical-device certification, and v2.6.0 does not rerun or expand the v2.5.0 physical-device matrix.
+
 ## 2.5.0
 
 `r3f-interactive-flow@2.5.0` is a validation-and-documentation-focused minor release. It preserves the 2.4.0 runtime source, public API, public types, package exports, dependencies, and peer dependency ranges while adding evidence-backed validation records, integration documentation, and release metadata.
