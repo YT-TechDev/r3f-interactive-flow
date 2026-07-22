@@ -56,9 +56,6 @@ importers:
       '@react-three/fiber':
         specifier: ^9.6.1
         version: 9.6.1(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(three@0.185.1)
-      '@vitest/browser-playwright':
-        specifier: 4.1.10
-        version: 4.1.10(vitest@4.1.10(vite@8.1.5(esbuild@0.27.7)))
       r3f-interactive-flow:
         specifier: workspace:*
         version: link:../../packages/r3f-interactive-flow
