@@ -254,6 +254,12 @@ and `a` with an `href`) without configuration. Use `ignore` selectors for
 additional DOM regions where native interaction should win: scrollable panels,
 drawers, menus, and other custom controls.
 
+Descendant event targets inherit protection from matching ignored, editable, or
+actionable ancestors. For example, an icon or nested span inside a button, a
+descendant inside an anchor with `href`, a descendant inside an editable or
+`contenteditable` region, and a descendant inside a `[data-flow-ignore]` region
+keep the native or local interaction boundary of that ancestor.
+
 ```tsx
 import { useTouchInput, useWheelInput } from "r3f-interactive-flow";
 
