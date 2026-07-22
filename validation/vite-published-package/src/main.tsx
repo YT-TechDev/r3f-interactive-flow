@@ -25,10 +25,10 @@ const keyboardKeys = {
 
 type MotionMode = "normal" | "reduced";
 
-const transitionMs: Record<MotionMode, number> = {
-  normal: 900,
-  reduced: 180
-};
+const flowTransitionByMotionMode = {
+  normal: { duration: 900, cooldown: 240 },
+  reduced: { duration: 0, cooldown: 240 }
+} as const;
 
 function FlowInputs({ useUnresolvedTarget }: { useUnresolvedTarget: boolean }) {
   const unresolvedTarget = useRef<HTMLElement>(null);
@@ -338,8 +338,7 @@ function Experience({ motionMode }: { motionMode: MotionMode }) {
     <FlowProvider
       key={motionMode}
       phases={phases}
-      transitionDurationMs={transitionMs[motionMode]}
-      cooldownMs={240}
+      transition={flowTransitionByMotionMode[motionMode]}
     >
       <FlowInputs useUnresolvedTarget={useUnresolvedTarget} />
       <InputEventTrace />
@@ -366,8 +365,13 @@ function Experience({ motionMode }: { motionMode: MotionMode }) {
             remain visible while no useFlowFrame consumer is mounted.
           </p>
           <p>
-            Reduced motion is configured outside the provider and intentionally remounts this keyed
-            provider instance, resetting flow state.
+            Reduced mode uses immediate flow transitions with provider cooldown kept separate at
+            240ms. Switching modes is application-owned, remounts this keyed provider, and resets
+            flow state.
+          </p>
+          <p>
+            Canvas scene motion is reduced separately by application code rather than by the flow
+            transition duration.
           </p>
         </section>
         <NativeControls />
