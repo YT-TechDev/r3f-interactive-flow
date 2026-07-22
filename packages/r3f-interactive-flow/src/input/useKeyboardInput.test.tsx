@@ -1,6 +1,6 @@
 import React, { act, useContext, useEffect, useRef } from "react";
 import type { RefObject } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 
 import type { FlowControls, FlowMachine } from "../core/types";
 import { FlowMachineContext } from "../react/FlowContext";
@@ -459,6 +459,15 @@ describe("useKeyboardInput", () => {
 
   it("resumes keyboard navigation after one provider large delta settles transition and cooldown", () => {
     const frameClock = installTestFrameClock();
+
+    onTestFinished(() => {
+      try {
+        expect(frameClock.pendingFrameCount()).toBe(0);
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+
     let latestControls: FlowControls<TestPhase> | undefined;
 
     renderFlow(

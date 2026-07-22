@@ -1238,8 +1238,9 @@ describe("createFlowMachine", () => {
     });
     expect(machine.isSettling).toBe(true);
 
-    // The caller-supplied delta is spent as 300ms of transition and 1000ms of cooldown; excess is ignored.
-    machine.update(1300);
+    // The caller-supplied delta is spent as 300ms of transition,
+    // then 1000ms of cooldown; the remaining 100ms is discarded.
+    machine.update(1400);
 
     expect(machine.getSnapshot()).toEqual({
       phase: "work",
