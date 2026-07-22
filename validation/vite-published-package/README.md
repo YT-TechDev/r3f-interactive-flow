@@ -37,7 +37,10 @@ The consumer also includes a local `pnpm-workspace.yaml` with only `allowBuilds.
 - `data-flow-ignore` is passed to the wheel and touch hooks for the explicit nested-scroll region. Keyboard input uses the public `keys` and `ignoreWhenTyping` options, so native form typing is preserved without claiming `useKeyboardInput` supports ignore selectors.
 - Two independent Canvas-bound `useFlowFrame` observers write read-only frame samples to DOM outputs without React state writes, navigation calls, transition timing changes, or extra clocks.
 - The Canvas mount/unmount control removes and restores the Canvas subtree without unmounting `FlowProvider`, leaving DOM phase state and `useFlowProgress` mounted.
-- Normal and reduced motion are application-owned modes. Switching modes intentionally changes the provider key, remounts `FlowProvider`, and resets flow state; this does not claim a complete library-level reduced-motion policy.
+- Normal and reduced motion are application-owned modes. The fixture keeps stable application constants for provider transition configuration, using positive-duration normal transitions and representative `duration: 0` reduced transitions with a separate positive provider cooldown.
+- Switching modes intentionally changes the provider key, remounts `FlowProvider`, and resets flow state. The key is React remount behavior, not a package API prop.
+- Canvas scene motion is separately reduced by application code; changing provider duration does not automatically reduce scene, camera, shader, CSS, or other non-flow motion.
+- The `duration: 0` reduced-mode choice is one application policy example, not a universal accessibility requirement or a complete reduced-motion policy.
 - The layout is mobile-responsive for owner-assisted browser validation.
 
 ## Owner-assisted browser validation results
@@ -48,4 +51,4 @@ Physical mouse, high-resolution trackpad, keyboard, and iPhone Safari touch evid
 
 ## Non-goals
 
-This fixture does not add runtime dependencies, workspace links, local tarballs, source-path imports, shaders, particle systems, camera presets, GSAP, Framer Motion, Zustand, routing, release automation, package publishing, tags, or changes to library runtime behavior. It is not a portfolio starter, visual-effects package, browser certification suite, or full accessibility solution.
+This fixture does not add runtime dependencies, workspace links, local tarballs, source-path imports, shaders, particle systems, camera presets, GSAP, Framer Motion, Zustand, routing, release automation, package publishing, tags, or changes to library runtime behavior. It is not a portfolio starter, visual-effects package, browser certification suite, accessibility certification suite, complete reduced-motion policy, or full accessibility solution.

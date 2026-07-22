@@ -1662,6 +1662,108 @@ describe("FlowProvider provider-owned transition clock", () => {
     expect(latestControls?.progress).toBe(0.5);
   });
 
+  it("remounts from active normal motion to reduced zero-duration config with fresh state and cooldown", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let context: NonNullable<React.ContextType<typeof FlowMachineContext>> | undefined;
+    const children = (
+      <>
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe onRender={(value) => (context = value)} />
+      </>
+    );
+
+    renderInlineFlow({
+      providerKey: "normal",
+      children,
+      transition: { duration: 1000, cooldown: 600 }
+    });
+
+    act(() => {
+      latestControls?.next();
+    });
+    advanceClock(16);
+    advanceClock(250);
+    act(() => {
+      latestControls?.lock();
+    });
+
+    const oldMachine = context?.machine;
+
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 0.25,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: true
+    });
+    expect(pendingFrameCount()).toBe(1);
+
+    renderInlineFlow({
+      providerKey: "reduced",
+      children,
+      transition: { duration: 0, cooldown: 240 }
+    });
+
+    expect(context?.machine).not.toBe(oldMachine);
+    expect(pendingFrameCount()).toBe(0);
+    expect(latestControls).toMatchObject({
+      phase: "intro",
+      phaseIndex: 0,
+      progress: 0,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 1,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+    expect(pendingFrameCount()).toBe(1);
+
+    runFrameAt(1000);
+    runFrameAt(1239);
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 1,
+      direction: "none",
+      isTransitioning: false
+    });
+    expect(pendingFrameCount()).toBe(1);
+
+    runFrameAt(1240);
+
+    expect(pendingFrameCount()).toBe(0);
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    expect(latestControls).toMatchObject({
+      phase: "contact",
+      phaseIndex: 2,
+      progress: 1,
+      direction: "none",
+      isTransitioning: false
+    });
+    expect(pendingFrameCount()).toBe(1);
+  });
+
   it("remounts with a new machine and cancels old clock when the provider key changes", () => {
     let latestControls: FlowControls<TestPhase> | undefined;
     let context: NonNullable<React.ContextType<typeof FlowMachineContext>> | undefined;

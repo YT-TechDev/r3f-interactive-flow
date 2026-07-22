@@ -1,5 +1,5 @@
 import React, { act, useContext } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { FlowControls, FlowMachine } from "../core/types";
 import { FlowMachineContext } from "../react/FlowContext";
@@ -88,9 +88,9 @@ const ControlsProbe = createControlsProbe<TestPhase>();
 const { renderFlow } = createFlowTestHarness<TestPhase>({ createRoot, phases });
 
 function AllInputProbe() {
-  useWheelInput<TestPhase>({ threshold: 40 });
-  useKeyboardInput<TestPhase>();
-  useTouchInput<TestPhase>({ threshold: 40 });
+  useWheelInput<TestPhase>({ threshold: 40, cooldown: 0 });
+  useKeyboardInput<TestPhase>({ cooldown: 0 });
+  useTouchInput<TestPhase>({ threshold: 40, cooldown: 0 });
 
   return null;
 }
@@ -295,4 +295,80 @@ describe("cross-input lock and cooldown behavior", () => {
     expect(flow.getControls()?.phase).toBe("contact");
     expect(flow.getControls()?.direction).toBe("next");
   });
+
+  it.each([
+    ["wheel", () => dispatchWheel(41)],
+    [
+      "touch",
+      () => {
+        dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] });
+
+        return dispatchTouch("touchend", { changedTouches: [{ clientX: 0, clientY: 59 }] });
+      }
+    ],
+    ["keyboard", () => dispatchKeyDown("ArrowDown")]
+  ] as const)(
+    "settles accepted %s navigation immediately while shared provider cooldown remains active",
+    (_inputName, dispatchAcceptedInput) => {
+      const flow = renderCrossInputFlow(undefined, {
+        providerKey: `reduced-${_inputName}`,
+        transition: { duration: 0, cooldown: 240 }
+      });
+      let inputNow = 0;
+      vi.spyOn(performance, "now").mockImplementation(() => inputNow);
+      const dispatchFreshInput = () => {
+        inputNow += 201;
+
+        return dispatchAcceptedInput();
+      };
+
+      const firstEvent = dispatchFreshInput();
+
+      expect(firstEvent.defaultPrevented).toBe(true);
+      expect(flow.getControls()).toMatchObject({
+        phase: "work",
+        phaseIndex: 1,
+        progress: 1,
+        direction: "none",
+        isTransitioning: false
+      });
+
+      const blockedEvent = dispatchFreshInput();
+
+      expect(blockedEvent.defaultPrevented).toBe(false);
+      expect(flow.getControls()).toMatchObject({
+        phase: "work",
+        phaseIndex: 1,
+        progress: 1,
+        direction: "none",
+        isTransitioning: false
+      });
+
+      act(() => {
+        flow.getMachine()?.update(239);
+        flow.sync();
+      });
+
+      const earlyEvent = dispatchFreshInput();
+
+      expect(earlyEvent.defaultPrevented).toBe(false);
+      expect(flow.getControls()?.phase).toBe("work");
+
+      act(() => {
+        flow.getMachine()?.update(1);
+        flow.sync();
+      });
+
+      const resumedEvent = dispatchFreshInput();
+
+      expect(resumedEvent.defaultPrevented).toBe(true);
+      expect(flow.getControls()).toMatchObject({
+        phase: "contact",
+        phaseIndex: 2,
+        progress: 1,
+        direction: "none",
+        isTransitioning: false
+      });
+    }
+  );
 });
