@@ -174,6 +174,7 @@ function FlowDashboard() {
 
       <div
         className="button-row"
+        role="group"
         aria-label="Sequential navigation"
         aria-describedby="flow-operation-guidance"
       >
@@ -187,6 +188,7 @@ function FlowDashboard() {
 
       <div
         className="phase-controls"
+        role="group"
         aria-label="Direct phase navigation"
         aria-describedby="flow-operation-guidance"
       >

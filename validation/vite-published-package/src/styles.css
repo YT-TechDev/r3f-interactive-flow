@@ -33,6 +33,13 @@ select,
 a {
   color: #93c5fd;
 }
+.action-link {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
