@@ -94,8 +94,8 @@ function InputEventTrace() {
   }, []);
 
   return (
-    <div className="trace-output" aria-live="polite">
-      <strong>Last input event trace</strong>
+    <section className="trace-output" aria-labelledby="input-trace-heading">
+      <strong id="input-trace-heading">Last input event trace</strong>
       {trace ? (
         <dl>
           <div>
@@ -114,7 +114,7 @@ function InputEventTrace() {
       ) : (
         <p>No wheel, touchmove, touchend, or keydown event observed yet.</p>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -130,8 +130,16 @@ function FlowDashboard() {
         <p className="eyebrow">Package-root API validation</p>
         <h1 id="flow-heading">Published package usage experience</h1>
         <p>
-          Wheel, touch, keyboard, buttons, and direct phase controls all drive one FlowProvider
-          while DOM status and the Canvas subtree observe the same phase state.
+          Visible buttons and direct phase controls drive one FlowProvider while optional input
+          enhancements and the Canvas subtree observe the same phase state.
+        </p>
+        <p id="flow-operation-guidance" className="operation-guidance">
+          Use Previous, Next, or a phase button to move through the flow. Arrow keys, Page Up/Page
+          Down, wheel, and touch are optional enhancements; gesture or shortcut input is not
+          required.
+        </p>
+        <p className="phase-status" role="status" aria-live="polite" aria-atomic="true">
+          Current phase: {flow.phase} ({flow.phaseIndex + 1} of {phases.length}).
         </p>
       </div>
 
@@ -164,7 +172,11 @@ function FlowDashboard() {
         </div>
       </dl>
 
-      <div className="button-row" aria-label="Sequential navigation">
+      <div
+        className="button-row"
+        aria-label="Sequential navigation"
+        aria-describedby="flow-operation-guidance"
+      >
         <button type="button" onClick={flow.prev} disabled={atFirst}>
           Previous
         </button>
@@ -173,15 +185,20 @@ function FlowDashboard() {
         </button>
       </div>
 
-      <div className="phase-controls" aria-label="Direct phase navigation">
+      <div
+        className="phase-controls"
+        aria-label="Direct phase navigation"
+        aria-describedby="flow-operation-guidance"
+      >
         {phases.map((phase) => (
           <button
             key={phase}
             type="button"
             onClick={() => flow.goTo(phase)}
             disabled={flow.phase === phase}
+            aria-current={flow.phase === phase ? "step" : undefined}
           >
-            {phase}
+            {flow.phase === phase ? `${phase} (current)` : phase}
           </button>
         ))}
       </div>
@@ -235,7 +252,9 @@ function NativeControls() {
           <input type="checkbox" /> Toggle option
         </label>
         <button type="button">Regular button</button>
-        <a href="https://github.com/YT-TechDev/r3f-interactive-flow">Regular anchor</a>
+        <a className="action-link" href="https://github.com/YT-TechDev/r3f-interactive-flow">
+          Regular anchor
+        </a>
         <div className="editable-region" contentEditable suppressContentEditableWarning>
           Contenteditable region: edit this text without changing phase.
         </div>
@@ -248,6 +267,10 @@ function IgnoredScrollRegion() {
   return (
     <section className="panel" aria-labelledby="ignored-heading">
       <h2 id="ignored-heading">Explicit ignored nested scroll region</h2>
+      <p>
+        This region scrolls independently. Wheel and touch input inside it remain local, while
+        visible flow buttons remain available outside the region.
+      </p>
       <div className="nested-scroll" data-flow-ignore tabIndex={0}>
         {Array.from({ length: 14 }, (_, index) => (
           <p key={index}>Nested scroll item {index + 1}: wheel and touch gestures stay here.</p>
@@ -406,15 +429,23 @@ function App() {
 
   return (
     <>
-      <div className="mode-toggle">
+      <header className="mode-toggle" aria-label="Motion preference">
+        <div>
+          <strong>Motion preference</strong>
+          <p id="motion-mode-description">
+            Current mode: {motionMode}. Changing modes remounts the provider and resets the flow.
+            Scene motion is controlled separately by the application.
+          </p>
+        </div>
         <button
           type="button"
           aria-pressed={motionMode === "reduced"}
+          aria-describedby="motion-mode-description"
           onClick={() => setMotionMode((mode) => (mode === "normal" ? "reduced" : "normal"))}
         >
           {motionMode === "normal" ? "Switch to reduced motion" : "Switch to normal motion"}
         </button>
-      </div>
+      </header>
       <Experience motionMode={motionMode} />
     </>
   );
