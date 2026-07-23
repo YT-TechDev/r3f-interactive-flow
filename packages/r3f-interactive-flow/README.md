@@ -57,7 +57,7 @@ Published-package validation for the v2.5.0 usage milestone exercised `r3f-inter
 
 A single `FlowProvider` can wrap DOM controls, input helpers, progress UI, and a Canvas subtree. DOM navigation and `useFlowProgress` do not require Canvas, and a remounted Canvas can observe the current provider-owned flow again through read-only `useFlowFrame` consumers. Input hooks call the existing `next` and `prev` controls. Accepted input navigation may call `preventDefault()` when enabled; rejected input preserves native page scrolling and native control behavior. Reduced motion is application-owned: pass the transition timing your app wants, and use a React `key` remount only when you intentionally want to apply a new provider configuration and reset flow state.
 
-The evidence included representative desktop Chrome validation with physical mouse, high-resolution trackpad, and keyboard input, plus physical iPhone Safari touch validation. This is not broad browser certification, and optional physical tablet validation was not completed. v2.6.0 does not include automated Chromium browser coverage because #383 is deferred; focused Node/minimal-DOM tests prove deterministic library contracts, not physical-device or broad browser certification. The detailed input guide is available at <https://github.com/YT-TechDev/r3f-interactive-flow/blob/main/docs/guides/input-handling.md>, and the repository evidence report is available at <https://github.com/YT-TechDev/r3f-interactive-flow/blob/main/docs/releases/v2.5.0-real-world-browser-validation-report.md>.
+The evidence included representative desktop Chrome validation with physical mouse, high-resolution trackpad, and keyboard input, plus physical iPhone Safari touch validation. This is not broad browser certification, and optional physical tablet validation was not completed. Current bounded evidence includes focused Node/minimal-DOM tests for deterministic library contracts and one Vitest Browser Mode file running through a Playwright-managed headless Chromium instance for native activation, focus non-interference, prevention, repeat, and DOM ancestry. This is not physical-device, screen-reader, cross-browser, WCAG, or accessibility certification. The detailed input guide is available at <https://github.com/YT-TechDev/r3f-interactive-flow/blob/main/docs/guides/input-handling.md>, the accessible interaction and reduced-motion guide is available at <https://github.com/YT-TechDev/r3f-interactive-flow/blob/main/docs/guides/accessibility-and-reduced-motion.md>, and the repository evidence report is available at <https://github.com/YT-TechDev/r3f-interactive-flow/blob/main/docs/releases/v2.5.0-real-world-browser-validation-report.md>.
 
 ## Install
 
@@ -103,14 +103,20 @@ const phases = ["intro", "work", "contact"] as const;
 type Phase = (typeof phases)[number];
 
 function Controls() {
-  const { phase, next, prev, goTo } = useFlow<Phase>();
+  const { phase, phaseIndex, next, prev, goTo } = useFlow<Phase>();
 
   return (
     <div>
       <p>Current phase: {phase}</p>
-      <button onClick={prev}>Previous</button>
-      <button onClick={next}>Next</button>
-      <button onClick={() => goTo("contact")}>Contact</button>
+      <button type="button" onClick={prev} disabled={phaseIndex === 0}>
+        Previous
+      </button>
+      <button type="button" onClick={next} disabled={phaseIndex === phases.length - 1}>
+        Next
+      </button>
+      <button type="button" onClick={() => goTo("contact")}>
+        Contact
+      </button>
     </div>
   );
 }
@@ -171,14 +177,20 @@ const phases = ["intro", "work", "contact"] as const;
 type Phase = (typeof phases)[number];
 
 function Navigation() {
-  const { phase, next, prev, goTo } = useFlow<Phase>();
+  const { phase, phaseIndex, next, prev, goTo } = useFlow<Phase>();
 
   return (
     <nav>
       <p>Phase: {phase}</p>
-      <button onClick={prev}>Previous</button>
-      <button onClick={next}>Next</button>
-      <button onClick={() => goTo("contact")}>Contact</button>
+      <button type="button" onClick={prev} disabled={phaseIndex === 0}>
+        Previous
+      </button>
+      <button type="button" onClick={next} disabled={phaseIndex === phases.length - 1}>
+        Next
+      </button>
+      <button type="button" onClick={() => goTo("contact")}>
+        Contact
+      </button>
     </nav>
   );
 }
@@ -203,13 +215,15 @@ function PhaseControls() {
       <p>
         {phaseIndex + 1} / {phases.length}: {phase}
       </p>
-      <button onClick={prev} disabled={phaseIndex === 0}>
+      <button type="button" onClick={prev} disabled={phaseIndex === 0}>
         Previous
       </button>
-      <button onClick={next} disabled={phaseIndex === phases.length - 1}>
+      <button type="button" onClick={next} disabled={phaseIndex === phases.length - 1}>
         Next
       </button>
-      <button onClick={() => goTo("work")}>Work</button>
+      <button type="button" onClick={() => goTo("work")}>
+        Work
+      </button>
     </section>
   );
 }
@@ -302,13 +316,19 @@ function Status() {
 }
 
 function Controls() {
-  const { next, prev, goTo } = useFlow<Phase>();
+  const { phaseIndex, next, prev, goTo } = useFlow<Phase>();
 
   return (
     <div>
-      <button onClick={prev}>Previous</button>
-      <button onClick={next}>Next</button>
-      <button onClick={() => goTo("contact")}>Contact</button>
+      <button type="button" onClick={prev} disabled={phaseIndex === 0}>
+        Previous
+      </button>
+      <button type="button" onClick={next} disabled={phaseIndex === phases.length - 1}>
+        Next
+      </button>
+      <button type="button" onClick={() => goTo("contact")}>
+        Contact
+      </button>
     </div>
   );
 }

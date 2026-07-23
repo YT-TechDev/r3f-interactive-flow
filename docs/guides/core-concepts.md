@@ -71,19 +71,19 @@ Changing configuration props alone does not reconfigure an already mounted provi
 
 ### Reduced motion is application policy
 
-The library does not expose a separate reduced-motion API or automatically choose a reduced-motion mode. If your app needs reduced motion, choose the transition timing in application code. To intentionally apply a changed provider configuration, change the provider element's React `key`; that remounts `FlowProvider` and resets its flow state.
+The library does not expose a separate reduced-motion API, read `matchMedia`, or automatically choose a reduced-motion mode. If your app needs reduced motion, choose the transition timing in application code. To intentionally apply a changed provider configuration, change the provider element's React `key`; that remounts `FlowProvider` and explicitly resets phase, progress, transition, lock, and cooldown state.
 
 ```tsx
 <FlowProvider
   key={reducedMotion ? "reduced" : "normal"}
   phases={phases}
-  transition={reducedMotion ? { duration: 0, cooldown: 0 } : { duration: 700, cooldown: 250 }}
+  transition={reducedMotion ? { duration: 0, cooldown: 250 } : { duration: 700, cooldown: 250 }}
 >
   <Experience />
 </FlowProvider>
 ```
 
-Use `duration: 0` only if an immediate transition is right for your app; a short non-zero duration is also valid.
+Use `duration: 0` only if an immediate transition is right for your app; it is representative, not mandatory. A short non-zero duration is also valid, and cooldown is independent so a positive cooldown may remain. Changing provider duration does not automatically reduce scene, camera, shader, particle, CSS, or other motion. See [Accessible interaction and reduced motion](./accessibility-and-reduced-motion.md) for the full responsibility split and keyed-remount recipe.
 
 ## Phase index
 
