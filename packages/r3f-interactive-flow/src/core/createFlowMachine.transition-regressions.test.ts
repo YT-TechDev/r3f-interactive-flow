@@ -3,6 +3,165 @@ import { describe, expect, it } from "vitest";
 import { createFlowMachine } from "./createFlowMachine";
 
 describe("createFlowMachine transition regressions", () => {
+  it("locks the exact accepted-navigation snapshot matrix for next, prev, and non-adjacent goTo", () => {
+    const nextMachine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 100
+    });
+
+    expect(nextMachine.getSnapshot()).toEqual({
+      phase: "intro",
+      phaseIndex: 0,
+      progress: 0,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+
+    nextMachine.next();
+
+    expect(nextMachine.getSnapshot()).toEqual({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false
+    });
+
+    const prevMachine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      initialPhase: "contact",
+      transitionDurationMs: 100
+    });
+
+    expect(prevMachine.getSnapshot()).toEqual({
+      phase: "contact",
+      phaseIndex: 2,
+      progress: 0,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+
+    prevMachine.prev();
+
+    expect(prevMachine.getSnapshot()).toEqual({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 0,
+      direction: "prev",
+      isTransitioning: true,
+      isLocked: false
+    });
+
+    const goToMachine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 100
+    });
+
+    expect(goToMachine.getSnapshot()).toEqual({
+      phase: "intro",
+      phaseIndex: 0,
+      progress: 0,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+
+    goToMachine.goTo("contact");
+
+    expect(goToMachine.getSnapshot()).toEqual({
+      phase: "contact",
+      phaseIndex: 2,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false
+    });
+  });
+
+  it("locks the exact active-transition and completion snapshot lifecycle for a representative transition", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work"] as const,
+      transitionDurationMs: 1000
+    });
+
+    expect(machine.getSnapshot()).toEqual({
+      phase: "intro",
+      phaseIndex: 0,
+      progress: 0,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+
+    machine.next();
+
+    expect(machine.getSnapshot()).toEqual({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false
+    });
+
+    machine.update(250);
+
+    expect(machine.getSnapshot()).toEqual({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 0.25,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false
+    });
+
+    machine.update(750);
+
+    const completedSnapshot = machine.getSnapshot();
+
+    expect(completedSnapshot).toEqual({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 1,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+
+    machine.update(100);
+
+    expect(machine.getSnapshot()).toEqual(completedSnapshot);
+  });
+
+  it("keeps isSettling out of the public snapshot shape and type", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 100,
+      cooldownMs: 50
+    });
+
+    machine.next();
+
+    const snapshot = machine.getSnapshot();
+
+    expect(Object.keys(snapshot).sort()).toEqual([
+      "direction",
+      "isLocked",
+      "isTransitioning",
+      "phase",
+      "phaseIndex",
+      "progress"
+    ]);
+    expect(snapshot).not.toHaveProperty("isSettling");
+
+    // @ts-expect-error isSettling is an internal machine signal, not part of the public FlowSnapshot type.
+    const isSettlingOnSnapshot = snapshot.isSettling;
+    void isSettlingOnSnapshot;
+  });
+
   it("keeps the full snapshot stable when prev is rejected at the first phase boundary", () => {
     const machine = createFlowMachine({
       phases: ["intro", "work", "contact"] as const,
@@ -520,6 +679,7 @@ describe("createFlowMachine transition regressions", () => {
       machine.next();
       expect(machine.phase).toBe("work");
       machine.update(1);
+      expect(machine.isSettling).toBe(false);
       machine.next();
       expect(machine.getSnapshot()).toMatchObject({ phase: "contact", isTransitioning: true });
     }

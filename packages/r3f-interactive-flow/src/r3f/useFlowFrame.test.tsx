@@ -7,7 +7,7 @@ import type { FlowControls } from "../core/types";
 import { FlowProvider } from "../react/FlowProvider";
 import { useFlow } from "../react/useFlow";
 import { useFlowFrame } from "./useFlowFrame";
-import type { FlowFrameCallback } from "./useFlowFrame";
+import type { FlowFrameCallback, FlowFrameState } from "./useFlowFrame";
 
 const useFrameMock = vi.hoisted(() => vi.fn());
 
@@ -623,6 +623,117 @@ describe("useFlowFrame", () => {
     expect(container.textContent).toContain('"isTransitioning":false');
     // The completed clock stops scheduling frames.
     expect(pendingFrameCount()).toBe(0);
+  });
+
+  it("locks the full read-only R3F sampling sequence from accepted start through completion for two consumers", () => {
+    const firstFrame = vi.fn();
+    const secondFrame = vi.fn();
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <FrameProbe onFrame={firstFrame} />
+        <FrameProbe onFrame={secondFrame} />
+      </>,
+      1000
+    );
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    // Sample both R3F callbacks before any provider-clock advancement: accepted
+    // target, progress 0, and the active direction.
+    act(() => {
+      getRegisteredFrame(0)(undefined, 0.016);
+      getRegisteredFrame(1)(undefined, 0.016);
+    });
+
+    const acceptedState = {
+      phase: "work",
+      phaseIndex: 1,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true
+    };
+
+    expect(firstFrame).toHaveBeenLastCalledWith(acceptedState, 0.016);
+    expect(secondFrame).toHaveBeenLastCalledWith(acceptedState, 0.016);
+
+    // Advance only the provider RAF clock to an intermediate value.
+    advanceClock(16);
+    advanceClock(500);
+
+    act(() => {
+      getRegisteredFrame(0)(undefined, 0.25);
+      getRegisteredFrame(1)(undefined, 0.25);
+    });
+
+    const intermediateState = {
+      phase: "work",
+      phaseIndex: 1,
+      progress: 0.5,
+      direction: "next",
+      isTransitioning: true
+    };
+
+    expect(firstFrame).toHaveBeenLastCalledWith(intermediateState, 0.25);
+    expect(secondFrame).toHaveBeenLastCalledWith(intermediateState, 0.25);
+
+    // Invoking the R3F callbacks repeatedly without advancing provider time must
+    // not change progress or provider-clock state.
+    act(() => {
+      getRegisteredFrame(0)(undefined, 0.1);
+      getRegisteredFrame(1)(undefined, 0.1);
+      getRegisteredFrame(0)(undefined, 0.1);
+      getRegisteredFrame(1)(undefined, 0.1);
+    });
+
+    expect(firstFrame).toHaveBeenLastCalledWith(intermediateState, 0.1);
+    expect(secondFrame).toHaveBeenLastCalledWith(intermediateState, 0.1);
+    expect(latestControls).toMatchObject({ phase: "work", progress: 0.5, isTransitioning: true });
+
+    // Advance the provider clock to completion.
+    advanceClock(500);
+
+    act(() => {
+      getRegisteredFrame(0)(undefined, 0.016);
+      getRegisteredFrame(1)(undefined, 0.016);
+    });
+
+    const completedState = {
+      phase: "work",
+      phaseIndex: 1,
+      progress: 1,
+      direction: "none",
+      isTransitioning: false
+    };
+
+    expect(firstFrame).toHaveBeenLastCalledWith(completedState, 0.016);
+    expect(secondFrame).toHaveBeenLastCalledWith(completedState, 0.016);
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 1,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+  });
+
+  it("keeps isSettling out of the public FlowFrameState type", () => {
+    const state: FlowFrameState<TestPhase> = {
+      phase: "intro",
+      phaseIndex: 0,
+      progress: 0,
+      direction: "none",
+      isTransitioning: false
+    };
+
+    // @ts-expect-error isSettling is internal machine state, not part of the public FlowFrameState type.
+    const isSettlingOnState = state.isSettling;
+    void isSettlingOnState;
   });
 
   it("throws a clear error when rendered outside FlowProvider", () => {

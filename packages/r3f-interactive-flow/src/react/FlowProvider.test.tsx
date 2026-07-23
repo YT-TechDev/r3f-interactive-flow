@@ -1011,6 +1011,18 @@ describe("FlowProvider and hooks", () => {
     }
   });
 
+  it("keeps isSettling out of the public FlowControls type", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(<ControlsProbe onRender={(controls) => (latestControls = controls)} />);
+
+    expect(latestControls).not.toHaveProperty("isSettling");
+
+    // @ts-expect-error isSettling is internal machine state, not part of the public FlowControls type.
+    const isSettlingOnControls = latestControls?.isSettling;
+    void isSettlingOnControls;
+  });
+
   it("throws a clear error when useFlow is rendered outside FlowProvider", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
 
@@ -1469,6 +1481,126 @@ describe("FlowProvider provider-owned transition clock", () => {
     });
 
     expect(latestControls).toMatchObject({ phase: "contact", isTransitioning: true });
+  });
+
+  it("keeps the completed React snapshot exactly stable across cooldown-only provider frames", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(<ControlsProbe onRender={(controls) => (latestControls = controls)} />, undefined, {
+      transition: { duration: 100, cooldown: 300 }
+    });
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    advanceClock(16);
+    advanceClock(100);
+
+    const completedSnapshot = getRenderedSnapshot();
+
+    expect(completedSnapshot).toEqual({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 1,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+
+    // Cooldown-only provider frames must not mutate the completed public snapshot.
+    advanceClock(150);
+    expect(getRenderedSnapshot()).toEqual(completedSnapshot);
+
+    // A new navigation request stays rejected while cooldown remains.
+    act(() => {
+      latestControls?.next();
+    });
+    expect(getRenderedSnapshot()).toEqual(completedSnapshot);
+
+    advanceClock(150);
+    expect(pendingFrameCount()).toBe(0);
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    expect(getRenderedSnapshot()).toEqual({
+      phase: "contact",
+      phaseIndex: 2,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false
+    });
+  });
+
+  it("keeps two React consumers aligned on the full public snapshot through accepted start, intermediate progress, and completion", () => {
+    const toSnapshot = (controls: FlowControls<TestPhase>): RenderedSnapshot => ({
+      phase: controls.phase,
+      phaseIndex: controls.phaseIndex,
+      progress: controls.progress,
+      direction: controls.direction,
+      isTransitioning: controls.isTransitioning,
+      isLocked: controls.isLocked
+    });
+
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let firstSnapshot: RenderedSnapshot | undefined;
+    let secondSnapshot: RenderedSnapshot | undefined;
+
+    renderFlow(
+      <>
+        <ControlsProbe
+          onRender={(controls) => {
+            latestControls = controls;
+            firstSnapshot = toSnapshot(controls);
+          }}
+        />
+        <ControlsProbe onRender={(controls) => (secondSnapshot = toSnapshot(controls))} />
+      </>,
+      undefined,
+      { transition: { duration: 1000 } }
+    );
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    expect(firstSnapshot).toEqual({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false
+    });
+    expect(secondSnapshot).toEqual(firstSnapshot);
+
+    advanceClock(16);
+    advanceClock(250);
+
+    expect(firstSnapshot).toEqual({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 0.25,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false
+    });
+    expect(secondSnapshot).toEqual(firstSnapshot);
+
+    advanceClock(750);
+
+    expect(firstSnapshot).toEqual({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 1,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+    expect(secondSnapshot).toEqual(firstSnapshot);
   });
 
   it("cancels scheduled clock work when the provider unmounts", () => {
