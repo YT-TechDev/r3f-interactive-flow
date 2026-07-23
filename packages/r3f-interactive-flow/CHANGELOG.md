@@ -1,5 +1,38 @@
 # r3f-interactive-flow
 
+## 2.7.0
+
+`r3f-interactive-flow@2.7.0` is a repository-only release-preparation update for the completed accessibility responsibility, reduced-motion, browser input, representative usage, and user-facing guidance work. It preserves the stable v2 runtime, public API, package boundary, dependencies, and peer ranges while recording the evidence and boundaries for the next manual release.
+
+### Validated
+
+- Zero-duration transitions complete immediately.
+- Positive provider cooldown may remain after an immediate transition.
+- React key remount applies changed provider configuration.
+- Remount resets phase, progress, transition, lock, and cooldown state.
+- One Vitest Browser Mode file uses one Playwright-managed headless Chromium.
+- Bounded browser evidence covers native button, anchor, checkbox, editable targets, prevention, repeat, DOM ancestry, and focus non-interference.
+- Visible native controls work without `useKeyboardInput`.
+
+### Usage and documentation
+
+- Package and application responsibility boundaries are explicit.
+- Applications own controls, labels, ARIA, disabled/current states, focus, status wording, responsive layout, nested-scroll CSS, and motion preference.
+- The representative consumer demonstrates visible controls, discrete status, focus-visible styles, nested scrolling, responsive targets, and motion modes.
+- The new guide documents package-root recipes, keyed remount, state reset, nested scrolling, and separate Canvas motion.
+- Stale deferred-Chromium wording was corrected.
+
+### Compatibility
+
+- No runtime source changes are included in v2.7.0 milestone work.
+- No public API or public type changes are included.
+- No export or package-subpath changes are included.
+- No runtime dependency or peer-range changes are included.
+- The root-only package boundary remains unchanged.
+- Browser tooling is root development tooling only.
+- No package-rendered UI, automatic ARIA, focus movement, announcement API, `matchMedia` behavior, or reduced-motion hook is included.
+- No accessibility, WCAG, screen-reader, cross-browser, or physical-device certification claim is included.
+
 ## 2.6.0
 
 `r3f-interactive-flow@2.6.0` is a focused browser lifecycle and input hardening minor release. It preserves the existing public API, public types, package exports, dependencies, peer dependency ranges, and root-only package boundary while correcting two input timing and touch lifecycle behaviors and documenting the proven browser boundaries.
