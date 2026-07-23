@@ -68,9 +68,9 @@ Supported imports are package-root imports only. Internal source, build, or resp
 
 The v2.5.0 real-world usage validation used the published-package consumer and package-root imports from `"r3f-interactive-flow"` only. It confirmed that `next()`, `prev()`, and direct `goTo()` use the same provider-owned flow machine; rejected navigation from boundaries, locks, active transitions, or cooldowns does not queue a stale later navigation.
 
-DOM controls, input helpers, progress UI, and the Canvas subtree can share one `FlowProvider`. `useFlow` and `useFlowProgress` continue working with no Canvas mounted, while remounting Canvas lets `useFlowFrame` resume read-only observation of the current provider-owned flow. Accepted wheel, touch, and keyboard navigation may suppress native browser behavior when `preventDefault` is enabled; rejected navigation preserves native page scroll and control behavior. Reduced-motion behavior remains application policy: choose shorter or zero-duration transition options yourself, and use a React `key` remount only when you intentionally want to apply a new provider configuration and reset flow state.
+DOM controls, input helpers, progress UI, and the Canvas subtree can share one `FlowProvider`. `useFlow` and `useFlowProgress` continue working with no Canvas mounted, while remounting Canvas lets `useFlowFrame` resume read-only observation of the current provider-owned flow. Accepted wheel, touch, and keyboard navigation may suppress native browser behavior when `preventDefault` is enabled; rejected navigation preserves native page scroll and control behavior. Accessible interaction is application-owned: visible controls are the baseline, input hooks are enhancements, and disabled/current semantics, focus, discrete status, CSS, responsive layout, and motion preference belong to the app. Reduced-motion behavior remains application policy: choose shorter or zero-duration transition options yourself, use a React `key` remount only when you intentionally want to apply a new provider configuration and reset flow state, and reduce Canvas scene motion separately.
 
-Validation covered representative desktop Chrome usage with physical mouse, high-resolution trackpad, and keyboard input, plus physical iPhone Safari touch usage. It did not certify every browser or device class; optional physical tablet validation remained unverified because no tablet was available. v2.6.0 does not include automated Chromium browser coverage because #383 is deferred; focused Node/minimal-DOM tests prove deterministic library contracts, not physical-device or broad browser certification. See the detailed guides for [R3F usage](docs/guides/r3f-usage.md), [input handling](docs/guides/input-handling.md), and [common mistakes](docs/guides/common-mistakes.md), and see the evidence report at [docs/releases/v2.5.0-real-world-browser-validation-report.md](docs/releases/v2.5.0-real-world-browser-validation-report.md).
+Validation covered representative desktop Chrome usage with physical mouse, high-resolution trackpad, and keyboard input, plus physical iPhone Safari touch usage. It did not certify every browser or device class; optional physical tablet validation remained unverified because no tablet was available. Current bounded evidence includes focused Node/minimal-DOM tests for deterministic library contracts and one Vitest Browser Mode file running through a Playwright-managed headless Chromium instance for native activation, focus non-interference, prevention, repeat, and DOM ancestry. This is not physical-device, screen-reader, cross-browser, WCAG, or accessibility certification. See the detailed guides for [R3F usage](docs/guides/r3f-usage.md), [input handling](docs/guides/input-handling.md), [accessible interaction and reduced motion](docs/guides/accessibility-and-reduced-motion.md), and [common mistakes](docs/guides/common-mistakes.md), and see the evidence report at [docs/releases/v2.5.0-real-world-browser-validation-report.md](docs/releases/v2.5.0-real-world-browser-validation-report.md).
 
 ## Installation
 
@@ -113,15 +113,19 @@ const phases = ["intro", "work", "contact"] as const;
 type Phase = (typeof phases)[number];
 
 function FlowControls() {
-  const { phase, next, prev, goTo } = useFlow<Phase>();
+  const { phase, phaseIndex, next, prev, goTo } = useFlow<Phase>();
   const progress = useFlowProgress();
 
   return (
     <div>
       <p>Current phase: {phase}</p>
       <p>Progress: {Math.round(progress * 100)}%</p>
-      <button onClick={prev}>Previous</button>
-      <button onClick={next}>Next</button>
+      <button onClick={prev} disabled={phaseIndex === 0}>
+        Previous
+      </button>
+      <button onClick={next} disabled={phaseIndex === phases.length - 1}>
+        Next
+      </button>
       <button onClick={() => goTo("contact")}>Contact</button>
     </div>
   );
@@ -151,13 +155,17 @@ const phases = ["intro", "work", "contact"] as const;
 type Phase = (typeof phases)[number];
 
 function Navigation() {
-  const { phase, next, prev, goTo } = useFlow<Phase>();
+  const { phase, phaseIndex, next, prev, goTo } = useFlow<Phase>();
 
   return (
     <nav>
       <p>Phase: {phase}</p>
-      <button onClick={prev}>Previous</button>
-      <button onClick={next}>Next</button>
+      <button onClick={prev} disabled={phaseIndex === 0}>
+        Previous
+      </button>
+      <button onClick={next} disabled={phaseIndex === phases.length - 1}>
+        Next
+      </button>
       <button onClick={() => goTo("contact")}>Contact</button>
     </nav>
   );

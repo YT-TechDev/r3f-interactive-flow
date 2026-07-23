@@ -49,21 +49,25 @@ not public package exports.
    Canvas boundaries.
 4. [Input handling](./input-handling.md) — wheel, touch, and keyboard input
    hooks.
-5. [Next.js usage](./nextjs-usage.md) — safe Client Component usage in the App
+5. [Accessible interaction and reduced motion](./accessibility-and-reduced-motion.md) —
+   application-owned visible controls, status, focus boundaries, nested scrolling,
+   and motion policy.
+6. [Next.js usage](./nextjs-usage.md) — safe Client Component usage in the App
    Router.
-6. [Common mistakes](./common-mistakes.md) — patterns to avoid and how to fix
+7. [Common mistakes](./common-mistakes.md) — patterns to avoid and how to fix
    them.
 
 ## Guides
 
-| Guide                                     | Covers                                                                     |
-| ----------------------------------------- | -------------------------------------------------------------------------- |
-| [Getting started](./getting-started.md)   | Install, peer dependencies, first phase flow.                              |
-| [Core concepts](./core-concepts.md)       | Phases, transitions, progress, locks, cooldowns, reduced-motion ownership. |
-| [React Three Fiber usage](./r3f-usage.md) | `useFlowFrame`, Canvas boundaries, frame updates.                          |
-| [Input handling](./input-handling.md)     | `useWheelInput`, `useTouchInput`, `useKeyboardInput`.                      |
-| [Next.js usage](./nextjs-usage.md)        | Client Component boundaries in the App Router.                             |
-| [Common mistakes](./common-mistakes.md)   | Anti-patterns and their fixes.                                             |
+| Guide                                                                              | Covers                                                                                                                |
+| ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| [Getting started](./getting-started.md)                                            | Install, peer dependencies, first phase flow.                                                                         |
+| [Core concepts](./core-concepts.md)                                                | Phases, transitions, progress, locks, cooldowns, reduced-motion ownership.                                            |
+| [React Three Fiber usage](./r3f-usage.md)                                          | `useFlowFrame`, Canvas boundaries, frame updates.                                                                     |
+| [Input handling](./input-handling.md)                                              | `useWheelInput`, `useTouchInput`, `useKeyboardInput`.                                                                 |
+| [Accessible interaction and reduced motion](./accessibility-and-reduced-motion.md) | Application-owned visible controls, phase status, focus boundaries, nested scrolling, and reduced-motion integration. |
+| [Next.js usage](./nextjs-usage.md)                                                 | Client Component boundaries in the App Router.                                                                        |
+| [Common mistakes](./common-mistakes.md)                                            | Anti-patterns and their fixes.                                                                                        |
 
 ## How the documentation is organized
 

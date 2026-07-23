@@ -1,6 +1,6 @@
 # Published package usage validation
 
-This standalone Vite + React Three Fiber consumer validates the published npm package lane for `r3f-interactive-flow@2.4.0`. It is a real consumer fixture, not a template.
+This standalone Vite + React Three Fiber consumer validates the published npm package lane for `r3f-interactive-flow@2.4.0`. It is a real consumer fixture and one application pattern, not a template or complete accessibility solution. See the public guide for the current responsibility boundary: [Accessible interaction and reduced motion](../../docs/guides/accessibility-and-reduced-motion.md).
 
 ## Purpose
 

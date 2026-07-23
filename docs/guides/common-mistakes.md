@@ -218,6 +218,18 @@ import {
 Package-root imports keep examples portable and keep your app aligned with the
 supported public surface.
 
+## Relying only on wheel, touch, or shortcuts
+
+Wheel, touch, and keyboard hooks are optional enhancements, not the baseline operation path. Render visible native controls that call `next`, `prev`, and `goTo`, and disable first, last, and current boundaries in application code. See [Accessible interaction and reduced motion](./accessibility-and-reduced-motion.md).
+
+## Expecting package-rendered accessibility UI
+
+The package exposes state and controls. It does not render Previous/Next controls, choose labels, set all ARIA semantics, move focus, restore focus, or announce phase changes for you. Application code owns native controls, disabled/current semantics, visible focus, discrete phase status, and announcement wording.
+
+## Announcing progress every frame
+
+`useFlowProgress` is useful for visual progress UI, but transition progress updates every frame. Do not put per-frame `progress` values in a live region. Announce discrete phase status, such as phase name and index, when that matches your application policy.
+
 ## Treating prop changes as live FlowProvider reconfiguration
 
 A mounted `FlowProvider` reads its phases and transition configuration once, when
@@ -272,7 +284,7 @@ remount mechanism, not a `FlowProvider` API prop.
 
 ## Treating reduced motion as a built-in provider mode
 
-Reduced motion is application policy. The library does not expose a separate reduced-motion hook, provider prop, or automatic media-query behavior. Choose the normal or reduced transition options in your app, and change the provider element's React `key` only when you intentionally want to remount the provider and reset flow state.
+Reduced motion is application policy. The library does not expose a separate reduced-motion hook, provider prop, or automatic media-query behavior. Choose the normal or reduced transition options in your app, and change the provider element's React `key` only when you intentionally want to remount the provider and reset phase, progress, transition, lock, and cooldown state. Changing configuration props on the same mounted provider does not live-reconfigure the machine.
 
 ```tsx
 <FlowProvider
@@ -284,7 +296,7 @@ Reduced motion is application policy. The library does not expose a separate red
 </FlowProvider>
 ```
 
-`duration: 0` is one valid app choice, not a requirement; a short non-zero duration may be more appropriate.
+`duration: 0` is one valid app choice, not a universal requirement; a short non-zero duration may be more appropriate, and cooldown can remain positive. Provider duration also does not reduce Canvas, camera, shader, particle, CSS, or other motion; reduce scene motion separately in Canvas-bound code.
 
 ## Copying high-frequency frame values into React state
 

@@ -11,15 +11,7 @@ framework, router, animation system, or replacement for your app's own input
 model. Use them when a page should let common browser input move through the
 same flow phases that your buttons or other controls already use.
 
-The v2.5.0 real-world usage validation confirmed this behavior with
-representative desktop Chrome physical mouse, high-resolution trackpad,
-keyboard, and physical iPhone Safari touch evidence. Treat that as bounded
-evidence, not broad browser certification; optional physical tablet validation
-remained unverified because no tablet was available. v2.6.0 does not add
-automated Chromium browser coverage because #383 is deferred. The focused
-Node/minimal-DOM tests prove deterministic library contracts, but they are not
-physical-device evidence, cross-browser certification, a native-scroll-feel
-promise, or a background-tab guarantee.
+Visible DOM controls are the baseline operation path; wheel, touch, and keyboard hooks are optional enhancements around the same flow controls. Earlier v2.5.0 real-world usage validation confirmed representative desktop Chrome physical mouse, high-resolution trackpad, keyboard, and physical iPhone Safari touch evidence. Current bounded evidence also includes focused Node/minimal-DOM tests for deterministic hook contracts and one Vitest Browser Mode file running through a Playwright-managed headless Chromium instance for native activation, focus non-interference, prevention, repeat, and DOM ancestry. Treat this as bounded evidence, not physical-device proof, cross-browser certification, screen-reader certification, WCAG conformance, a native-scroll-feel promise, or a background-tab guarantee. For application-owned controls, focus, nested scrolling, and motion policy, see [Accessible interaction and reduced motion](./accessibility-and-reduced-motion.md).
 
 ## Import contract
 
@@ -314,9 +306,9 @@ export function FlowInputLayer() {
 Mapped `keydown` events call `next` or `prev`. Repeated `keydown` events from a
 held key are ignored. Typing targets are protected when `ignoreWhenTyping` is
 enabled. Space and Enter retain native activation behavior on actionable
-controls. Accepted mapped navigation may be prevented when configured. Rejected
+controls, including button and anchor descendants. Accepted mapped navigation may be prevented when configured. Rejected
 or protected keyboard input remains unprevented. Keyboard has no `ignore`
-selector. Hook-local cooldown uses monotonic elapsed time, and rejected input
+selector, and focus remains application-owned. Hook-local cooldown uses monotonic elapsed time, and rejected input
 does not consume cooldown.
 
 If you omit `keys`, the default next keys are `ArrowDown`, `ArrowRight`,
