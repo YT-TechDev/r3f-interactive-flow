@@ -2,7 +2,12 @@
 
 ## 2.7.0
 
-`r3f-interactive-flow@2.7.0` is a repository-only release-preparation update for the completed accessibility responsibility, reduced-motion, browser input, representative usage, and user-facing guidance work. It preserves the stable v2 runtime, public API, package boundary, dependencies, and peer ranges while recording the evidence and boundaries for the next manual release.
+`r3f-interactive-flow@2.7.0` is an accessibility-responsibility,
+reduced-motion-guidance, and focused browser-evidence minor release. It
+preserves the stable v2 runtime, public API, package boundary, dependencies, and
+peer ranges while validating and documenting how application-owned controls,
+focus, native activation, motion preference, and Canvas motion integrate with
+the existing flow primitives.
 
 ### Validated
 
