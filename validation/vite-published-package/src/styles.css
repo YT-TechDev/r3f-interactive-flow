@@ -24,11 +24,34 @@ textarea,
 select {
   font: inherit;
 }
+button,
+input,
+select,
+.action-link {
+  min-block-size: 2.75rem;
+}
 a {
   color: #93c5fd;
 }
+.action-link {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[contenteditable]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid #facc15;
+  outline-offset: 3px;
+}
 button {
-  border: 0;
+  border: 1px solid transparent;
   border-radius: 999px;
   padding: 0.7rem 1rem;
   color: #0f172a;
@@ -37,15 +60,26 @@ button {
 }
 button:disabled {
   cursor: not-allowed;
-  opacity: 0.45;
+  opacity: 1;
+  color: #cbd5e1;
+  background: #334155;
+  border-color: #64748b;
 }
 .mode-toggle {
   position: sticky;
   top: 0;
   z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
   padding: 1rem;
   background: rgb(15 23 42 / 0.88);
   backdrop-filter: blur(8px);
+}
+.mode-toggle p {
+  margin: 0.25rem 0 0;
+  color: #cbd5e1;
 }
 .app-shell {
   display: grid;
@@ -77,6 +111,16 @@ h1,
 h2 {
   margin: 0 0 0.75rem;
 }
+.phase-status,
+.operation-guidance {
+  margin: 0.75rem 0 0;
+  color: #cbd5e1;
+}
+.phase-status {
+  border-inline-start: 4px solid #67e8f9;
+  padding-inline-start: 0.75rem;
+  font-weight: 700;
+}
 .status-grid,
 .form-grid {
   display: grid;
@@ -107,6 +151,9 @@ dd {
   gap: 0.7rem;
   grid-column: span 2;
 }
+.phase-controls button[aria-current="step"] {
+  border-style: dashed;
+}
 .form-grid label {
   display: grid;
   gap: 0.35rem;
@@ -132,6 +179,9 @@ dd {
 .nested-scroll {
   max-height: 10rem;
   overflow: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  scrollbar-gutter: stable;
   border: 1px dashed #38bdf8;
   border-radius: 1rem;
   padding: 0 1rem;
@@ -203,10 +253,6 @@ dd {
   color: #e5eefb;
   background: #0f172a;
 }
-.editable-region:focus {
-  outline: 2px solid #67e8f9;
-  outline-offset: 2px;
-}
 .observer-panel {
   display: grid;
   gap: 0.75rem;
@@ -219,5 +265,22 @@ dd {
 @media (max-width: 860px) {
   .trace-output dl {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .mode-toggle {
+    grid-template-columns: 1fr;
+  }
+
+  .button-row > button,
+  .phase-controls > button,
+  .mode-toggle > button {
+    width: 100%;
+  }
+
+  .form-grid > *,
+  .action-link {
+    min-width: 0;
   }
 }
