@@ -120,13 +120,15 @@ function FlowControls() {
     <div>
       <p>Current phase: {phase}</p>
       <p>Progress: {Math.round(progress * 100)}%</p>
-      <button onClick={prev} disabled={phaseIndex === 0}>
+      <button type="button" onClick={prev} disabled={phaseIndex === 0}>
         Previous
       </button>
-      <button onClick={next} disabled={phaseIndex === phases.length - 1}>
+      <button type="button" onClick={next} disabled={phaseIndex === phases.length - 1}>
         Next
       </button>
-      <button onClick={() => goTo("contact")}>Contact</button>
+      <button type="button" onClick={() => goTo("contact")}>
+        Contact
+      </button>
     </div>
   );
 }
@@ -160,13 +162,15 @@ function Navigation() {
   return (
     <nav>
       <p>Phase: {phase}</p>
-      <button onClick={prev} disabled={phaseIndex === 0}>
+      <button type="button" onClick={prev} disabled={phaseIndex === 0}>
         Previous
       </button>
-      <button onClick={next} disabled={phaseIndex === phases.length - 1}>
+      <button type="button" onClick={next} disabled={phaseIndex === phases.length - 1}>
         Next
       </button>
-      <button onClick={() => goTo("contact")}>Contact</button>
+      <button type="button" onClick={() => goTo("contact")}>
+        Contact
+      </button>
     </nav>
   );
 }
@@ -191,13 +195,15 @@ function PhaseControls() {
       <p>
         {phaseIndex + 1} / {phases.length}: {phase}
       </p>
-      <button onClick={prev} disabled={phaseIndex === 0}>
+      <button type="button" onClick={prev} disabled={phaseIndex === 0}>
         Previous
       </button>
-      <button onClick={next} disabled={phaseIndex === phases.length - 1}>
+      <button type="button" onClick={next} disabled={phaseIndex === phases.length - 1}>
         Next
       </button>
-      <button onClick={() => goTo("work")}>Work</button>
+      <button type="button" onClick={() => goTo("work")}>
+        Work
+      </button>
     </section>
   );
 }
