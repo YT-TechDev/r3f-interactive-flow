@@ -18,14 +18,17 @@
     "release:check": "pnpm build && pnpm package:verify && pnpm package:smoke && pnpm package:compat && pnpm typecheck && pnpm test && pnpm lint && pnpm format && pnpm --filter vite-basic build && pnpm pack:dry-run",
     "release": "pnpm release:check && changeset publish",
     "pack:dry-run": "pnpm --filter r3f-interactive-flow pack:dry-run",
-    "consumer:published:verify": "node scripts/verify-published-package-consumer.mjs"
+    "consumer:published:verify": "node scripts/verify-published-package-consumer.mjs",
+    "test:browser:input": "pnpm --dir packages/r3f-interactive-flow exec vitest run --config vitest.browser.config.ts"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.1",
     "@react-three/fiber": "^9.6.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@vitest/browser-playwright": "4.1.10",
     "eslint": "^10.7.0",
+    "playwright": "1.61.1",
     "prettier": "^3.9.5",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

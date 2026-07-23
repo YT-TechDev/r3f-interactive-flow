@@ -70,3 +70,43 @@ jobs:
 
       - name: Published package usage consumer
         run: pnpm consumer:published:verify
+
+  browser-input:
+    name: Browser input smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup pnpm
+        run: corepack prepare pnpm@11.5.0 --activate
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build library
+        run: pnpm build
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Print browser smoke versions
+        run: |
+          pnpm exec vitest --version
+          pnpm list --depth 0 vitest @vitest/browser-playwright
+          pnpm exec playwright --version
+          pnpm exec playwright install --dry-run chromium
+
+      - name: Test browser input smoke
+        run: pnpm test:browser:input
