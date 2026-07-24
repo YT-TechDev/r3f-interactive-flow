@@ -19,10 +19,11 @@ dependencies, and peer dependency ranges.
 - Raw elapsed progress, not eased public progress, decides transition
   completion; eased output reaching `0` or `1` early does not end the
   transition or reset lifecycle state.
-- Finite custom easing output is clamped through the existing `clamp01`
-  behavior before becoming public `progress`; non-finite and non-monotonic
-  easing output remain incidental implementation detail, not a stable
-  contract.
+- Finite custom easing output, including non-monotonic output, is clamped
+  through the existing `clamp01` behavior before becoming public `progress`;
+  decreasing eased progress does not end the transition or reset lifecycle
+  state. Non-finite easing return values remain outside the stable contract
+  and must not be relied upon.
 - Zero-duration transitions complete synchronously in the same call: target
   phase and index update, `progress` becomes `1`, `direction` returns to
   `"none"`, and `isTransitioning` remains `false`.
