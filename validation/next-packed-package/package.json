@@ -1,0 +1,24 @@
+{
+  "name": "next-packed-package-consumer",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "next build"
+  },
+  "dependencies": {
+    "@react-three/fiber": "9.6.1",
+    "next": "16.2.11",
+    "r3f-interactive-flow": "file:./r3f-interactive-flow.tgz",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "three": "0.185.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.1",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "@types/three": "0.185.1",
+    "typescript": "6.0.3"
+  }
+}

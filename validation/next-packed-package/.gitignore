@@ -1,0 +1,8 @@
+node_modules
+.next
+package-lock.json
+r3f-interactive-flow.tgz
+*.tgz
+tsconfig.tsbuildinfo
+*.log
+.env*
