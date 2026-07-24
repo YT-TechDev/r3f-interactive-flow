@@ -56,6 +56,9 @@ jobs:
       - name: Packed Next.js consumer
         run: pnpm consumer:packed:next:verify
 
+      - name: Public-docs agent fixtures
+        run: pnpm consumer:agent:verify
+
       - name: Typecheck
         run: pnpm typecheck
 
