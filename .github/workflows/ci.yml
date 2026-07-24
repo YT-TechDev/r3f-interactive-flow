@@ -53,6 +53,9 @@ jobs:
       - name: Packed Vite consumer
         run: pnpm consumer:packed:vite:verify
 
+      - name: Packed Next.js consumer
+        run: pnpm consumer:packed:next:verify
+
       - name: Typecheck
         run: pnpm typecheck
 
