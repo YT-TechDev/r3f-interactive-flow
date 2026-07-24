@@ -53,13 +53,30 @@ useFlowFrame<Phase>(({ progress }) => {
 
 ### Better
 
+`isTransitioning` is the reliable lifecycle state, but a completion callback
+needs the `true -> false` edge, not just `!isTransitioning`. Checking only
+`!isTransitioning` is not enough because the machine is also `false` before
+any transition starts and during every later idle frame — that condition is
+`true` on almost every frame, not once at completion:
+
 ```tsx
+const wasTransitioningRef = useRef(false);
+
 useFlowFrame<Phase>(({ isTransitioning }) => {
-  if (!isTransitioning) {
-    onTransitionDone(); // false only at raw completion
+  if (wasTransitioningRef.current && !isTransitioning) {
+    onTransitionDone(); // fires once, on the true -> false edge
   }
+
+  wasTransitioningRef.current = isTransitioning;
 });
 ```
+
+A zero-duration transition has no observable active frame — `isTransitioning`
+is already `false` on the very next frame after the accepted call, so it never
+produces a `true -> false` edge for this pattern to catch. For zero-duration
+moves, observe the accepted public `phase` change instead, or use the
+application-owned source/target trace described in
+[Expecting source/target metadata from the package](#expecting-sourcetarget-metadata-from-the-package).
 
 Use `isTransitioning` — not `progress === 1` — as the lifecycle signal.
 
@@ -98,26 +115,43 @@ const { sourcePhase, targetPhase } = useFlow<Phase>(); // does not exist
 ### Better
 
 Retain the previously observed public `phase` yourself and derive source and
-target from it:
+target from it. In React, do this in an Effect so the trace only updates after
+an actually committed phase change, not during render:
 
 ```tsx
-function usePhaseTrace(phase: Phase) {
-  const previousRef = useRef<Phase | null>(null);
-  const sourceRef = useRef<Phase | null>(null);
+import { useEffect, useRef, useState } from "react";
 
-  if (previousRef.current !== phase) {
-    sourceRef.current = previousRef.current;
-    previousRef.current = phase;
-  }
+type PhaseTrace<Phase extends string> = {
+  source: Phase;
+  target: Phase;
+} | null;
 
-  return { source: sourceRef.current, target: phase };
+function usePhaseTrace<Phase extends string>(phase: Phase): PhaseTrace<Phase> {
+  const previousPhaseRef = useRef(phase);
+  const [trace, setTrace] = useState<PhaseTrace<Phase>>(null);
+
+  useEffect(() => {
+    const source = previousPhaseRef.current;
+
+    if (source === phase) {
+      return;
+    }
+
+    setTrace({ source, target: phase });
+    previousPhaseRef.current = phase;
+  }, [phase]);
+
+  return trace;
 }
 ```
 
-This is application code built on public `useFlow`/`useFlowFrame` output, not
-a package API — see
+Rejected and same-phase requests never change the public `phase`, so this
+Effect never fires for them and the trace never records a false entry. This is
+application code built on public `useFlow` output, not a package API — see
 [Core concepts](./core-concepts.md#application-owned-previous-phase-tracking)
-for the full pattern.
+for the full pattern, and
+[React Three Fiber usage](./r3f-usage.md#target-phase-non-adjacent-transitions-and-zero-duration)
+for the equivalent frame-local pattern inside `useFlowFrame`.
 
 ## Assuming `lock()` pauses transition or cooldown
 

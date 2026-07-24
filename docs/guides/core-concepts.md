@@ -401,34 +401,50 @@ what keeps the React/R3F split clean.
 The package does not add `sourcePhase`, `targetPhase`, or `previousPhase` to
 the public snapshot — evaluation found no case that the current API and
 ordinary React state cannot already handle. When your app needs the phase a
-transition left from, derive it yourself:
+transition left from, derive it yourself in an Effect, so the trace only
+updates after an actually committed phase change rather than during render:
 
 ```tsx
-function usePhaseTrace(phase: Phase): { source: Phase | null; target: Phase } {
-  const previousRef = useRef<Phase | null>(null);
-  const sourceRef = useRef<Phase | null>(null);
+import { useEffect, useRef, useState } from "react";
 
-  if (previousRef.current !== phase) {
-    sourceRef.current = previousRef.current;
-    previousRef.current = phase;
-  }
+type PhaseTrace = { source: Phase; target: Phase } | null;
 
-  return { source: sourceRef.current, target: phase };
+function usePhaseTrace(phase: Phase): PhaseTrace {
+  const previousPhaseRef = useRef(phase);
+  const [trace, setTrace] = useState<PhaseTrace>(null);
+
+  useEffect(() => {
+    const source = previousPhaseRef.current;
+
+    if (source === phase) {
+      return;
+    }
+
+    setTrace({ source, target: phase });
+    previousPhaseRef.current = phase;
+  }, [phase]);
+
+  return trace;
 }
 ```
 
-- Retain the previously observed public `phase` and compare it on each render.
+- Initialize the retained phase from the current public `phase`, and compare
+  it inside an Effect that runs when `phase` changes — not by mutating a ref
+  during render, which a concurrent or discarded render must not commit.
 - When `phase` has actually changed, the retained value is the **source** and
   the new `phase` is the **target**.
 - Use `direction` directly for a positive-duration transition; for a
   zero-duration transition, `direction` is already `"none"` in the same call,
   so derive direction by comparing the source and target phase indexes
   instead.
-- Rejected and same-phase requests never mutate `phase`, so this derivation
-  never records a false trace.
+- Rejected and same-phase requests never mutate `phase`, so the Effect never
+  fires for them and this derivation never records a false trace.
 
 This is application code built on public `useFlow` output, not a package API —
-no such field is planned for a future release.
+no such field is planned for a future release. Inside `useFlowFrame`, the
+equivalent comparison happens directly in the frame callback instead of an
+Effect — see
+[React Three Fiber usage](./r3f-usage.md#target-phase-non-adjacent-transitions-and-zero-duration).
 
 ## Next steps
 

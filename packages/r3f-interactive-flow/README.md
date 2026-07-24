@@ -178,14 +178,14 @@ One `FlowProvider` owns one flow machine and its transition clock for its mounte
 
 r3f-interactive-flow intentionally does not add `sourcePhase`, `targetPhase`, or `previousPhase` to `FlowSnapshot`, `FlowControls`, or `FlowFrameState`. Evaluation found no genuine missing capability: `phase` already reports the accepted target immediately, and `direction` reports forward/reverse for positive-duration transitions.
 
-When application code needs the phase a transition left from:
+When application code needs the phase a transition left from, retain the previously observed public `phase` and compare it against the current one, but the comparison point differs by environment:
 
-1. Retain the previously observed public `phase` in a ref or state.
-2. On render (or frame), compare it against the current public `phase`.
-3. When the phase has actually changed, the retained value is the source and the new `phase` is the target; then update the retained value.
-4. For a positive-duration transition, use the current `direction` directly. For a zero-duration transition (where `direction` is already `"none"` in the same call), derive direction by comparing the source and target phase indexes instead.
+- **React** (`useFlow`): compare committed phase observations inside a `useEffect` that depends on `phase`, so the trace updates only after an actually committed phase change, not during render.
+- **R3F** (`useFlowFrame`): compare samples directly inside the frame callback, since that callback already runs once per Canvas frame outside React's render cycle.
 
-Rejected and same-phase requests never mutate the public `phase`, so this derivation never records a false trace. This pattern is application code built on public `useFlow`/`useFlowFrame` output — it is not a package API, and no such field is planned.
+In both environments: when the retained value differs from the newly observed `phase`, the retained value is the source and the new `phase` is the target; then update the retained value. For a positive-duration transition, use the current `direction` directly. For a zero-duration transition (where `direction` is already `"none"` in the same call), derive direction by comparing the source and target phase indexes instead.
+
+Rejected and same-phase requests never mutate the public `phase`, so this derivation never records a false trace. This pattern is application code built on public `useFlow`/`useFlowFrame` output — it is not a package API, and no such field is planned. React and R3F observe the same provider-owned machine through separate scheduling paths, so do not assume a React comparison and an R3F frame comparison land on the exact same instant.
 
 ## Minimal setup
 
