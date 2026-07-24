@@ -1,26 +1,31 @@
-import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
 import {
   existsSync,
   mkdirSync,
-  mkdtempSync,
-  readdirSync,
   readFileSync,
+  readdirSync,
   realpathSync,
-  rmSync,
-  lstatSync,
-  cpSync,
   writeFileSync
 } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import ts from "typescript";
+import { join } from "node:path";
+import {
+  PackedConsumerError,
+  assertBuildOutputExists,
+  assertCommandSucceeded,
+  assertNotUnderRepoNodeModules,
+  assertRealInstalledCopy,
+  createTempRoot,
+  packTarball,
+  packageDir,
+  readJsonFile,
+  removeTempRoot,
+  repoRoot,
+  runCommand,
+  scriptsDir
+} from "./lib/packed-consumer-utils.mjs";
 
-const scriptsDir = dirname(fileURLToPath(import.meta.url));
-const repoRoot = join(scriptsDir, "..");
-const packageDir = join(repoRoot, "packages", "r3f-interactive-flow");
 const fixturesDir = join(scriptsDir, "fixtures", "peer-compatibility-consumer");
-const isWindows = process.platform === "win32";
+const tsFixtureDir = join(fixturesDir, "ts");
 
 const EXPECTED_RUNTIME_EXPORTS = [
   "FlowProvider",
@@ -37,12 +42,12 @@ const EXPECTED_RUNTIME_EXPORTS = [
 // check, so that ambient reference must resolve to a real installed package.
 const OFFSCREENCANVAS_TYPES_VERSION = "2019.7.3";
 
-// Two representative, exactly-pinned peer combinations (see #349). Versions are pinned
-// to specific patch releases -- never a range, tag, or major-only version -- so this
-// check cannot silently start passing or failing because a new upstream release shipped.
-const compatibilityCases = [
-  {
-    name: "react-18-r3f-8-three-lower",
+// Two representative, exactly-pinned peer combinations (see #349, refined by #405).
+// Versions are pinned to specific patch releases -- never a range, tag, or major-only
+// version -- so this check cannot silently start passing or failing because a new
+// upstream release shipped.
+const PEER_TUPLES = {
+  lower: {
     // Newest published patch on the React 18 line, paired with the newest R3F 8.x release
     // (whose peer range is "react/react-dom >=18 <19"). three@0.150.1 is the newest patch
     // on the package's declared peer floor ("three": ">=0.150.0 <1.0.0"), which also clears
@@ -55,210 +60,176 @@ const compatibilityCases = [
     three: "0.150.1",
     threeTypes: "0.150.1"
   },
-  {
-    name: "react-19-r3f-9-three-current",
+  current: {
     // Matches the workspace's own resolved devDependency versions exactly (see
-    // `pnpm list --depth 0` at the repo root), i.e. the combination this repository is
+    // `package.json` at the repo root), i.e. the combination this repository is
     // actually built and tested against day-to-day.
-    react: "19.2.7",
-    reactDom: "19.2.7",
+    react: "19.2.8",
+    reactDom: "19.2.8",
     reactTypes: "19.2.17",
     reactDomTypes: "19.2.3",
     fiber: "9.6.1",
     three: "0.185.1",
     threeTypes: "0.185.1"
   }
+};
+
+// TypeScript declaration-route lanes. Each lane pairs a standalone tsconfig with the
+// consumer source file it exercises, and the exact package-root declaration route it
+// must (and must not) resolve to.
+const TS_LANES = {
+  bundler: {
+    tsconfig: "tsconfig.bundler.json",
+    expectedDeclaration: "index.d.ts",
+    forbiddenDeclaration: "index.d.cts"
+  },
+  "nodenext-esm": {
+    tsconfig: "tsconfig.nodenext-esm.json",
+    expectedDeclaration: "index.d.ts",
+    forbiddenDeclaration: "index.d.cts"
+  },
+  "nodenext-cjs": {
+    tsconfig: "tsconfig.nodenext-cjs.json",
+    expectedDeclaration: "index.d.cts",
+    forbiddenDeclaration: "index.d.ts"
+  }
+};
+
+// Bounded three-case matrix (see docs/releases/v2.9.0-consumer-ai-validation-matrix.md).
+// Deliberately not a Cartesian product across peers x TypeScript modes.
+const compatibilityCases = [
+  {
+    name: "react-18-r3f-8-three-lower",
+    scenarioIds: ["PEER-MINIMUM-SAMPLE"],
+    peers: PEER_TUPLES.lower,
+    typescript: "6.0.3",
+    runtimeImportCheck: true,
+    tsLanes: ["nodenext-esm", "nodenext-cjs"]
+  },
+  {
+    name: "react-19-r3f-9-three-current",
+    scenarioIds: ["PEER-CURRENT-SAMPLE", "TS-CURRENT-BUNDLER", "TS-CURRENT-NODENEXT"],
+    peers: PEER_TUPLES.current,
+    typescript: "6.0.3",
+    runtimeImportCheck: true,
+    tsLanes: ["bundler", "nodenext-esm", "nodenext-cjs"]
+  },
+  {
+    name: "typescript-5.9.3-bundler-current-peers",
+    scenarioIds: ["TS-LOWER-REPRESENTATIVE"],
+    peers: PEER_TUPLES.current,
+    typescript: "5.9.3",
+    runtimeImportCheck: false,
+    tsLanes: ["bundler"]
+  }
 ];
 
-class CompatibilityError extends Error {}
+const PEER_PACKAGES = ["react", "react-dom", "three", "@react-three/fiber"];
 
-function runCommand(command, args, options) {
-  const result = spawnSync(command, args, {
-    encoding: "utf8",
-    shell: isWindows,
-    ...options
-  });
-
-  if (result.error) {
-    throw new CompatibilityError(
-      `Failed to run ${command} ${args.join(" ")}: ${result.error.message}`
-    );
-  }
-
-  if (result.status !== 0) {
-    throw new CompatibilityError(
-      `Command "${command} ${args.join(" ")}" exited with code ${result.status}.\n` +
-        `--- stdout ---\n${result.stdout}\n--- stderr ---\n${result.stderr}`
-    );
-  }
-
-  return result;
-}
-
-function assertBuildOutputExists() {
-  const requiredFiles = ["dist/index.js", "dist/index.cjs", "dist/index.d.ts", "dist/index.d.cts"];
-
-  for (const relativePath of requiredFiles) {
-    if (!existsSync(join(packageDir, relativePath))) {
-      throw new CompatibilityError(
-        `Expected build output "${relativePath}" is missing. Run "pnpm build" before "pnpm package:compat".`
-      );
-    }
-  }
-}
-
-function packTarball(tmpDir) {
-  const result = runCommand("npm", ["pack", "--json", "--pack-destination", tmpDir], {
-    cwd: packageDir
-  });
-
-  let packInfo;
-  try {
-    packInfo = JSON.parse(result.stdout)[0];
-  } catch (err) {
-    throw new CompatibilityError(
-      `Failed to parse "npm pack --json" output: ${err.message}\n${result.stdout}`
-    );
-  }
-
-  return join(tmpDir, packInfo.filename);
-}
-
-function createCaseConsumer(baseDir, testCase) {
-  const consumerDir = join(baseDir, testCase.name);
+function createCaseConsumer(tempRoot, testCase) {
+  const consumerDir = join(tempRoot, testCase.name);
   mkdirSync(consumerDir, { recursive: true });
 
-  writeConsumerPackageJson(consumerDir, testCase.name);
-
-  return consumerDir;
-}
-
-function writeConsumerPackageJson(consumerDir, caseName) {
-  const packageJsonPath = join(consumerDir, "package.json");
-  const content = JSON.stringify(
-    { name: `peer-compat-${caseName}`, version: "0.0.0", private: true },
-    null,
-    2
+  writeFileSync(
+    join(consumerDir, "package.json"),
+    JSON.stringify(
+      { name: `peer-compat-${testCase.name}`, version: "0.0.0", private: true, type: "module" },
+      null,
+      2
+    )
   );
 
-  writeFileSync(packageJsonPath, content);
+  return consumerDir;
 }
 
 function installCase(consumerDir, tarballPath, testCase) {
   const specs = [
     tarballPath,
-    `react@${testCase.react}`,
-    `react-dom@${testCase.reactDom}`,
-    `three@${testCase.three}`,
-    `@react-three/fiber@${testCase.fiber}`,
-    `@types/react@${testCase.reactTypes}`,
-    `@types/react-dom@${testCase.reactDomTypes}`,
-    `@types/three@${testCase.threeTypes}`,
-    `@types/offscreencanvas@${OFFSCREENCANVAS_TYPES_VERSION}`
+    `react@${testCase.peers.react}`,
+    `react-dom@${testCase.peers.reactDom}`,
+    `three@${testCase.peers.three}`,
+    `@react-three/fiber@${testCase.peers.fiber}`,
+    `@types/react@${testCase.peers.reactTypes}`,
+    `@types/react-dom@${testCase.peers.reactDomTypes}`,
+    `@types/three@${testCase.peers.threeTypes}`,
+    `@types/offscreencanvas@${OFFSCREENCANVAS_TYPES_VERSION}`,
+    `typescript@${testCase.typescript}`
   ];
 
-  return runCommand(
-    "npm",
-    ["install", ...specs, "--no-audit", "--no-fund", "--ignore-scripts", "--save-exact"],
-    { cwd: consumerDir }
-  );
+  const commandArgs = [
+    "install",
+    ...specs,
+    "--no-audit",
+    "--no-fund",
+    "--ignore-scripts",
+    "--save-exact"
+  ];
+  const result = runCommand("npm", commandArgs, { cwd: consumerDir });
+
+  assertCommandSucceeded(result, "npm install", `npm ${commandArgs.join(" ")}`);
+  return result;
 }
 
-function reviewNpmWarnings(installResult) {
+function reviewNpmWarnings(installResult, testCase) {
   const combined = `${installResult.stdout}\n${installResult.stderr}`;
-  return combined
+  const warnings = combined
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => /npm warn/i.test(line));
+
+  if (warnings.length > 0) {
+    throw new PackedConsumerError(
+      `Case "${testCase.name}": expected zero npm warnings, found ${warnings.length}:\n` +
+        warnings.join("\n")
+    );
+  }
+
+  return warnings;
 }
 
 function installedPackageJson(consumerDir, packageName) {
   const packageJsonPath = join(consumerDir, "node_modules", packageName, "package.json");
 
   if (!existsSync(packageJsonPath)) {
-    throw new CompatibilityError(
+    throw new PackedConsumerError(
       `Expected "${packageName}" to be installed at ${packageJsonPath}.`
     );
   }
 
-  return JSON.parse(readFileSync(packageJsonPath, "utf8"));
+  return readJsonFile(packageJsonPath);
+}
+
+function assertPeersAreRealInstalledCopies(consumerDir, tempRoot, testCase) {
+  for (const packageName of PEER_PACKAGES) {
+    const installedDir = join(consumerDir, "node_modules", ...packageName.split("/"));
+
+    assertRealInstalledCopy({
+      installedDir,
+      tempRoot,
+      excludedSourceDir: join(repoRoot, "node_modules"),
+      label: `${packageName} (case ${testCase.name})`
+    });
+    assertNotUnderRepoNodeModules(installedDir, `${packageName} (case ${testCase.name})`);
+  }
 }
 
 function assertExactInstalledVersions(consumerDir, testCase) {
   const expectedVersions = {
-    react: testCase.react,
-    "react-dom": testCase.reactDom,
-    three: testCase.three,
-    "@react-three/fiber": testCase.fiber,
-    "@types/react": testCase.reactTypes,
-    "@types/react-dom": testCase.reactDomTypes,
-    "@types/three": testCase.threeTypes
+    react: testCase.peers.react,
+    "react-dom": testCase.peers.reactDom,
+    three: testCase.peers.three,
+    "@react-three/fiber": testCase.peers.fiber,
+    "@types/react": testCase.peers.reactTypes,
+    "@types/react-dom": testCase.peers.reactDomTypes,
+    "@types/three": testCase.peers.threeTypes
   };
 
   for (const [packageName, expectedVersion] of Object.entries(expectedVersions)) {
     const installed = installedPackageJson(consumerDir, packageName);
 
     if (installed.version !== expectedVersion) {
-      throw new CompatibilityError(
+      throw new PackedConsumerError(
         `Expected "${packageName}" to resolve to exactly ${expectedVersion}, but found ${installed.version}.`
-      );
-    }
-  }
-}
-
-function assertInstalledFromTarball(consumerDir, baseDir) {
-  const installedDir = join(consumerDir, "node_modules", "r3f-interactive-flow");
-
-  if (!existsSync(installedDir)) {
-    throw new CompatibilityError(
-      `Expected "r3f-interactive-flow" to be installed at ${installedDir}.`
-    );
-  }
-
-  if (lstatSync(installedDir).isSymbolicLink()) {
-    throw new CompatibilityError(
-      `Expected "r3f-interactive-flow" to be a real installed copy from the tarball, but found a symlink at ${installedDir}.`
-    );
-  }
-
-  const realInstalledDir = realpathSync(installedDir);
-  const realBaseDir = realpathSync(baseDir);
-  const realPackageDir = realpathSync(packageDir);
-
-  if (!realInstalledDir.startsWith(realBaseDir)) {
-    throw new CompatibilityError(
-      `Expected installed package to live under the isolated temp directory, but resolved to ${realInstalledDir}.`
-    );
-  }
-
-  if (realInstalledDir.startsWith(realPackageDir)) {
-    throw new CompatibilityError(
-      `Installed package resolved back into the workspace source directory (${realInstalledDir}). ` +
-        "This check must exercise the packed tarball, not the workspace."
-    );
-  }
-}
-
-function assertPeersAreNotWorkspaceSymlinks(consumerDir, testCase) {
-  const peerPackages = ["react", "react-dom", "three", "@react-three/fiber"];
-  const realRepoNodeModules = realpathSync(join(repoRoot, "node_modules"));
-
-  for (const packageName of peerPackages) {
-    const installedDir = join(consumerDir, "node_modules", packageName);
-
-    if (lstatSync(installedDir).isSymbolicLink()) {
-      throw new CompatibilityError(
-        `Expected "${packageName}" to be a real installed package for case "${testCase.name}", ` +
-          `but found a symlink at ${installedDir}. Compatibility cases must not reuse workspace peers.`
-      );
-    }
-
-    const realInstalledDir = realpathSync(installedDir);
-
-    if (realInstalledDir.startsWith(realRepoNodeModules)) {
-      throw new CompatibilityError(
-        `"${packageName}" resolved back into the workspace's node_modules (${realInstalledDir}) ` +
-          `for case "${testCase.name}". Each case must install its own exact peer versions.`
       );
     }
   }
@@ -279,7 +250,7 @@ function collectInstalledVersions(nodeModulesRoot, packageName, visited = new Se
 
   const candidate = join(nodeModulesRoot, packageName);
   if (existsSync(join(candidate, "package.json"))) {
-    const pkg = JSON.parse(readFileSync(join(candidate, "package.json"), "utf8"));
+    const pkg = readJsonFile(join(candidate, "package.json"));
     versions.add(pkg.version);
   }
 
@@ -313,13 +284,13 @@ function assertSingleReactGraph(consumerDir, testCase) {
   const nodeModulesRoot = join(consumerDir, "node_modules");
 
   for (const [packageName, expectedVersion] of [
-    ["react", testCase.react],
-    ["react-dom", testCase.reactDom]
+    ["react", testCase.peers.react],
+    ["react-dom", testCase.peers.reactDom]
   ]) {
     const versions = collectInstalledVersions(nodeModulesRoot, packageName);
 
     if (versions.size !== 1 || !versions.has(expectedVersion)) {
-      throw new CompatibilityError(
+      throw new PackedConsumerError(
         `Case "${testCase.name}" expected exactly one installed "${packageName}" version ` +
           `(${expectedVersion}), but found: ${[...versions].join(", ") || "none"}.`
       );
@@ -327,22 +298,15 @@ function assertSingleReactGraph(consumerDir, testCase) {
   }
 }
 
-function runNpmLsCheck(consumerDir) {
-  const result = spawnSync("npm", ["ls", "--json", "--all"], {
-    encoding: "utf8",
-    shell: isWindows,
-    cwd: consumerDir
-  });
-
-  if (result.error) {
-    throw new CompatibilityError(`Failed to run "npm ls": ${result.error.message}`);
-  }
+function runNpmLsCheck(consumerDir, testCase) {
+  const commandText = "npm ls --json --all";
+  const result = runCommand("npm", ["ls", "--json", "--all"], { cwd: consumerDir });
 
   let parsed;
   try {
     parsed = JSON.parse(result.stdout);
   } catch (err) {
-    throw new CompatibilityError(
+    throw new PackedConsumerError(
       `Failed to parse "npm ls --json" output: ${err.message}\n${result.stdout}`
     );
   }
@@ -350,46 +314,163 @@ function runNpmLsCheck(consumerDir) {
   const problems = parsed.problems ?? [];
 
   if (problems.length > 0) {
-    throw new CompatibilityError(
-      `"npm ls" reported an invalid dependency graph:\n${problems.join("\n")}`
+    throw new PackedConsumerError(
+      `Case "${testCase.name}": "npm ls" reported an invalid dependency graph:\n${problems.join("\n")}`
     );
   }
 
-  return problems;
+  assertCommandSucceeded(result, `"npm ls" dependency graph (case ${testCase.name})`, commandText);
+
+  return parsed;
 }
 
 function copyRuntimeFixture(consumerDir) {
-  cpSync(join(fixturesDir, "runtime-check.mjs"), join(consumerDir, "runtime-check.mjs"));
+  const source = join(fixturesDir, "runtime-check.mjs");
+  const destination = join(consumerDir, "runtime-check.mjs");
+  writeFileSync(destination, readFileSync(source, "utf8"));
 }
 
 function runRuntimeImportCheck(consumerDir) {
-  const result = spawnSync(process.execPath, [join(consumerDir, "runtime-check.mjs")], {
+  copyRuntimeFixture(consumerDir);
+
+  const result = runCommand(process.execPath, [join(consumerDir, "runtime-check.mjs")], {
     cwd: consumerDir,
-    encoding: "utf8",
     env: { ...process.env, EXPECTED_RUNTIME_EXPORTS: JSON.stringify(EXPECTED_RUNTIME_EXPORTS) }
   });
 
-  if (result.status !== 0) {
-    throw new CompatibilityError(
-      `Bare runtime import failed.\n--- stdout ---\n${result.stdout}\n--- stderr ---\n${result.stderr}`
+  assertCommandSucceeded(result, "bare ESM runtime import", "node runtime-check.mjs");
+}
+
+function loadInstalledTypeScript(consumerDir, tempRoot, testCase) {
+  const installedDir = join(consumerDir, "node_modules", "typescript");
+
+  assertRealInstalledCopy({
+    installedDir,
+    tempRoot,
+    excludedSourceDir: join(repoRoot, "node_modules"),
+    label: `typescript (case ${testCase.name})`
+  });
+  assertNotUnderRepoNodeModules(installedDir, `typescript (case ${testCase.name})`);
+
+  const require = createRequire(join(consumerDir, "package.json"));
+  const ts = require("typescript");
+
+  if (ts.version !== testCase.typescript) {
+    throw new PackedConsumerError(
+      `Case "${testCase.name}": expected the consumer-installed compiler to report version ` +
+        `${testCase.typescript}, but it reported ${ts.version}.`
     );
   }
+
+  return ts;
 }
 
 function copyTypeScriptFixture(consumerDir) {
   const tsDir = join(consumerDir, "ts");
-  cpSync(join(fixturesDir, "ts"), tsDir, { recursive: true });
+  mkdirSync(tsDir, { recursive: true });
+
+  for (const fileName of readdirSync(tsFixtureDir)) {
+    writeFileSync(join(tsDir, fileName), readFileSync(join(tsFixtureDir, fileName), "utf8"));
+  }
+
   return tsDir;
 }
 
-function runTypeScriptCheck(consumerDir, testCase) {
-  const tsDir = copyTypeScriptFixture(consumerDir);
-  const tsconfigPath = join(tsDir, "tsconfig.json");
+function assertDeclarationRoute(program, consumerDir, testCase, laneName, laneConfig) {
+  const installedPackageDistDir = join(consumerDir, "node_modules", "r3f-interactive-flow", "dist");
+  const realExpectedDeclaration = realpathSync(
+    join(installedPackageDistDir, laneConfig.expectedDeclaration)
+  );
+  const realConsumerDir = realpathSync(consumerDir);
+  const realRepoNodeModules = realpathSync(join(repoRoot, "node_modules"));
+  const realPackageDir = realpathSync(packageDir);
+
+  const sourceFileNames = program.getSourceFiles().map((sourceFile) => sourceFile.fileName);
+  const realSourceFileNames = sourceFileNames.map((fileName) => {
+    try {
+      return realpathSync(fileName);
+    } catch {
+      return fileName;
+    }
+  });
+
+  const resolvesExpected = realSourceFileNames.includes(realExpectedDeclaration);
+
+  if (!resolvesExpected) {
+    throw new PackedConsumerError(
+      `Case "${testCase.name}" lane "${laneName}": expected the program to resolve ` +
+        `"dist/${laneConfig.expectedDeclaration}", but it did not appear in the program.`
+    );
+  }
+
+  const forbiddenSuffix = `r3f-interactive-flow/dist/${laneConfig.forbiddenDeclaration}`;
+  const resolvesForbidden = sourceFileNames.some((fileName) => fileName.includes(forbiddenSuffix));
+
+  if (resolvesForbidden) {
+    throw new PackedConsumerError(
+      `Case "${testCase.name}" lane "${laneName}": did not expect the program to resolve ` +
+        `"dist/${laneConfig.forbiddenDeclaration}", but it did.`
+    );
+  }
+
+  const peerModuleMarkers = [
+    "node_modules/react/",
+    "node_modules/@types/react/",
+    "node_modules/react-dom/",
+    "node_modules/@types/react-dom/",
+    "node_modules/three/",
+    "node_modules/@types/three/",
+    "node_modules/@react-three/fiber/"
+  ];
+
+  const peerDeclarationFiles = sourceFileNames.filter((fileName) =>
+    peerModuleMarkers.some((marker) => fileName.includes(marker))
+  );
+
+  if (peerDeclarationFiles.length === 0) {
+    throw new PackedConsumerError(
+      `Case "${testCase.name}" lane "${laneName}": expected peer package declarations to resolve, found none.`
+    );
+  }
+
+  for (const fileName of peerDeclarationFiles) {
+    const realFileName = realpathSync(fileName);
+
+    if (!realFileName.startsWith(realConsumerDir)) {
+      throw new PackedConsumerError(
+        `Case "${testCase.name}" lane "${laneName}": expected "${fileName}" to resolve inside ` +
+          "the isolated consumer, but it resolved outside of it."
+      );
+    }
+
+    if (realFileName.startsWith(realRepoNodeModules)) {
+      throw new PackedConsumerError(
+        `Case "${testCase.name}" lane "${laneName}": TypeScript resolved "${fileName}" back into ` +
+          "the workspace's node_modules instead of the isolated consumer's installed peers."
+      );
+    }
+  }
+
+  for (const realFileName of realSourceFileNames) {
+    if (realFileName.startsWith(realPackageDir)) {
+      throw new PackedConsumerError(
+        `Case "${testCase.name}" lane "${laneName}": TypeScript resolved "${realFileName}" back ` +
+          "into the workspace package source instead of the installed tarball."
+      );
+    }
+  }
+
+  return `dist/${laneConfig.expectedDeclaration}`;
+}
+
+function runDeclarationLane(ts, tsDir, consumerDir, testCase, laneName) {
+  const laneConfig = TS_LANES[laneName];
+  const tsconfigPath = join(tsDir, laneConfig.tsconfig);
   const configFile = ts.readConfigFile(tsconfigPath, ts.sys.readFile);
 
   if (configFile.error) {
-    throw new CompatibilityError(
-      `Case "${testCase.name}": failed to read tsconfig.json: ` +
+    throw new PackedConsumerError(
+      `Case "${testCase.name}" lane "${laneName}": failed to read ${laneConfig.tsconfig}: ` +
         ts.flattenDiagnosticMessageText(configFile.error.messageText, "\n")
     );
   }
@@ -400,7 +481,9 @@ function runTypeScriptCheck(consumerDir, testCase) {
     const formatted = parsed.errors
       .map((error) => ts.flattenDiagnosticMessageText(error.messageText, "\n"))
       .join("\n");
-    throw new CompatibilityError(`Case "${testCase.name}": invalid tsconfig.json:\n${formatted}`);
+    throw new PackedConsumerError(
+      `Case "${testCase.name}" lane "${laneName}": invalid ${laneConfig.tsconfig}:\n${formatted}`
+    );
   }
 
   const program = ts.createProgram({ rootNames: parsed.fileNames, options: parsed.options });
@@ -412,50 +495,20 @@ function runTypeScriptCheck(consumerDir, testCase) {
       getCurrentDirectory: () => tsDir,
       getNewLine: () => ts.sys.newLine
     });
-    throw new CompatibilityError(`Case "${testCase.name}": type errors found:\n${formatted}`);
-  }
-
-  assertConsumerRootedTypeResolution(program, consumerDir, testCase);
-}
-
-function assertConsumerRootedTypeResolution(program, consumerDir, testCase) {
-  const realConsumerDir = realpathSync(consumerDir);
-  const realRepoNodeModules = realpathSync(join(repoRoot, "node_modules"));
-  const peerModuleMarkers = [
-    "node_modules/react/",
-    "node_modules/react-dom/",
-    "node_modules/three/",
-    "node_modules/@react-three/fiber/"
-  ];
-
-  const peerDeclarationFiles = program
-    .getSourceFiles()
-    .map((sourceFile) => sourceFile.fileName)
-    .filter((fileName) => peerModuleMarkers.some((marker) => fileName.includes(marker)));
-
-  if (peerDeclarationFiles.length === 0) {
-    throw new CompatibilityError(
-      `Case "${testCase.name}": expected the TypeScript program to resolve peer package declarations, found none.`
+    throw new PackedConsumerError(
+      `Case "${testCase.name}" lane "${laneName}": type errors found:\n${formatted}`
     );
   }
 
-  for (const fileName of peerDeclarationFiles) {
-    const realFileName = realpathSync(fileName);
+  const declarationRoute = assertDeclarationRoute(
+    program,
+    consumerDir,
+    testCase,
+    laneName,
+    laneConfig
+  );
 
-    if (!realFileName.startsWith(realConsumerDir)) {
-      throw new CompatibilityError(
-        `Case "${testCase.name}": expected "${fileName}" to resolve inside the isolated consumer, ` +
-          `but it resolved outside of it.`
-      );
-    }
-
-    if (realFileName.startsWith(realRepoNodeModules)) {
-      throw new CompatibilityError(
-        `Case "${testCase.name}": TypeScript resolved "${fileName}" back into the workspace's ` +
-          "node_modules instead of the isolated consumer's installed peers."
-      );
-    }
-  }
+  return { lane: laneName, mode: laneConfig.tsconfig, declarationRoute };
 }
 
 function step(label, fn) {
@@ -464,34 +517,60 @@ function step(label, fn) {
     console.log(`  ✔ ${label}`);
     return value;
   } catch (err) {
-    throw new CompatibilityError(
+    throw new PackedConsumerError(
       `Stage failed: ${label}\n${err instanceof Error ? err.message : String(err)}`
     );
   }
 }
 
-function runCompatibilityCase(baseDir, tarballPath, testCase) {
-  console.log(`\n=== ${testCase.name} ===`);
+function getRepositoryCheckoutCommit() {
+  if (process.env.GITHUB_SHA) {
+    return process.env.GITHUB_SHA;
+  }
+
+  const result = runCommand("git", ["rev-parse", "HEAD"], { cwd: repoRoot });
+
+  if (result.status === 0) {
+    return result.stdout.trim();
+  }
+
+  return "unavailable";
+}
+
+function runCompatibilityCase(tempRoot, tarballPath, testCase) {
+  console.log(`\n=== ${testCase.name} (${testCase.scenarioIds.join(", ")}) ===`);
   console.log(
-    `react@${testCase.react} react-dom@${testCase.reactDom} @react-three/fiber@${testCase.fiber} ` +
-      `three@${testCase.three}`
+    `react@${testCase.peers.react} react-dom@${testCase.peers.reactDom} ` +
+      `@react-three/fiber@${testCase.peers.fiber} three@${testCase.peers.three} ` +
+      `typescript@${testCase.typescript}`
   );
 
-  const consumerDir = createCaseConsumer(baseDir, testCase);
-  const report = { name: testCase.name, warnings: [] };
+  const consumerDir = createCaseConsumer(tempRoot, testCase);
 
   try {
-    const installResult = step("install packed tarball + exact peers", () =>
+    const installResult = step("install packed tarball + exact peers + exact typescript", () =>
       installCase(consumerDir, tarballPath, testCase)
     );
-    report.warnings = reviewNpmWarnings(installResult);
+
+    const warnings = step("zero npm warnings", () => reviewNpmWarnings(installResult, testCase));
 
     step("installed package is the packed tarball copy, not the workspace", () =>
-      assertInstalledFromTarball(consumerDir, baseDir)
+      assertRealInstalledCopy({
+        installedDir: join(consumerDir, "node_modules", "r3f-interactive-flow"),
+        tempRoot,
+        excludedSourceDir: packageDir,
+        label: `r3f-interactive-flow (case ${testCase.name})`
+      })
+    );
+    step("installed package does not resolve into repository node_modules", () =>
+      assertNotUnderRepoNodeModules(
+        join(consumerDir, "node_modules", "r3f-interactive-flow"),
+        `r3f-interactive-flow (case ${testCase.name})`
+      )
     );
 
     step("installed peers are real packages, not workspace symlinks", () =>
-      assertPeersAreNotWorkspaceSymlinks(consumerDir, testCase)
+      assertPeersAreRealInstalledCopies(consumerDir, tempRoot, testCase)
     );
 
     step("exact pinned peer versions are installed", () =>
@@ -502,60 +581,109 @@ function runCompatibilityCase(baseDir, tarballPath, testCase) {
       assertSingleReactGraph(consumerDir, testCase)
     );
 
-    step('"npm ls" reports a valid dependency graph', () => runNpmLsCheck(consumerDir));
+    step('"npm ls" reports a valid dependency graph', () => runNpmLsCheck(consumerDir, testCase));
 
-    step("bare ESM runtime import resolves the public API", () => {
-      copyRuntimeFixture(consumerDir);
-      runRuntimeImportCheck(consumerDir);
-    });
+    if (testCase.runtimeImportCheck) {
+      step("bare ESM runtime import resolves the public API", () =>
+        runRuntimeImportCheck(consumerDir)
+      );
+    }
 
-    step("NodeNext TypeScript check resolves consumer-installed peers", () =>
-      runTypeScriptCheck(consumerDir, testCase)
+    const ts = step("load the exact consumer-installed TypeScript compiler", () =>
+      loadInstalledTypeScript(consumerDir, tempRoot, testCase)
     );
 
-    report.status = "passed";
+    const tsDir = step("copy TypeScript fixture into isolated consumer", () =>
+      copyTypeScriptFixture(consumerDir)
+    );
+
+    const laneResults = testCase.tsLanes.map((laneName) =>
+      step(`TypeScript lane "${laneName}" declaration-route resolution`, () =>
+        runDeclarationLane(ts, tsDir, consumerDir, testCase, laneName)
+      )
+    );
+
+    return {
+      name: testCase.name,
+      scenarioIds: testCase.scenarioIds,
+      peers: testCase.peers,
+      typescript: testCase.typescript,
+      runtimeImportCheck: testCase.runtimeImportCheck,
+      warnings,
+      laneResults,
+      status: "passed"
+    };
   } finally {
-    rmSync(consumerDir, { recursive: true, force: true });
+    removeTempRoot(consumerDir);
   }
-
-  if (report.warnings.length > 0) {
-    console.log(`  npm warnings (${report.warnings.length}), reviewed and non-blocking:`);
-    for (const warning of report.warnings) {
-      console.log(`    ${warning}`);
-    }
-  } else {
-    console.log("  no npm warnings reported");
-  }
-
-  return report;
 }
 
 function main() {
-  console.log("Supported peer compatibility check\n");
-  step("build output exists", assertBuildOutputExists);
+  console.log("Supported peer and TypeScript compatibility check\n");
+  step("build output exists", () =>
+    assertBuildOutputExists(packageDir, [
+      "dist/index.js",
+      "dist/index.cjs",
+      "dist/index.d.ts",
+      "dist/index.d.cts"
+    ])
+  );
 
-  const baseDir = mkdtempSync(join(tmpdir(), "r3f-peer-compat-"));
+  const tempRoot = createTempRoot("r3f-peer-compat-");
   const reports = [];
 
+  let tarballInfo;
+
   try {
-    let tarballPath;
-    step("pack tarball with npm pack", () => {
-      tarballPath = packTarball(baseDir);
-    });
+    tarballInfo = step("pack tarball with npm pack", () => packTarball(packageDir, tempRoot));
 
     for (const testCase of compatibilityCases) {
-      reports.push(runCompatibilityCase(baseDir, tarballPath, testCase));
+      reports.push(runCompatibilityCase(tempRoot, tarballInfo.tarballPath, testCase));
     }
   } finally {
-    rmSync(baseDir, { recursive: true, force: true });
+    removeTempRoot(tempRoot);
   }
 
-  console.log("\nSummary:");
+  const workspacePackageJson = readJsonFile(join(packageDir, "package.json"));
+  const repositoryCheckoutCommit = getRepositoryCheckoutCommit();
+
+  console.log("\n--- Evidence summary ---");
+  console.log(`repository checkout commit: ${repositoryCheckoutCommit}`);
+  console.log(`package: ${workspacePackageJson.name}@${workspacePackageJson.version}`);
+  console.log(`tarball filename: ${tarballInfo.filename}`);
+  console.log(`tarball SHA-256: ${tarballInfo.sha256}`);
+  console.log(`tarball packed file count: ${tarballInfo.fileCount}`);
+
   for (const report of reports) {
-    console.log(`  ${report.name}: ${report.status} (${report.warnings.length} npm warning(s))`);
+    console.log(`\ncase: ${report.name}`);
+    console.log(`  scenario IDs: ${report.scenarioIds.join(", ")}`);
+    console.log(
+      `  peers: react@${report.peers.react}, react-dom@${report.peers.reactDom}, ` +
+        `@react-three/fiber@${report.peers.fiber}, three@${report.peers.three}`
+    );
+    console.log(
+      `  type packages: @types/react@${report.peers.reactTypes}, ` +
+        `@types/react-dom@${report.peers.reactDomTypes}, @types/three@${report.peers.threeTypes}, ` +
+        `@types/offscreencanvas@${OFFSCREENCANVAS_TYPES_VERSION}`
+    );
+    console.log(`  typescript: ${report.typescript} (consumer-installed, exact)`);
+    console.log("  installed package classification: real tarball copy, no workspace resolution");
+    console.log(`  npm warnings: ${report.warnings.length}`);
+    console.log("  dependency graph (npm ls): passed");
+    if (report.runtimeImportCheck) {
+      console.log("  bare ESM runtime import: passed");
+    }
+    for (const laneResult of report.laneResults) {
+      console.log(
+        `  TypeScript lane "${laneResult.lane}": mode=${laneResult.mode}, ` +
+          `declaration route=${laneResult.declarationRoute}, peer declarations resolved inside isolated consumer`
+      );
+    }
+    console.log(`  status: ${report.status}`);
   }
 
-  console.log("\nSupported peer compatibility check passed.");
+  console.log("\nfinal classification: VERIFIED");
+  console.log("\nSupported peer and TypeScript compatibility check passed.");
 }
 
 try {
