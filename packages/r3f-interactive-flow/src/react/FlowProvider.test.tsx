@@ -1,9 +1,9 @@
-import React, { act, useContext } from "react";
+import React, { act, useContext, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { FlowControls } from "../core/types";
+import type { FlowControls, FlowDirection } from "../core/types";
 import { FlowMachineContext } from "./FlowContext";
 import type { FlowProviderProps } from "./FlowProvider";
 import { FlowProvider } from "./FlowProvider";
@@ -1948,5 +1948,114 @@ describe("FlowProvider provider-owned transition clock", () => {
       direction: "prev",
       isTransitioning: true
     });
+  });
+});
+
+// Evidence for #397/#399: can application code derive an accepted source/target
+// pair using only the current public useFlow observation plus its own
+// previous-phase tracking? No package API addition is used here.
+describe("FlowProvider application-owned previous-phase evidence for non-adjacent goTo", () => {
+  const applicationPhases = ["intro", "overview", "detail", "contact"] as const;
+  type ApplicationPhase = (typeof applicationPhases)[number];
+
+  type TransitionTrace = {
+    source: ApplicationPhase;
+    target: ApplicationPhase;
+    direction: FlowDirection;
+  } | null;
+
+  // Derived state during render: previousPhaseRef holds the last observed
+  // public phase, and the trace updates only when the observed phase actually
+  // changes, never merely because a navigation method was called.
+  function PreviousPhaseTraceProbe({
+    onRender
+  }: {
+    onRender: (trace: TransitionTrace, controls: FlowControls<ApplicationPhase>) => void;
+  }) {
+    const controls = useFlow<ApplicationPhase>();
+    const previousPhaseRef = useRef(controls.phase);
+    const [trace, setTrace] = useState<TransitionTrace>(null);
+
+    if (previousPhaseRef.current !== controls.phase) {
+      setTrace({
+        source: previousPhaseRef.current,
+        target: controls.phase,
+        direction: controls.direction
+      });
+      previousPhaseRef.current = controls.phase;
+    }
+
+    onRender(trace, controls);
+
+    return null;
+  }
+
+  beforeEach(() => {
+    installFrameClock();
+  });
+
+  afterEach(() => {
+    uninstallFrameClock();
+  });
+
+  it("derives an accepted source/target/direction trace from application-owned previous-phase tracking", () => {
+    let latestTrace: TransitionTrace = null;
+    let latestControls: FlowControls<ApplicationPhase> | undefined;
+
+    act(() => {
+      root?.render(
+        <FlowProvider phases={applicationPhases} transition={{ duration: 100, cooldown: 50 }}>
+          <PreviousPhaseTraceProbe
+            onRender={(trace, controls) => {
+              latestTrace = trace;
+              latestControls = controls;
+            }}
+          />
+        </FlowProvider>
+      );
+    });
+
+    // 1. Initial state has no accepted transition trace.
+    expect(latestTrace).toBeNull();
+
+    // 2. Accepted forward non-adjacent goTo records intro -> contact.
+    act(() => {
+      latestControls?.goTo("contact");
+    });
+
+    expect(latestTrace).toEqual({ source: "intro", target: "contact", direction: "next" });
+
+    // 3. A rejected request during the active transition does not change the trace.
+    act(() => {
+      latestControls?.goTo("overview");
+    });
+
+    expect(latestTrace).toEqual({ source: "intro", target: "contact", direction: "next" });
+
+    // Complete the forward transition and its cooldown through the provider-owned clock.
+    advanceClock(16);
+    advanceClock(100);
+    advanceClock(50);
+
+    expect(latestControls).toMatchObject({ phase: "contact", isTransitioning: false });
+    expect(latestTrace).toEqual({ source: "intro", target: "contact", direction: "next" });
+
+    // 4. After completion, accepted reverse non-adjacent goTo records contact -> overview.
+    act(() => {
+      latestControls?.goTo("overview");
+    });
+
+    expect(latestTrace).toEqual({ source: "contact", target: "overview", direction: "prev" });
+
+    advanceClock(16);
+    advanceClock(100);
+    advanceClock(50);
+
+    // 5. A same-phase request does not change the trace.
+    act(() => {
+      latestControls?.goTo("overview");
+    });
+
+    expect(latestTrace).toEqual({ source: "contact", target: "overview", direction: "prev" });
   });
 });

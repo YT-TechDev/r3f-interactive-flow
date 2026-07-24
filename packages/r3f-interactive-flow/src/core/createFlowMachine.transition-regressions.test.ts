@@ -793,4 +793,157 @@ describe("createFlowMachine transition regressions", () => {
     byPhase.next();
     expect(byPhase.getSnapshot()).toMatchObject({ phase: "work", progress: 1 });
   });
+
+  it("resolves non-adjacent goTo directly to the accepted target with the exact accepted snapshot, forward and reverse", () => {
+    const forwardMachine = createFlowMachine({
+      phases: ["intro", "overview", "detail", "contact"] as const,
+      transitionDurationMs: 500
+    });
+
+    // intro (index 0) -> goTo("contact") (index 3): a direct two-index skip.
+    forwardMachine.goTo("contact");
+
+    expect(forwardMachine.getSnapshot()).toEqual({
+      phase: "contact",
+      phaseIndex: 3,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false
+    });
+
+    const reverseMachine = createFlowMachine({
+      phases: ["intro", "overview", "detail", "contact"] as const,
+      initialPhase: "contact",
+      transitionDurationMs: 500
+    });
+
+    // contact (index 3) -> goTo("overview") (index 1): a direct two-index skip in reverse.
+    reverseMachine.goTo("overview");
+
+    expect(reverseMachine.getSnapshot()).toEqual({
+      phase: "overview",
+      phaseIndex: 1,
+      progress: 0,
+      direction: "prev",
+      isTransitioning: true,
+      isLocked: false
+    });
+  });
+
+  it("resolves transition.byPhase strictly from the source phase during non-adjacent goTo, proving forward and reverse duration, cooldown, and easing", () => {
+    // Legacy, global, and byPhase fields are all deliberately distinct so an
+    // incorrect fallback level or an incorrect (target-phase) source selection
+    // produces an observably different progress or cooldown-boundary result.
+    const machine = createFlowMachine({
+      phases: ["intro", "overview", "detail", "contact"] as const,
+      transitionDurationMs: 700,
+      cooldownMs: 700,
+      easing: () => 0,
+      transition: {
+        duration: 500,
+        cooldown: 500,
+        easing: (progress) => progress,
+        byPhase: {
+          intro: { duration: 200, cooldown: 300, easing: (progress) => progress * progress },
+          contact: { duration: 400, cooldown: 600, easing: (progress) => Math.sqrt(progress) },
+          overview: { duration: 900, cooldown: 900, easing: () => 1 }
+        }
+      }
+    });
+
+    // Forward: source "intro" must select intro's byPhase, not contact's (the target).
+    machine.goTo("contact");
+
+    expect(machine.getSnapshot()).toEqual({
+      phase: "contact",
+      phaseIndex: 3,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false
+    });
+
+    machine.update(100);
+
+    // intro duration 200ms, easing progress*progress: raw 0.5 -> 0.25.
+    // Using contact's byPhase (duration 400, sqrt) instead would produce 0.5.
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "contact",
+      progress: 0.25,
+      isTransitioning: true
+    });
+
+    machine.update(100);
+
+    expect(machine.getSnapshot()).toEqual({
+      phase: "contact",
+      phaseIndex: 3,
+      progress: 1,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+
+    const completedForwardSnapshot = machine.getSnapshot();
+
+    // intro's cooldown is 300ms; navigation stays rejected up to the exact boundary.
+    machine.update(299);
+    machine.goTo("overview");
+
+    expect(machine.getSnapshot()).toEqual(completedForwardSnapshot);
+
+    machine.update(1);
+
+    // Reverse: source "contact" must select contact's byPhase, not overview's (the target).
+    machine.goTo("overview");
+
+    expect(machine.getSnapshot()).toEqual({
+      phase: "overview",
+      phaseIndex: 1,
+      progress: 0,
+      direction: "prev",
+      isTransitioning: true,
+      isLocked: false
+    });
+
+    machine.update(100);
+
+    // contact duration 400ms, easing sqrt: raw 0.25 -> 0.5.
+    // Using overview's byPhase (duration 900, constant 1) instead would produce 1
+    // while the transition is still active.
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "overview",
+      progress: 0.5,
+      isTransitioning: true
+    });
+
+    machine.update(300);
+
+    expect(machine.getSnapshot()).toEqual({
+      phase: "overview",
+      phaseIndex: 1,
+      progress: 1,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+
+    const completedReverseSnapshot = machine.getSnapshot();
+
+    // contact's cooldown is 600ms; navigation stays rejected up to the exact boundary.
+    machine.update(599);
+    machine.goTo("intro");
+
+    expect(machine.getSnapshot()).toEqual(completedReverseSnapshot);
+
+    machine.update(1);
+    machine.goTo("intro");
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "intro",
+      direction: "prev",
+      isTransitioning: true
+    });
+  });
 });
