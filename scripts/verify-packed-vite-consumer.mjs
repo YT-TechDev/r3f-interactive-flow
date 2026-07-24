@@ -1,5 +1,5 @@
 import { cpSync, copyFileSync, existsSync, readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   PackedConsumerError,
@@ -8,6 +8,7 @@ import {
   assertNotUnderRepoNodeModules,
   assertRealInstalledCopy,
   createTempRoot,
+  packTarball,
   packageDir,
   readJsonFile,
   removeTempRoot,
@@ -43,6 +44,40 @@ function step(label, fn) {
       `Stage failed: ${label}\n${err instanceof Error ? err.message : String(err)}`
     );
   }
+}
+
+async function asyncStep(label, fn) {
+  try {
+    const value = await fn();
+    console.log(`✔ ${label}`);
+    return value;
+  } catch (err) {
+    throw new PackedConsumerError(
+      `Stage failed: ${label}\n${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+}
+
+function extractDiagnosticLines(diagnosticText) {
+  return diagnosticText
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => /error TS\d{4,5}:/.test(line));
+}
+
+function getRepositoryCheckoutCommit() {
+  if (process.env.GITHUB_SHA) {
+    return process.env.GITHUB_SHA;
+  }
+
+  const result = runCommand("git", ["rev-parse", "HEAD"], { cwd: repoRoot });
+
+  if (result.status === 0) {
+    return result.stdout.trim();
+  }
+
+  return "unavailable";
 }
 
 function validateFixtureContract() {
@@ -110,33 +145,6 @@ function validateFixtureContract() {
       `Negative fixture must import the private specifier "${EXPECTED_PRIVATE_SPECIFIER}".`
     );
   }
-}
-
-function packageTarball(tempRoot) {
-  const result = runCommand("npm", ["pack", "--json", "--pack-destination", tempRoot], {
-    cwd: packageDir
-  });
-
-  assertCommandSucceeded(result, "npm pack", `npm pack --json --pack-destination <temp-consumer>`);
-
-  let packInfo;
-  try {
-    packInfo = JSON.parse(result.stdout)[0];
-  } catch (err) {
-    throw new PackedConsumerError(
-      `Failed to parse "npm pack --json" output: ${err.message}\n${result.stdout}`
-    );
-  }
-
-  const tarballPath = join(tempRoot, packInfo.filename);
-
-  return {
-    tarballPath,
-    filename: packInfo.filename,
-    packageName: packInfo.name,
-    packageVersion: packInfo.version,
-    fileCount: Array.isArray(packInfo.files) ? packInfo.files.length : undefined
-  };
 }
 
 function createConsumer(tempRoot) {
@@ -218,6 +226,7 @@ function assertInstalledPeers(consumerDir, tempRoot) {
 }
 
 function runDependencyGraphCheck(consumerDir) {
+  const commandText = "npm ls --json --all";
   const result = runCommand("npm", ["ls", "--json", "--all"], { cwd: consumerDir });
 
   let parsed;
@@ -236,6 +245,8 @@ function runDependencyGraphCheck(consumerDir) {
       `"npm ls" reported an invalid dependency graph:\n${problems.join("\n")}`
     );
   }
+
+  assertCommandSucceeded(result, '"npm ls" dependency graph', commandText);
 
   return parsed;
 }
@@ -256,6 +267,31 @@ function runProductionBuild(consumerDir) {
 
   assertCommandSucceeded(result, "production Vite build", "vite build");
   return result;
+}
+
+function assertBrowserBuildArtifacts(consumerDir) {
+  const distDir = join(consumerDir, "dist");
+  const indexHtmlPath = join(distDir, "index.html");
+
+  if (!existsSync(indexHtmlPath)) {
+    throw new PackedConsumerError(`Expected generated "dist/index.html" under ${distDir}.`);
+  }
+
+  const assetsDir = join(distDir, "assets");
+  const jsAssetName = existsSync(assetsDir)
+    ? readdirSync(assetsDir).find((name) => name.endsWith(".js"))
+    : undefined;
+
+  if (!jsAssetName) {
+    throw new PackedConsumerError(
+      `Expected at least one generated JavaScript asset under ${assetsDir}.`
+    );
+  }
+
+  return {
+    indexHtmlRelative: "dist/index.html",
+    jsAssetRelative: `dist/assets/${jsAssetName}`
+  };
 }
 
 function runRuntimeBuild(consumerDir) {
@@ -345,7 +381,15 @@ function runPrivateSubpathCheck(consumerDir) {
     );
   }
 
-  return { exitCode: result.status, diagnosticText };
+  const diagnosticLines = extractDiagnosticLines(diagnosticText);
+
+  if (diagnosticLines.length !== 1) {
+    throw new PackedConsumerError(
+      `Expected exactly one TypeScript diagnostic line in the private-subpath check, found ${diagnosticLines.length}:\n${diagnosticText}`
+    );
+  }
+
+  return { exitCode: result.status, diagnosticLine: diagnosticLines[0] };
 }
 
 async function main() {
@@ -364,7 +408,7 @@ async function main() {
   const tempRoot = createTempRoot("r3f-packed-vite-consumer-");
 
   try {
-    const tarballInfo = step("pack tarball with npm pack", () => packageTarball(tempRoot));
+    const tarballInfo = step("pack tarball with npm pack", () => packTarball(packageDir, tempRoot));
 
     const consumerDir = step("create isolated consumer environment", () =>
       createConsumer(tempRoot)
@@ -390,13 +434,18 @@ async function main() {
 
     step("production Vite build", () => runProductionBuild(consumerDir));
 
+    const browserBuildArtifacts = step("assert generated browser build artifacts", () =>
+      assertBrowserBuildArtifacts(consumerDir)
+    );
+
     step("Vite runtime/SSR build", () => runRuntimeBuild(consumerDir));
 
     const runtimeEntryPath = step("locate generated runtime entry output", () =>
       locateRuntimeEntryOutput(consumerDir)
     );
+    const runtimeEntryRelative = relative(consumerDir, runtimeEntryPath);
 
-    await step("import and execute the Vite-produced runtime entry", () =>
+    await asyncStep("import and execute the Vite-produced runtime entry", () =>
       runRuntimeImportCheck(runtimeEntryPath)
     );
 
@@ -405,10 +454,14 @@ async function main() {
       () => runPrivateSubpathCheck(consumerDir)
     );
 
+    const repositoryCheckoutCommit = getRepositoryCheckoutCommit();
+
     console.log("\n--- Evidence summary ---");
     console.log("scenario: VITE-PACKED-CURRENT, VITE-PACKED-PRIVATE-REJECTION");
+    console.log(`repository checkout commit: ${repositoryCheckoutCommit}`);
     console.log(`source package: ${tarballInfo.packageName}@${tarballInfo.packageVersion}`);
     console.log(`tarball filename: ${tarballInfo.filename}`);
+    console.log(`tarball SHA-256: ${tarballInfo.sha256}`);
     console.log(`tarball packed file count: ${tarballInfo.fileCount}`);
     console.log("installed package classification: real tarball copy, no workspace resolution");
     console.log(
@@ -420,12 +473,16 @@ async function main() {
     }
     console.log("positive typecheck: PASSED");
     console.log("production build: PASSED");
-    console.log("runtime/SSR build + import execution: PASSED");
+    console.log(`browser build entry: ${browserBuildArtifacts.indexHtmlRelative}`);
+    console.log(`browser JS artifact: ${browserBuildArtifacts.jsAssetRelative}`);
+    console.log(`runtime entry: ${runtimeEntryRelative}`);
+    console.log("runtime entry execution: PASSED");
     console.log("dependency graph (npm ls): PASSED");
     console.log(`private path tested: ${EXPECTED_PRIVATE_SPECIFIER}`);
     console.log(
-      `expected diagnostic class: ${EXPECTED_DIAGNOSTIC_CODE} (observed, exit code ${negativeResult.exitCode})`
+      `expected diagnostic class: ${EXPECTED_DIAGNOSTIC_CODE} (exit code ${negativeResult.exitCode})`
     );
+    console.log(`negative diagnostic: ${negativeResult.diagnosticLine}`);
     console.log("final classification: VERIFIED");
   } finally {
     removeTempRoot(tempRoot);
