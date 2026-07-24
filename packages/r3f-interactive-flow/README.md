@@ -87,6 +87,106 @@ yarn add r3f-interactive-flow three @react-three/fiber react react-dom
 
 The package does not add Next.js, `@react-three/drei`, GSAP, Framer Motion, or any visual-effect library as a dependency.
 
+## Transition semantics
+
+This section is the complete public transition contract and stands on its own. It is validated against the v2.8.0 test suite (`createFlowMachine.transition-regressions.test.ts`, `FlowProvider.test.tsx`, `useFlowFrame.test.tsx`).
+
+### Initial snapshot
+
+On mount, the snapshot reports the configured `initialPhase` (or the first phase in `phases`), `progress: 0`, `direction: "none"`, and `isTransitioning: false`.
+
+### Accepted navigation start (positive duration)
+
+Immediately after an accepted `next()`, `prev()`, or different-phase `goTo()` with a positive `duration`:
+
+| Field                | Value                                                    |
+| -------------------- | -------------------------------------------------------- |
+| `phase`/`phaseIndex` | the accepted **target**, synchronously                   |
+| `progress`           | `0`                                                      |
+| `direction`          | `"next"` or `"prev"`, from target index vs. source index |
+| `isTransitioning`    | `true`                                                   |
+
+The **source** phase (the phase being left) selects `transition.byPhase` options for this transition, but the source phase itself is not exposed in the public snapshot — only the target `phase` is.
+
+### Active transition: easing and progress
+
+While a positive-duration transition runs, raw elapsed progress is derived from elapsed time and `duration`, and the configured easing function receives that raw progress. Ordinary finite easing output is clamped to `[0, 1]` and becomes public `progress`.
+
+- A non-monotonic or endpoint-producing custom easing function can make `progress` decrease, or reach `0` or `1`, before the transition actually finishes.
+- **Raw elapsed time — not the eased `progress` value — decides completion.** Reaching `progress === 1` does not by itself prove the transition is done.
+- `direction` and `isTransitioning` both stay unchanged until raw completion.
+
+Use `isTransitioning` as the lifecycle signal, not `progress === 1` alone. Non-finite (`NaN`, `Infinity`) easing return values are not part of the stable contract — treat them as an incidental implementation detail, not something to rely on.
+
+### Completion
+
+At raw completion: `progress` is forced to `1`, `direction` becomes `"none"`, `isTransitioning` becomes `false`, and provider cooldown begins (if configured). The completed snapshot stays stable through cooldown-only time — nothing mutates it again until the next accepted navigation.
+
+### Adjacent and non-adjacent `goTo()`
+
+`next()`/`prev()` move exactly one phase index. `goTo(target)` navigates directly to any known phase, forward or backward, in **one** transition:
+
+```text
+phases: ["intro", "overview", "detail", "contact"]
+current: "intro" (index 0)
+goTo("contact") -> target "contact" (index 3), direction "next"
+```
+
+Intermediate phases (`"overview"`, `"detail"`) are neither visited nor queued. `transition.byPhase` resolves from the source phase for both adjacent and non-adjacent navigation. There is no route-pair configuration, graph, queue, or timeline — one direct transition per accepted call.
+
+### Rejection and errors
+
+| Request                            | Blocking condition          | Result                  |
+| ---------------------------------- | --------------------------- | ----------------------- |
+| `next`/`prev`                      | out of bounds               | rejected, no mutation   |
+| `goTo(known target)`               | same as current phase       | rejected, no mutation   |
+| `next`/`prev`/`goTo(known target)` | manual lock active          | rejected, no mutation   |
+| `next`/`prev`/`goTo(known target)` | active transition           | rejected, no mutation   |
+| `next`/`prev`/`goTo(known target)` | provider cooldown remaining | rejected, no mutation   |
+| `goTo(unknown target)`             | any state                   | **throws**, no mutation |
+
+An unknown `goTo()` target throws before the normal lock/transition/cooldown rejection path — this happens even while locked, transitioning, or in cooldown. With a properly typed closed phase union (an `as const` phase tuple), ordinary application code cannot construct an unknown target; an unsafe cast or an unvalidated dynamic string is what reaches this path. Known targets never throw — they are rejected as a safe no-op instead.
+
+### Transition option precedence
+
+Each option field resolves independently, in this order:
+
+1. `transition.byPhase[sourcePhase].field`
+2. `transition.field`
+3. legacy top-level field (`transitionDurationMs`, `cooldownMs`, `easing` prop)
+4. package default
+
+Defaults: `duration: 1000`, `cooldown: 0`, `easing`: linear.
+
+A `byPhase` override for one field (say, `duration`) does not replace the other fields (`cooldown`, `easing`) — each field falls back through the precedence chain independently. `byPhase` selects by **source** phase only; it does not select by target phase or by a source/target pair.
+
+### Zero-duration transitions
+
+An accepted transition with `duration: 0` completes synchronously in the same call: `phase`/`phaseIndex` update immediately, `progress` is `1` immediately, `direction` is `"none"` immediately, and `isTransitioning` stays `false` — there is no observable active-transition frame. Provider cooldown (if configured) starts immediately.
+
+### Manual lock and cooldown composition
+
+- **Manual lock** (`lock()`/`unlock()`) blocks new valid navigation. It does not pause, cancel, or slow an active transition, and it does not pause provider cooldown. It is a navigation gate, not a clock pause.
+- **Provider cooldown** belongs to the provider-owned flow machine. It starts once a transition completes (including synchronous zero-duration completion) and rejects manual controls and all input hooks globally until it elapses. It continues to run while manual lock is active. It is not exposed as a remaining-time value.
+- **Hook-local cooldown** belongs only to one `useWheelInput`/`useTouchInput`/`useKeyboardInput` instance. It starts only after that hook produces an accepted navigation and throttles only that hook — it does not lock the machine and does not block direct `next`/`prev`/`goTo` calls or other hook instances when provider state is otherwise ready.
+
+### React and R3F sampling
+
+One `FlowProvider` owns one flow machine and its transition clock for its mounted lifetime. `useFlow` and `useFlowProgress` are the public React/DOM observation surface; `useFlowFrame` (Canvas-bound) is a read-only R3F observer that samples the same machine every frame without advancing it. Multiple React and R3F consumers observe the same provider-owned flow, but React commits and R3F frames run on separate scheduling paths — they are not guaranteed to read the exact same `progress` at the exact same instant.
+
+### Source and target metadata
+
+r3f-interactive-flow intentionally does not add `sourcePhase`, `targetPhase`, or `previousPhase` to `FlowSnapshot`, `FlowControls`, or `FlowFrameState`. Evaluation found no genuine missing capability: `phase` already reports the accepted target immediately, and `direction` reports forward/reverse for positive-duration transitions.
+
+When application code needs the phase a transition left from:
+
+1. Retain the previously observed public `phase` in a ref or state.
+2. On render (or frame), compare it against the current public `phase`.
+3. When the phase has actually changed, the retained value is the source and the new `phase` is the target; then update the retained value.
+4. For a positive-duration transition, use the current `direction` directly. For a zero-duration transition (where `direction` is already `"none"` in the same call), derive direction by comparing the source and target phase indexes instead.
+
+Rejected and same-phase requests never mutate the public `phase`, so this derivation never records a false trace. This pattern is application code built on public `useFlow`/`useFlowFrame` output — it is not a package API, and no such field is planned.
+
 ## Minimal setup
 
 Define phases as a stable const tuple, wrap the shared DOM and Canvas subtree with `FlowProvider`, and consume flow state from hooks under the provider.

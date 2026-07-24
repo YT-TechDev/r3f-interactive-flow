@@ -108,10 +108,18 @@ You move between phases with three controls from `useFlow`:
 - `prev()` steps back to the previous phase.
 - `goTo(target)` jumps directly to a named phase.
 
-All three are safe to call unconditionally. A call is ignored when it is out of
-bounds (`next` on the last phase, `prev` on the first), or when it is blocked by
-an active transition, a lock, or a cooldown. Controls never throw and never move
-you somewhere unexpected, so you can wire them straight to buttons or input.
+`next()` and `prev()` always reject safely at the tuple's boundaries — calling
+`next()` on the last phase or `prev()` on the first is a no-op, never a throw.
+A `goTo()` call with a **known** phase (any value from your `as const` tuple)
+is also always safe: it is rejected as a no-op, with no snapshot mutation,
+when it targets the current phase or is blocked by an active transition, a
+lock, or a cooldown. A `goTo()` call with an **unknown** target — a phase name
+outside `phases` — throws instead of rejecting, and it throws before the
+normal lock/transition/cooldown check even runs. With a properly typed closed
+phase union, ordinary application code never constructs an unknown target;
+only an unsafe cast or an unvalidated dynamic string reaches that throw. See
+[Navigation rejection and errors](#navigation-rejection-and-errors) for the
+full matrix.
 
 ## Direction
 
@@ -128,6 +136,77 @@ forward or backward through the phases?" — nothing more. Your scene code can u
 it to decide how to interpret progress, but the library assigns it no visual
 meaning of its own.
 
+## Adjacent and non-adjacent navigation
+
+`next()` and `prev()` move exactly one phase index. `goTo(target)` can jump to
+**any** known phase, not just an adjacent one — forward or backward through the
+tuple:
+
+```tsx
+const phases = ["intro", "overview", "detail", "contact"] as const;
+// current: "intro" (index 0)
+goTo("contact"); // target "contact" (index 3), direction "next"
+```
+
+A non-adjacent `goTo()` still performs exactly **one** transition straight to
+the target. The phases in between (`"overview"`, `"detail"`) are not visited
+and not queued — there is no route-pair configuration, graph, or timeline
+behind `goTo()`. `direction` is based on the target index relative to the
+source index, the same way it is for `next()`/`prev()`. `transition.byPhase`
+resolves from the **source** phase for both adjacent and non-adjacent
+navigation — see [Transition options and `byPhase`](#transition-options-and-byphase).
+
+## Transition options and `byPhase`
+
+`duration`, `cooldown`, and `easing` configure how a transition runs. Each
+field resolves independently, falling back through this precedence:
+
+1. `transition.byPhase[sourcePhase].field`
+2. `transition.field`
+3. legacy top-level prop (`transitionDurationMs`, `cooldownMs`, `easing`)
+4. package default (`duration: 1000`, `cooldown: 0`, linear `easing`)
+
+```tsx
+<FlowProvider
+  phases={phases}
+  transition={{
+    duration: 700,
+    cooldown: 200,
+    byPhase: {
+      intro: { duration: 1200 }
+    }
+  }}
+>
+  {/* ... */}
+</FlowProvider>
+```
+
+Here, leaving `"intro"` uses `duration: 1200` but still falls back to the
+transition-level `cooldown: 200` and the default easing — a `byPhase` override
+for one field does not replace the other fields. `byPhase` is keyed by the
+**source** phase (the phase you are transitioning away from), and it resolves
+the same way for adjacent and non-adjacent `goTo()` navigation. There is no way
+to select options by target phase or by a source/target pair.
+
+## Navigation rejection and errors
+
+| Request                             | Blocking condition          | Result                  |
+| ----------------------------------- | --------------------------- | ----------------------- |
+| `next()` / `prev()`                 | out of bounds               | rejected, no mutation   |
+| `goTo(knownTarget)`                 | same as current phase       | rejected, no mutation   |
+| `next()` / `prev()` / `goTo(known)` | manual lock active          | rejected, no mutation   |
+| `next()` / `prev()` / `goTo(known)` | active transition           | rejected, no mutation   |
+| `next()` / `prev()` / `goTo(known)` | provider cooldown remaining | rejected, no mutation   |
+| `goTo(unknownTarget)`               | any state                   | **throws**, no mutation |
+
+A rejected call never mutates the snapshot — `phase`, `progress`, and
+`direction` are exactly what they were before the call. An unknown `goTo()`
+target throws _before_ the lock/transition/cooldown checks run, so it throws
+even while locked, mid-transition, or in cooldown. A closed `as const` phase
+union is what keeps ordinary application code out of that throwing path in the
+first place; treat it as a programmer-error guard, not a runtime condition your
+UI needs to branch on.
+
 ## Transition progress
 
 A move between phases is not instantaneous. While it runs, `progress` reports how
@@ -141,6 +220,14 @@ far along the transition is as a **normalized value from `0` to `1`**:
 tied to any particular easing curve — it is a normalized position within the
 current transition that you are free to map onto anything: an opacity, a
 rotation, a progress bar, a scroll indicator.
+
+Public `progress` is the configured easing function's output, applied to the
+transition's raw elapsed time. For ordinary finite easing this stays within
+`[0, 1]`, but a non-monotonic or endpoint-producing custom easing function can
+make `progress` decrease, or reach `0` or `1`, before the transition has
+actually finished — **raw elapsed time, not eased `progress`, decides
+completion.** Do not treat `progress === 1` alone as proof a transition is
+done; use `isTransitioning` for that (see [Transition state](#transition-state)).
 
 For DOM/UI, read it with `useFlowProgress`. While a transition runs, the provider
 advances its single clock once per animation frame and updates the React snapshot
@@ -183,6 +270,14 @@ form the full transition snapshot. When `isTransitioning` is `false`, `direction
 is `"none"` and `progress` rests at a settled value; when it is `true`,
 `direction` and `progress` describe the move that is underway.
 
+During an active transition, `phase` and `phaseIndex` already identify the
+**target** you are moving to, not the phase you started from — the package
+does not expose a public source-phase field while a transition runs. At raw
+completion, `direction` resets to `"none"` and `isTransitioning` becomes
+`false` in the same update. Because eased `progress` can reach `1` before raw
+completion, `isTransitioning` — not `progress === 1` — is the reliable signal
+that a transition has actually finished.
+
 ## Locking and cooldown
 
 Both locking and cooldown exist for the same reason: to keep navigation
@@ -215,8 +310,13 @@ which new navigation is ignored. It absorbs rapid repeated triggers — a fast
 scroll, a held key, a double tap — so a single intent produces a single phase
 change. Provider transition cooldown starts at the transition completion
 boundary, runs for the complete configured duration after that boundary, and
-applies globally to manual controls and all input hooks. Input hook cooldown is
-separate: it starts only after that hook produces an accepted input navigation.
+applies globally to manual controls and all input hooks. Provider cooldown is
+a single machine-wide gate — it blocks every control and every input hook, not
+just the one that triggered it. Hook-local cooldown is a separate, narrower
+mechanism: it belongs to one `useWheelInput`/`useTouchInput`/`useKeyboardInput`
+instance, starts only after that hook produces an accepted input navigation,
+and throttles only that hook — it does not lock the machine and does not block
+direct `next`/`prev`/`goTo` calls or other hook instances.
 
 ```tsx
 <FlowProvider phases={phases} transition={{ duration: 700, cooldown: 250 }}>
@@ -230,8 +330,12 @@ manages for you. Active positive-duration transitions also reject `next`,
 `prev`, and `goTo`; there is no `lockDuringTransition` option in the current v2
 API. A transition duration of `0` is supported as an immediate transition:
 `progress` is `1`, `isTransitioning` is `false`, and any provider cooldown starts
-immediately after that synchronous completion. Neither locking nor cooldown
-bypasses the machine — they just decide when a navigation call is accepted.
+immediately after that synchronous completion.
+
+Locking is purely a navigation gate: it never pauses, slows, or cancels an
+active transition, and it never pauses provider cooldown — both keep running
+on their own clock while locked. Locking and cooldown only decide whether a
+_new_ navigation call is accepted; they do not alter time already in progress.
 
 ## React state vs frame updates
 
@@ -291,6 +395,40 @@ All three live under one `FlowProvider` and observe one shared machine.
 `useFlow` and `useFlowProgress` belong to the React/DOM side; `useFlowFrame`
 belongs to the frame-updated Canvas side. Choosing the right hook for each job is
 what keeps the React/R3F split clean.
+
+## Application-owned previous-phase tracking
+
+The package does not add `sourcePhase`, `targetPhase`, or `previousPhase` to
+the public snapshot — evaluation found no case that the current API and
+ordinary React state cannot already handle. When your app needs the phase a
+transition left from, derive it yourself:
+
+```tsx
+function usePhaseTrace(phase: Phase): { source: Phase | null; target: Phase } {
+  const previousRef = useRef<Phase | null>(null);
+  const sourceRef = useRef<Phase | null>(null);
+
+  if (previousRef.current !== phase) {
+    sourceRef.current = previousRef.current;
+    previousRef.current = phase;
+  }
+
+  return { source: sourceRef.current, target: phase };
+}
+```
+
+- Retain the previously observed public `phase` and compare it on each render.
+- When `phase` has actually changed, the retained value is the **source** and
+  the new `phase` is the **target**.
+- Use `direction` directly for a positive-duration transition; for a
+  zero-duration transition, `direction` is already `"none"` in the same call,
+  so derive direction by comparing the source and target phase indexes
+  instead.
+- Rejected and same-phase requests never mutate `phase`, so this derivation
+  never records a false trace.
+
+This is application code built on public `useFlow` output, not a package API —
+no such field is planned for a future release.
 
 ## Next steps
 
