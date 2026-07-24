@@ -246,14 +246,20 @@ function assertInstalledFromTarball(consumerDir, tmpDir) {
   return installedDir;
 }
 
+// Anchored directive-prologue check: leading whitespace is allowed, but no comment,
+// import, or other statement may precede the "use client" directive.
+const USE_CLIENT_DIRECTIVE_PATTERN = /^(["'])use client\1;?/;
+
 function assertUseClientDirective(installedDir) {
   for (const relativePath of ["dist/index.js", "dist/index.cjs"]) {
     const filePath = join(installedDir, relativePath);
     const firstChunk = readFileSync(filePath, "utf8").slice(0, 300);
+    const trimmed = firstChunk.replace(/^\s+/, "");
 
-    if (!firstChunk.includes('"use client"') && !firstChunk.includes("'use client'")) {
+    if (!USE_CLIENT_DIRECTIVE_PATTERN.test(trimmed)) {
       throw new SmokeTestError(
-        `Installed "${relativePath}" does not include "use client" near the top.`
+        `Installed "${relativePath}" does not begin with a "use client" directive prologue ` +
+          "(leading whitespace is allowed, but no comment, import, or other statement may precede it)."
       );
     }
   }
