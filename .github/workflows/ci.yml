@@ -50,6 +50,9 @@ jobs:
       - name: Supported peer compatibility
         run: pnpm package:compat
 
+      - name: Packed Vite consumer
+        run: pnpm consumer:packed:vite:verify
+
       - name: Typecheck
         run: pnpm typecheck
 
