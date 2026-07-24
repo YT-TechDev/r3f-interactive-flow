@@ -330,10 +330,21 @@ describe("public API", () => {
     const options: FlowTransitionOptions<"intro" | "work"> = {
       ...baseOptions,
       byPhase: {
-        intro: { duration: 1600 }
+        intro: { duration: 1600 },
+        work: { cooldown: 800 }
       }
     };
 
     expect(options.byPhase?.intro?.duration).toBe(1600);
+    expect(options.byPhase?.work?.cooldown).toBe(800);
+
+    const optionsWithUnknownPhase: FlowTransitionOptions<"intro" | "work"> = {
+      byPhase: {
+        intro: { duration: 1600 },
+        // @ts-expect-error "missing" is not part of the closed "intro" | "work" phase union.
+        missing: { duration: 100 }
+      }
+    };
+    void optionsWithUnknownPhase;
   });
 });
