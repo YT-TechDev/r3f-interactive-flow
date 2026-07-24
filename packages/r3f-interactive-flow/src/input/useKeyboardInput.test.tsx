@@ -1192,6 +1192,62 @@ describe("useKeyboardInput", () => {
     vi.useRealTimers();
   });
 
+  it("keeps hook-local cooldown from locking the machine: direct public controls navigate while only the keyboard hook is throttled", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let machine: FlowMachine<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <KeyboardInputProbe options={{ cooldown: 500 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe onRender={(renderedMachine) => (machine = renderedMachine)} />
+      </>,
+      undefined,
+      { transitionDurationMs: 0, cooldownMs: 0 }
+    );
+
+    // First keyboard event is accepted.
+    const accepted = dispatchKeyDown("ArrowDown");
+    expect(accepted.defaultPrevented).toBe(true);
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      progress: 1,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+    // The machine is immediately idle: zero-duration transition, zero provider cooldown.
+    expect(machine?.isSettling).toBe(false);
+
+    // Direct public controls still navigate while hook-local cooldown remains,
+    // proving hook-local cooldown does not lock the machine itself.
+    act(() => {
+      latestControls?.prev();
+    });
+    expect(latestControls).toMatchObject({ phase: "intro", isTransitioning: false });
+
+    // A valid keyboard event during hook-local cooldown is rejected without calling preventDefault.
+    vi.advanceTimersByTime(100);
+    const throttledEvent = dispatchKeyDown("ArrowDown");
+    expect(throttledEvent.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("intro");
+
+    // After the exact hook-local cooldown boundary (500ms since the first accepted keyboard event), keyboard navigation is accepted again.
+    vi.advanceTimersByTime(400);
+    const resumedEvent = dispatchKeyDown("ArrowDown");
+    expect(resumedEvent.defaultPrevented).toBe(true);
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      progress: 1,
+      direction: "none",
+      isTransitioning: false
+    });
+
+    vi.useRealTimers();
+  });
+
   it("does not consume hook-local cooldown for locked, repeated, or typing-target key events", () => {
     vi.useFakeTimers();
     vi.setSystemTime(0);

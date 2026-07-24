@@ -745,10 +745,15 @@ describe("createFlowMachine transition regressions", () => {
     single.next();
     multiple.next();
     expect(single.getSnapshot()).toEqual(multiple.getSnapshot());
+    expect(single.isSettling).toBe(multiple.isSettling);
 
     single.update(150);
     multiple.update(100);
     multiple.update(50);
+    expect(single.getSnapshot()).toEqual(multiple.getSnapshot());
+    expect(single.isSettling).toBe(multiple.isSettling);
+    expect(single.isSettling).toBe(false);
+
     single.next();
     multiple.next();
     expect(single.getSnapshot()).toEqual(multiple.getSnapshot());
@@ -762,18 +767,28 @@ describe("createFlowMachine transition regressions", () => {
     });
 
     positiveCooldown.next();
-    expect(positiveCooldown.getSnapshot()).toEqual({
+
+    const acceptedZeroDurationSnapshot = {
       phase: "work",
       phaseIndex: 1,
       progress: 1,
       direction: "none",
       isTransitioning: false,
       isLocked: false
-    });
+    };
+
+    expect(positiveCooldown.getSnapshot()).toEqual(acceptedZeroDurationSnapshot);
     expect(positiveCooldown.isSettling).toBe(true);
+
+    // Rejected navigation up to the exact cooldown boundary must not mutate the snapshot.
+    positiveCooldown.update(299);
     positiveCooldown.next();
-    expect(positiveCooldown.phase).toBe("work");
-    positiveCooldown.update(300);
+    expect(positiveCooldown.getSnapshot()).toEqual(acceptedZeroDurationSnapshot);
+    expect(positiveCooldown.isSettling).toBe(true);
+
+    // The same navigation is accepted at the exact cooldown boundary, and isSettling clears.
+    positiveCooldown.update(1);
+    expect(positiveCooldown.isSettling).toBe(false);
     positiveCooldown.next();
     expect(positiveCooldown.phase).toBe("contact");
 
@@ -944,6 +959,209 @@ describe("createFlowMachine transition regressions", () => {
       phase: "intro",
       direction: "prev",
       isTransitioning: true
+    });
+  });
+
+  it("locks the exact custom monotonic easing lifecycle from accepted start through raw completion", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work"] as const,
+      transitionDurationMs: 1000,
+      easing: (progress) => progress * progress
+    });
+
+    expect(machine.getSnapshot()).toEqual({
+      phase: "intro",
+      phaseIndex: 0,
+      progress: 0,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+
+    machine.next();
+
+    expect(machine.getSnapshot()).toEqual({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false
+    });
+
+    // raw progress 0.5, quadratic easing: 0.5 * 0.5 = 0.25.
+    machine.update(500);
+
+    expect(machine.getSnapshot()).toEqual({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 0.25,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false
+    });
+
+    // Raw completion forces progress to 1 regardless of the easing curve.
+    machine.update(500);
+
+    expect(machine.getSnapshot()).toEqual({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 1,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+  });
+
+  it("follows finite non-monotonic easing output, including a mid-transition decrease, until raw completion forces progress to 1", () => {
+    // Deterministic finite easing whose output decreases between two increasing
+    // raw progress samples (0.25 -> 0.6, 0.5 -> 0.2), while staying within [0, 1].
+    const nonMonotonicEasing = (progress: number): number => {
+      if (progress < 0.5) {
+        return 0.6;
+      }
+
+      if (progress < 1) {
+        return 0.2;
+      }
+
+      return 1;
+    };
+
+    const machine = createFlowMachine({
+      phases: ["intro", "work"] as const,
+      transitionDurationMs: 1000,
+      easing: nonMonotonicEasing
+    });
+
+    machine.next();
+
+    // raw progress 0.25 -> eased 0.6.
+    machine.update(250);
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "work",
+      progress: 0.6,
+      direction: "next",
+      isTransitioning: true
+    });
+
+    // raw progress 0.75 -> eased 0.2, a decrease from the prior sample.
+    machine.update(500);
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "work",
+      progress: 0.2,
+      direction: "next",
+      isTransitioning: true
+    });
+
+    // Raw completion still forces progress to 1 and ends the transition.
+    machine.update(250);
+
+    expect(machine.getSnapshot()).toEqual({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 1,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+  });
+
+  it("keeps provider cooldown elapsing and the completed snapshot stable when manually locked during cooldown, accepting navigation only once both unlocked and cooldown-complete", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transition: { duration: 100, cooldown: 300 }
+    });
+
+    machine.next();
+    machine.update(100);
+
+    const completedSnapshot = machine.getSnapshot();
+
+    expect(completedSnapshot).toEqual({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 1,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
+
+    // Lock while provider cooldown is still counting down.
+    machine.lock();
+
+    expect(machine.getSnapshot()).toEqual({ ...completedSnapshot, isLocked: true });
+    expect(machine.isSettling).toBe(true);
+
+    // Cooldown keeps elapsing while locked; the rest of the snapshot stays stable.
+    machine.update(200);
+
+    expect(machine.getSnapshot()).toEqual({ ...completedSnapshot, isLocked: true });
+    expect(machine.isSettling).toBe(true);
+
+    // Unlocking before the cooldown boundary does not permit navigation yet.
+    machine.unlock();
+    machine.update(99);
+    machine.next();
+
+    expect(machine.getSnapshot()).toEqual(completedSnapshot);
+    expect(machine.isSettling).toBe(true);
+
+    // Navigation is accepted only once both the manual lock is cleared and
+    // provider cooldown has completed.
+    machine.update(1);
+    expect(machine.isSettling).toBe(false);
+    machine.next();
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "contact",
+      phaseIndex: 2,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false
+    });
+  });
+
+  it("keeps navigation rejected when the manual lock is re-applied and never cleared through the cooldown boundary", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transition: { duration: 100, cooldown: 300 }
+    });
+
+    machine.next();
+    machine.update(100);
+    machine.lock();
+    machine.update(300);
+
+    const lockedAfterCooldownSnapshot = machine.getSnapshot();
+
+    expect(lockedAfterCooldownSnapshot).toMatchObject({
+      phase: "work",
+      progress: 1,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: true
+    });
+    expect(machine.isSettling).toBe(false);
+
+    machine.next();
+
+    expect(machine.getSnapshot()).toEqual(lockedAfterCooldownSnapshot);
+
+    machine.unlock();
+    machine.next();
+
+    expect(machine.getSnapshot()).toMatchObject({
+      phase: "contact",
+      phaseIndex: 2,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false
     });
   });
 });

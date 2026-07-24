@@ -1535,6 +1535,106 @@ describe("FlowProvider provider-owned transition clock", () => {
     });
   });
 
+  it("locks during an active provider-clocked transition, keeps completed cooldown-only frames stable while locked, and only accepts navigation once unlocked past the exact cooldown boundary", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(<ControlsProbe onRender={(controls) => (latestControls = controls)} />, undefined, {
+      transition: { duration: 100, cooldown: 300 }
+    });
+
+    // Accept navigation through public controls, then lock during the active transition.
+    act(() => {
+      latestControls?.next();
+    });
+    act(() => {
+      latestControls?.lock();
+    });
+
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      progress: 0,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: true
+    });
+
+    // First RAF timestamp establishes the zero-delta baseline.
+    advanceClock(16);
+
+    // Advance to intermediate progress: lock does not pause the provider clock.
+    advanceClock(50);
+
+    expect(latestControls).toMatchObject({
+      phase: "work",
+      progress: 0.5,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: true
+    });
+
+    // Advance to exact raw completion: completion still occurs while locked.
+    advanceClock(50);
+
+    const completedLockedSnapshot = getRenderedSnapshot();
+
+    expect(completedLockedSnapshot).toEqual({
+      phase: "work",
+      phaseIndex: 1,
+      progress: 1,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: true
+    });
+
+    // Cooldown-only frames while locked must not mutate the completed snapshot.
+    advanceClock(150);
+
+    expect(getRenderedSnapshot()).toEqual(completedLockedSnapshot);
+    expect(pendingFrameCount()).toBe(1);
+
+    // Unlock before the cooldown boundary: navigation still stays rejected.
+    act(() => {
+      latestControls?.unlock();
+    });
+
+    const unlockedStillCoolingSnapshot = { ...completedLockedSnapshot, isLocked: false };
+
+    expect(getRenderedSnapshot()).toEqual(unlockedStillCoolingSnapshot);
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    expect(getRenderedSnapshot()).toEqual(unlockedStillCoolingSnapshot);
+
+    advanceClock(149);
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    expect(getRenderedSnapshot()).toEqual(unlockedStillCoolingSnapshot);
+    expect(pendingFrameCount()).toBe(1);
+
+    // Advance to the exact cooldown boundary: navigation is now accepted.
+    advanceClock(1);
+
+    expect(pendingFrameCount()).toBe(0);
+
+    act(() => {
+      latestControls?.next();
+    });
+
+    expect(getRenderedSnapshot()).toEqual({
+      phase: "contact",
+      phaseIndex: 2,
+      progress: 0,
+      direction: "next",
+      isTransitioning: true,
+      isLocked: false
+    });
+  });
+
   it("keeps two React consumers aligned on the full public snapshot through accepted start, intermediate progress, and completion", () => {
     const toSnapshot = (controls: FlowControls<TestPhase>): RenderedSnapshot => ({
       phase: controls.phase,
