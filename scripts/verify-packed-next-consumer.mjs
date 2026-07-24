@@ -206,21 +206,17 @@ function copyTarballIntoConsumer(consumerDir, tarballPath) {
 }
 
 function installConsumerDependencies(consumerDir) {
-  let result = runCommand("npm", ["install", "--no-audit", "--no-fund", "--ignore-scripts"], {
+  const result = runCommand("npm", ["install", "--no-audit", "--no-fund", "--ignore-scripts"], {
     cwd: consumerDir
   });
 
-  if (result.status === 0) {
-    return { result, ignoredScripts: true };
-  }
+  assertCommandSucceeded(
+    result,
+    "npm install",
+    "npm install --no-audit --no-fund --ignore-scripts"
+  );
 
-  const fallback = runCommand("npm", ["install", "--no-audit", "--no-fund"], {
-    cwd: consumerDir
-  });
-
-  assertCommandSucceeded(fallback, "npm install", "npm install --no-audit --no-fund");
-
-  return { result: fallback, ignoredScripts: false };
+  return result;
 }
 
 function assertInstalledPackage(consumerDir, tempRoot, expectedVersion) {
@@ -329,9 +325,9 @@ function assertInstalledClientDirective(installedDir) {
   for (const relativePath of ["dist/index.js", "dist/index.cjs"]) {
     const firstChunk = readFileSync(join(installedDir, relativePath), "utf8").slice(0, 300);
 
-    if (!firstChunk.includes('"use client"') && !firstChunk.includes("'use client'")) {
+    if (!startsWithUseClientDirective(firstChunk)) {
       throw new PackedConsumerError(
-        `Installed "${relativePath}" does not include "use client" near the top.`
+        `Installed "${relativePath}" does not begin with the "use client" directive.`
       );
     }
 
@@ -463,7 +459,7 @@ async function main() {
       copyTarballIntoConsumer(consumerDir, tarballInfo.tarballPath)
     );
 
-    const installOutcome = step("install fixture dependencies from the packed tarball", () =>
+    step("install fixture dependencies from the packed tarball", () =>
       installConsumerDependencies(consumerDir)
     );
 
@@ -508,9 +504,7 @@ async function main() {
     for (const [name, version] of Object.entries(EXPECTED_VERSIONS)) {
       console.log(`  ${name}@${version}`);
     }
-    console.log(
-      `install lifecycle scripts: ${installOutcome.ignoredScripts ? "ignored (--ignore-scripts)" : "enabled (public Next.js toolchain requirement)"}`
-    );
+    console.log("install lifecycle scripts: ignored (--ignore-scripts)");
     console.log("Server Component boundary: app/page.tsx (no package import, no hook)");
     console.log(
       "Client Component boundary: app/flow-client.tsx (FlowProvider, useFlow, useFlowProgress)"
