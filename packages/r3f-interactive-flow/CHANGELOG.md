@@ -1,5 +1,90 @@
 # r3f-interactive-flow
 
+## 2.8.0
+
+`r3f-interactive-flow@2.8.0` is a transition-contract completeness minor
+release. It validates and documents the existing transition lifecycle, records
+an evidence-backed no-change decision for source/target transition metadata,
+and aligns user-facing documentation with the confirmed runtime contract,
+while preserving the stable v2 runtime, public API, package exports,
+dependencies, and peer dependency ranges.
+
+### Validated transition contract
+
+- Accepted `next()`, `prev()`, and `goTo()` navigation with positive duration
+  updates `phase` and `phaseIndex` to the target synchronously, resets
+  `progress` to `0`, and derives `direction` from source versus target index.
+- `progress`, `direction`, and `isTransitioning` follow a deterministic
+  lifecycle from accepted navigation through raw completion.
+- Raw elapsed progress, not eased public progress, decides transition
+  completion; eased output reaching `0` or `1` early does not end the
+  transition or reset lifecycle state.
+- Finite custom easing output is clamped through the existing `clamp01`
+  behavior before becoming public `progress`; non-finite and non-monotonic
+  easing output remain incidental implementation detail, not a stable
+  contract.
+- Zero-duration transitions complete synchronously in the same call: target
+  phase and index update, `progress` becomes `1`, `direction` returns to
+  `"none"`, and `isTransitioning` remains `false`.
+- An oversized delta consumes remaining transition time first, then applies
+  the leftover delta to provider cooldown.
+- Manual lock composition is independent from transition and cooldown state:
+  it blocks new valid navigation without pausing an active transition or
+  cooldown.
+- The provider owns the only machine-advancing clock; `useFlowFrame` remains
+  read-only and never advances the machine. React and R3F sampling are
+  separate paths over the same provider-owned machine.
+- Provider cooldown and hook-local input cooldowns remain separate concerns
+  and are not conflated.
+
+### Direct navigation and transition options
+
+- Forward and reverse non-adjacent `goTo()` resolve in one direct transition
+  with direction derived from relative indexes; intermediate phases are not
+  visited or queued.
+- `transition.byPhase` resolves from the source phase for adjacent and
+  non-adjacent navigation, with independent per-field fallback:
+  `byPhase -> transition global -> legacy top-level -> default`.
+- Same-phase requests and known rejected navigation (boundary, locked,
+  transitioning, or cooldown) remain mutation-free no-ops.
+- Unknown `goTo()` targets throw before the normal rejection path, including
+  while locked, transitioning, or in cooldown.
+
+### Metadata decision and documentation
+
+- Recorded the evidence-backed decision not to add `sourcePhase`,
+  `targetPhase`, or `previousPhase` to `FlowSnapshot`, `FlowControls`, or
+  `FlowFrameState` in v2.8.0. Application-owned previous-phase tracking,
+  built from the existing public API, is sufficient for the demonstrated
+  non-adjacent scenarios. Future reconsideration requires a separately
+  approved, evidence-backed Issue.
+- Aligned the root README, the distributed package README, the core-concepts
+  guide, the R3F usage guide, and the common-mistakes guide with the
+  confirmed transition contract, including the React Effect-owned committed
+  observation pattern, R3F frame-local ref observation, and the
+  zero-duration completion-observation caveat.
+
+### Maintenance
+
+- Pinned `actions/checkout` to `7.0.1` in CI and release workflows.
+- Updated root and example development-tool dependencies (patch/minor) with
+  an associated root lockfile update. These are development tooling changes
+  only and do not affect the distributed package's runtime dependencies.
+
+### Compatibility
+
+- No runtime source changes are included in the v2.8.0 milestone work.
+- No public API additions or removals are included.
+- No public TypeScript production-type changes are included.
+- No package export or package-subpath changes are included.
+- No runtime dependency additions are included.
+- No peer dependency range changes are included.
+- The root-only package boundary remains unchanged.
+- No migration is required for existing v2 consumers.
+- No source/target metadata fields, accepted-navigation callbacks, lifecycle
+  event emitters, transition queues, route pairs, graphs, timelines, router
+  integration, or visual interpolation abstraction was added.
+
 ## 2.7.0
 
 `r3f-interactive-flow@2.7.0` is an accessibility-responsibility,
