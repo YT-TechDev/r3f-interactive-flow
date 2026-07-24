@@ -11,6 +11,185 @@ and [Core concepts](./core-concepts.md). For more placement details, see
 [React Three Fiber usage](./r3f-usage.md), [Input handling](./input-handling.md),
 and [Next.js usage](./nextjs-usage.md).
 
+## Treating `phase` as the source during a transition
+
+An accepted `next()`, `prev()`, or `goTo()` updates `phase` to the **target**
+immediately — before any transition frame has run. There is no point during an
+active transition where `phase` still reports where you came from; the package
+exposes no public source-phase field.
+
+### Mistake
+
+```tsx
+useFlowFrame<Phase>(({ phase, isTransitioning }) => {
+  if (isTransitioning) {
+    console.log("leaving", phase); // wrong: phase is already the target
+  }
+});
+```
+
+### Better
+
+Track the previously observed phase yourself if you need the source — see
+[Expecting source/target metadata from the package](#expecting-sourcetarget-metadata-from-the-package)
+below.
+
+## Treating `progress === 1` as the only completion signal
+
+Public `progress` is the configured easing function's output. A non-monotonic
+or endpoint-producing custom easing function can make `progress` reach `1`
+before the transition has actually completed — raw elapsed time, not eased
+`progress`, decides completion.
+
+### Mistake
+
+```tsx
+useFlowFrame<Phase>(({ progress }) => {
+  if (progress === 1) {
+    onTransitionDone(); // may fire early with a custom easing function
+  }
+});
+```
+
+### Better
+
+`isTransitioning` is the reliable lifecycle state, but a completion callback
+needs the `true -> false` edge, not just `!isTransitioning`. Checking only
+`!isTransitioning` is not enough because the machine is also `false` before
+any transition starts and during every later idle frame — that condition is
+`true` on almost every frame, not once at completion:
+
+```tsx
+const wasTransitioningRef = useRef(false);
+
+useFlowFrame<Phase>(({ isTransitioning }) => {
+  if (wasTransitioningRef.current && !isTransitioning) {
+    onTransitionDone(); // fires once, on the true -> false edge
+  }
+
+  wasTransitioningRef.current = isTransitioning;
+});
+```
+
+A zero-duration transition has no observable active frame — `isTransitioning`
+is already `false` on the very next frame after the accepted call, so it never
+produces a `true -> false` edge for this pattern to catch. For zero-duration
+moves, observe the accepted public `phase` change instead, or use the
+application-owned source/target trace described in
+[Expecting source/target metadata from the package](#expecting-sourcetarget-metadata-from-the-package).
+
+Use `isTransitioning` — not `progress === 1` — as the lifecycle signal.
+
+## Expecting non-adjacent `goTo()` to visit intermediate phases
+
+Calling `goTo("contact")` from `"intro"` performs exactly **one** transition
+straight to `"contact"`. Any phases in between are never visited and never
+queued — there is no route-pair configuration, graph, or timeline behind
+`goTo()`.
+
+### Mistake
+
+Building UI or scene logic that expects a frame callback, an intermediate
+`phase` value, or a queued sequence of transitions for a non-adjacent jump.
+
+### Better
+
+Treat every accepted `goTo()` as one direct transition to its target, whether
+the target is adjacent or not. If your scene needs to react differently to a
+non-adjacent jump, compare the source and target phase indexes yourself — see
+[Core concepts](./core-concepts.md#adjacent-and-non-adjacent-navigation).
+
+## Expecting source/target metadata from the package
+
+`FlowSnapshot`, `FlowControls`, and `FlowFrameState` do not include
+`sourcePhase`, `targetPhase`, or `previousPhase`. This is a deliberate v2.8.0
+decision, not a gap: `phase` already reports the accepted target immediately,
+and `direction` reports forward/reverse for positive-duration transitions.
+
+### Mistake
+
+```tsx
+const { sourcePhase, targetPhase } = useFlow<Phase>(); // does not exist
+```
+
+### Better
+
+Retain the previously observed public `phase` yourself and derive source and
+target from it. In React, do this in an Effect so the trace only updates after
+an actually committed phase change, not during render:
+
+```tsx
+import { useEffect, useRef, useState } from "react";
+
+type PhaseTrace<Phase extends string> = {
+  source: Phase;
+  target: Phase;
+} | null;
+
+function usePhaseTrace<Phase extends string>(phase: Phase): PhaseTrace<Phase> {
+  const previousPhaseRef = useRef(phase);
+  const [trace, setTrace] = useState<PhaseTrace<Phase>>(null);
+
+  useEffect(() => {
+    const source = previousPhaseRef.current;
+
+    if (source === phase) {
+      return;
+    }
+
+    setTrace({ source, target: phase });
+    previousPhaseRef.current = phase;
+  }, [phase]);
+
+  return trace;
+}
+```
+
+Rejected and same-phase requests never change the public `phase`, so this
+Effect never fires for them and the trace never records a false entry. This is
+application code built on public `useFlow` output, not a package API — see
+[Core concepts](./core-concepts.md#application-owned-previous-phase-tracking)
+for the full pattern, and
+[React Three Fiber usage](./r3f-usage.md#target-phase-non-adjacent-transitions-and-zero-duration)
+for the equivalent frame-local pattern inside `useFlowFrame`.
+
+## Assuming `lock()` pauses transition or cooldown
+
+`lock()` blocks new navigation. It does not pause, slow, or cancel an active
+transition, and it does not pause provider cooldown — both keep running on
+their own clock while locked.
+
+### Mistake
+
+Calling `lock()` expecting an in-progress transition to freeze at its current
+`progress`, or expecting provider cooldown to stop counting down.
+
+### Better
+
+Call `lock()` only to prevent _new_ navigation calls from being accepted.
+Active transitions and cooldowns finish on their own schedule regardless of
+lock state.
+
+## Conflating provider cooldown with hook-local cooldown
+
+There are two separate cooldown mechanisms. **Provider cooldown** is a
+machine-wide gate configured through `transition.cooldown`: it starts after a
+transition completes and rejects manual controls and every input hook until it
+elapses. **Hook-local cooldown** is a `cooldown` option on one
+`useWheelInput`/`useTouchInput`/`useKeyboardInput` instance: it starts only
+after that hook produces an accepted navigation and throttles only that hook.
+
+### Mistake
+
+Assuming a wheel hook's `cooldown` option blocks keyboard input, or that
+raising provider `transition.cooldown` throttles a single input hook only.
+
+### Better
+
+Configure provider `transition.cooldown` to gate all navigation globally after
+a transition. Configure each input hook's own `cooldown` option to throttle
+that hook's repeated triggers independently.
+
 ## Calling `useFlowFrame` outside `<Canvas>`
 
 `useFlowFrame` is Canvas-bound. It follows the same placement rule as React Three

@@ -136,7 +136,8 @@ function FlowDashboard() {
         <p id="flow-operation-guidance" className="operation-guidance">
           Use Previous, Next, or a phase button to move through the flow. Arrow keys, Page Up/Page
           Down, wheel, and touch are optional enhancements; gesture or shortcut input is not
-          required.
+          required. Accepted navigation shows the target phase immediately, and a phase button
+          transitions directly to that phase in one step without visiting the phases in between.
         </p>
         <p className="phase-status" role="status" aria-live="polite" aria-atomic="true">
           Current phase: {flow.phase} ({flow.phaseIndex + 1} of {phases.length}).

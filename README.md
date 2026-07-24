@@ -29,6 +29,20 @@ For step-by-step usage guides aimed at users and AI coding agents, see [docs/gui
 
 React manages application and UI state. React Three Fiber manages frame-based scene updates. This package keeps phase transitions, input, DOM/UI coordination, and the Canvas frame bridge explicit.
 
+## Transition semantics
+
+On an accepted `next()`, `prev()`, or `goTo()`, `phase` and `phaseIndex` already report the target immediately, `progress` resets to `0`, and `isTransitioning` becomes `true` — a `duration: 0` transition instead lands with `progress: 1` and `isTransitioning: false` in that same call. A direct non-adjacent `goTo()` performs one transition straight to the target; intermediate phases are never visited or queued.
+
+During an active transition, public `progress` is the eased value of raw elapsed time. A non-monotonic custom easing function can make `progress` decrease or touch `0`/`1` before the transition actually finishes, because raw elapsed time — not eased `progress` — decides completion. Use `isTransitioning`, not `progress === 1` alone, as the lifecycle signal.
+
+`transition.byPhase[sourcePhase]` resolves per field, falling back independently through `transition`, legacy top-level options, and package defaults, so overriding one field in `byPhase` does not silently override the others. Manual `lock()` blocks new navigation but never pauses or cancels an active transition or provider cooldown. Provider cooldown is a single machine-wide gate that starts once a transition completes and rejects manual controls and input hooks until it elapses; hook-local cooldown only throttles the one wheel/touch/keyboard hook instance that produced it.
+
+The package intentionally has no `sourcePhase`, `targetPhase`, or `previousPhase` field. When application code needs the phase a transition left from, retain the previously observed public `phase` and treat it as the source once `phase` actually changes.
+
+A known target (in-bounds `next`/`prev`, or a `goTo` target from the typed phase union) is always rejected safely with no snapshot mutation when blocked by a lock, an active transition, cooldown, or the same phase — it never throws. A `goTo()` target outside the known phase list throws instead; ordinary application code using a closed phase union does not reach that path.
+
+See [Core concepts](docs/guides/core-concepts.md), [React Three Fiber usage](docs/guides/r3f-usage.md), and the [package README](packages/r3f-interactive-flow/README.md) for the full transition contract.
+
 ## Public API
 
 Import public APIs from the package root:

@@ -122,9 +122,13 @@ function Controls() {
 ```
 
 `useFlow` and `useFlowProgress` are DOM/React hooks. They work anywhere under
-`FlowProvider` and do not require a Canvas. `next`, `prev`, and `goTo` are safe to
-call unconditionally — out-of-bounds or blocked calls are ignored — so you can
-wire them straight to buttons.
+`FlowProvider` and do not require a Canvas. `next()` and `prev()` reject safely
+at phase-list boundaries, and `goTo()` with a known phase rejects safely — no
+snapshot mutation — when blocked by a lock, an active transition, cooldown, or
+the same phase; none of that throws. A `goTo()` call with a target outside the
+known phase list throws instead; see
+[Core concepts](./core-concepts.md#navigation-rejection-and-errors) for the
+full rejection/error matrix.
 
 ## Canvas-bound scene updates
 
@@ -173,6 +177,62 @@ The state object gives you `phase`, `phaseIndex`, `progress`, `direction`, and
 `isTransitioning`. Read whatever you need and mutate refs or Three.js objects
 directly. The `delta` argument is the seconds elapsed since the previous frame,
 useful for frame-rate-independent motion.
+
+## Target phase, non-adjacent transitions, and zero duration
+
+Inside `useFlowFrame`, `phase` is always the **accepted target** — during an
+active transition it identifies where the transition is going, not where it
+started. The package does not expose a public source-phase field in
+`FlowFrameState`, or anywhere else.
+
+A direct non-adjacent `goTo()` (for example `"intro"` straight to `"contact"`)
+produces exactly one transition to the target. `useFlowFrame` never observes
+the phases in between — they are not visited or queued, so a scene component
+does not need to handle intermediate-phase frames.
+
+If a scene needs the phase a transition left from — to cross-fade between two
+meshes, for instance — track it yourself in a ref inside the Canvas-bound
+component:
+
+```tsx
+function FlowMesh() {
+  const meshRef = useRef<THREE.Mesh | null>(null);
+  const previousPhaseRef = useRef<Phase | null>(null);
+  const sourcePhaseRef = useRef<Phase | null>(null);
+
+  useFlowFrame<Phase>(({ phase }) => {
+    if (previousPhaseRef.current !== phase) {
+      sourcePhaseRef.current = previousPhaseRef.current;
+      previousPhaseRef.current = phase;
+    }
+
+    if (!meshRef.current) {
+      return;
+    }
+
+    meshRef.current.visible = phase !== sourcePhaseRef.current;
+  });
+
+  return <mesh ref={meshRef} />;
+}
+```
+
+This is ordinary application code reading public `useFlowFrame` output, not a
+package API.
+
+A `duration: 0` transition completes synchronously in the same call that
+accepted it: `progress` is already `1` and `direction` is already `"none"`
+before any Canvas frame runs, so `useFlowFrame` may never observe an active
+`isTransitioning: true` frame for that transition — a scene component that
+only reacts while transitioning can miss it entirely. If a scene needs
+forward/reverse information for a zero-duration move, derive it from the
+source and target phase indexes (using the same ref pattern above) instead of
+reading `direction`.
+
+React state (`useFlow`, `useFlowProgress`) and `useFlowFrame` read the same
+provider-owned machine, but React commits and R3F frames run on separate
+scheduling paths — do not assume they observe the exact same `progress` at the
+exact same instant.
 
 ## Using transition progress in a scene
 
@@ -260,9 +320,13 @@ or Three.js objects instead of calling a state setter each frame.
 `FlowProvider`. Two providers create two independent machines; consolidate to a
 single provider above both layers.
 
-**`goTo`, `next`, or `prev` seem to do nothing.** Calls are ignored when they are
-out of bounds, or blocked by an active transition, a lock, or a cooldown. This is
-expected — see [Core concepts](./core-concepts.md) for locks and cooldowns.
+**`goTo`, `next`, or `prev` seem to do nothing.** Calls to a known target are
+rejected as a no-op when they are out of bounds, or blocked by an active
+transition, a lock, or a cooldown. This is expected — see
+[Core concepts](./core-concepts.md#navigation-rejection-and-errors) for locks,
+cooldowns, and the full rejection matrix. If instead the call throws, the
+`goTo()` target is outside the known `phases` list — check that you passed a
+value from your `as const` phase tuple.
 
 ## Next steps
 
