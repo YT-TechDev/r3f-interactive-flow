@@ -60,6 +60,8 @@ jobs:
 
       - name: Public-docs agent fixtures
         run: pnpm consumer:agent:verify
+        env:
+          NO_COLOR: "1"
 
       - name: Typecheck
         run: pnpm typecheck
