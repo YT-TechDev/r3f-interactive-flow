@@ -943,6 +943,149 @@ function getCurrentHarnessCommit() {
   return result.status === 0 ? result.stdout.trim() : "unavailable";
 }
 
+// ---------------------------------------------------------------------------
+// Finding 2: baseline binding via Git-object reads (never the working tree)
+// ---------------------------------------------------------------------------
+
+const HARNESS_ARTIFACT_FILES = [
+  "scripts/verify-agent-public-docs.mjs",
+  "validation/agent-public-docs/contracts/agent-public-docs-v1.json",
+  "validation/agent-public-docs/contracts/agent-public-docs-evidence-v1.json",
+  "validation/agent-public-docs/public-docs-manifest.json",
+  "docs/releases/v2.9.0-agent-evaluation-protocol.md"
+];
+
+const HARNESS_ARTIFACT_DIRECTORIES = [
+  "validation/agent-public-docs/base",
+  "validation/agent-public-docs/tasks",
+  "validation/agent-public-docs/reference",
+  "validation/agent-public-docs/negative"
+];
+
+function computeGitBlobSha256(commit, relativePath) {
+  const result = runCommand("git", ["show", `${commit}:${relativePath}`], { cwd: repoRoot });
+
+  if (result.status !== 0) {
+    return null;
+  }
+
+  return createHash("sha256").update(Buffer.from(result.stdout, "utf8")).digest("hex");
+}
+
+function listGitTreeFiles(commit, dirPrefix) {
+  const result = runCommand("git", ["ls-tree", "-r", "--name-only", commit, "--", dirPrefix], {
+    cwd: repoRoot
+  });
+
+  if (result.status !== 0) {
+    return [];
+  }
+
+  return result.stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
+function computeHarnessArtifactHashesAtCommit(commit) {
+  const paths = new Set(HARNESS_ARTIFACT_FILES);
+
+  for (const dir of HARNESS_ARTIFACT_DIRECTORIES) {
+    for (const path of listGitTreeFiles(commit, dir)) {
+      paths.add(path);
+    }
+  }
+
+  const files = [];
+
+  for (const path of [...paths].sort()) {
+    const sha256 = computeGitBlobSha256(commit, path);
+
+    if (sha256 === null) {
+      throw new PackedConsumerError(
+        `Commit "${commit}" does not contain required harness artifact "${path}".`
+      );
+    }
+
+    files.push({ path, sha256 });
+  }
+
+  const aggregateSha256 = createHash("sha256").update(JSON.stringify(files)).digest("hex");
+
+  return { files, aggregateSha256 };
+}
+
+function assertHarnessBaselineBinding(runManifestData, context) {
+  const declaredCommit = runManifestData.phaseAHarnessCommit;
+
+  const commitExists = runCommand("git", ["cat-file", "-e", `${declaredCommit}^{commit}`], {
+    cwd: repoRoot
+  });
+
+  if (commitExists.status !== 0) {
+    throw new PackedConsumerError(
+      `${context}: phaseAHarnessCommit "${declaredCommit}" does not resolve to a real commit.`
+    );
+  }
+
+  const headResult = runCommand("git", ["rev-parse", "HEAD"], { cwd: repoRoot });
+  assertCommandSucceeded(headResult, "resolve current HEAD", "git rev-parse HEAD");
+  const currentHead = headResult.stdout.trim();
+
+  const isAncestor = runCommand(
+    "git",
+    ["merge-base", "--is-ancestor", declaredCommit, currentHead],
+    { cwd: repoRoot }
+  );
+
+  if (isAncestor.status !== 0) {
+    throw new PackedConsumerError(
+      `${context}: phaseAHarnessCommit "${declaredCommit}" is not an ancestor of the current branch HEAD (${currentHead}).`
+    );
+  }
+
+  const recomputedAtCommit = computeHarnessArtifactHashesAtCommit(declaredCommit);
+  assertFieldsEqual(
+    runManifestData.phaseAHarnessArtifacts,
+    recomputedAtCommit,
+    "phaseAHarnessArtifacts",
+    context
+  );
+
+  const recomputedAtHead = computeHarnessArtifactHashesAtCommit(currentHead);
+  assertFieldsEqual(
+    recomputedAtCommit,
+    recomputedAtHead,
+    "phaseAHarnessArtifacts (unchanged between phaseAHarnessCommit and current HEAD)",
+    context
+  );
+}
+
+// Creates a real, addressable commit object that reuses the current HEAD's
+// tree (so its content matches HEAD exactly) but has no parent, so it is
+// never reachable as an ancestor of HEAD. Used only by --self-test to prove
+// the ancestor check rejects an "unrelated existing commit"; it is never
+// referenced by any branch/tag, never pushed, and becomes an ordinary
+// unreferenced object once this process exits.
+function createOrphanCommitFromCurrentHead() {
+  const treeResult = runCommand("git", ["rev-parse", "HEAD^{tree}"], { cwd: repoRoot });
+  assertCommandSucceeded(treeResult, "resolve current HEAD tree", "git rev-parse HEAD^{tree}");
+
+  const commitResult = runCommand(
+    "git",
+    [
+      "commit-tree",
+      treeResult.stdout.trim(),
+      "-m",
+      "self-test orphan commit (unreferenced, not an ancestor of HEAD)"
+    ],
+    { cwd: repoRoot }
+  );
+  assertCommandSucceeded(commitResult, "create orphan commit", "git commit-tree");
+
+  return commitResult.stdout.trim();
+}
+
 function assertNonEmptyString(value, fieldName, context) {
   if (typeof value !== "string" || value.trim().length === 0) {
     throw new PackedConsumerError(`${context}: "${fieldName}" must be a non-empty string.`);
@@ -1006,6 +1149,33 @@ function validateEvidenceSchema(evidence, context) {
 
     if (evidence[field] === null && !schema.nullableFields.includes(field)) {
       throw new PackedConsumerError(`${context}: evidence field "${field}" must not be null.`);
+    }
+  }
+
+  for (const [field, expectedValue] of Object.entries(schema.constantFieldValues)) {
+    if (evidence[field] !== expectedValue) {
+      throw new PackedConsumerError(
+        `${context}: evidence field "${field}" must be exactly "${expectedValue}", found "${evidence[field]}".`
+      );
+    }
+  }
+
+  for (const field of schema.environmentFields) {
+    if (
+      typeof evidence.environment?.[field] !== "string" ||
+      evidence.environment[field].length === 0
+    ) {
+      throw new PackedConsumerError(
+        `${context}: evidence.environment."${field}" must be a non-empty string.`
+      );
+    }
+  }
+
+  for (const field of schema.toolchainFields) {
+    if (typeof evidence.toolchain?.[field] !== "string" || evidence.toolchain[field].length === 0) {
+      throw new PackedConsumerError(
+        `${context}: evidence.toolchain."${field}" must be a non-empty string.`
+      );
     }
   }
 
@@ -1173,12 +1343,42 @@ function validateRunManifest(runManifestData, runId, contract, manifest) {
     "contractVersion",
     context
   );
-  assertNonEmptyString(
+  assertFieldsEqual(
     runManifestData.repositoryBaselineCommit,
+    manifest.baselineCommit,
     "repositoryBaselineCommit",
     context
   );
   assertNonEmptyString(runManifestData.phaseAHarnessCommit, "phaseAHarnessCommit", context);
+
+  const artifacts = runManifestData.phaseAHarnessArtifacts;
+
+  if (
+    !artifacts ||
+    !Array.isArray(artifacts.files) ||
+    artifacts.files.length === 0 ||
+    typeof artifacts.aggregateSha256 !== "string" ||
+    artifacts.aggregateSha256.length === 0
+  ) {
+    throw new PackedConsumerError(
+      `${context}: "phaseAHarnessArtifacts" must be an object with a non-empty "files" array and an "aggregateSha256" string.`
+    );
+  }
+
+  for (const [index, entry] of artifacts.files.entries()) {
+    if (
+      !entry ||
+      typeof entry.path !== "string" ||
+      entry.path.length === 0 ||
+      typeof entry.sha256 !== "string" ||
+      entry.sha256.length === 0
+    ) {
+      throw new PackedConsumerError(
+        `${context}: "phaseAHarnessArtifacts.files[${index}]" must have a non-empty "path" and "sha256".`
+      );
+    }
+  }
+
   assertFieldsEqual(
     runManifestData.publicDocManifestId,
     manifest.manifestId,
@@ -1271,6 +1471,102 @@ function validateRunManifest(runManifestData, runId, contract, manifest) {
 // Raw/corrected evidence replay
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Environment / toolchain / command / warning derivation (Finding 1)
+// ---------------------------------------------------------------------------
+
+function getPinnedPnpmVersion() {
+  const rootPackageJson = readJsonFile(join(repoRoot, "package.json"));
+  const packageManager = rootPackageJson.packageManager ?? "";
+  const atIndex = packageManager.lastIndexOf("@");
+
+  if (atIndex === -1) {
+    throw new PackedConsumerError(
+      `Root package.json "packageManager" field ("${packageManager}") does not declare a pinned pnpm version.`
+    );
+  }
+
+  return packageManager.slice(atIndex + 1);
+}
+
+function getEnvironmentMetadata() {
+  return {
+    os: process.platform,
+    arch: process.arch,
+    nodeVersion: process.version,
+    pnpmVersion: getPinnedPnpmVersion()
+  };
+}
+
+function getInstalledToolchainVersions(consumerDir) {
+  const readInstalledVersion = (packageName) =>
+    readJsonFile(join(consumerDir, "node_modules", ...packageName.split("/"), "package.json"))
+      .version;
+
+  return {
+    react: readInstalledVersion("react"),
+    reactDom: readInstalledVersion("react-dom"),
+    r3f: readInstalledVersion("@react-three/fiber"),
+    three: readInstalledVersion("three"),
+    typescript: readInstalledVersion("typescript"),
+    vite: readInstalledVersion("vite")
+  };
+}
+
+function assertToolchainMatchesConsumerTuple(toolchain, contract, context) {
+  const expected = {
+    react: contract.consumerTuple.dependencies.react,
+    reactDom: contract.consumerTuple.dependencies["react-dom"],
+    r3f: contract.consumerTuple.dependencies["@react-three/fiber"],
+    three: contract.consumerTuple.dependencies.three,
+    typescript: contract.consumerTuple.devDependencies.typescript,
+    vite: contract.consumerTuple.devDependencies.vite
+  };
+
+  assertFieldsEqual(toolchain, expected, "toolchain", context);
+}
+
+function normalizeWarningLine(line, consumerDir) {
+  return line
+    .split(consumerDir)
+    .join("<consumer>")
+    .replace(/\d+(\.\d+)?\s*(ms|s)\b/gi, "<time>")
+    .trim();
+}
+
+function deriveNormalizedWarnings(commandResults, consumerDir) {
+  const warnings = [];
+
+  for (const result of commandResults) {
+    if (!result) {
+      continue;
+    }
+
+    const combined = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+
+    for (const line of combined.split("\n")) {
+      if (/\bwarning\b/i.test(line) && line.trim().length > 0) {
+        warnings.push(normalizeWarningLine(line, consumerDir));
+      }
+    }
+  }
+
+  return warnings;
+}
+
+function deriveAssertionObservations(task, fullPass) {
+  return {
+    positiveAssertions: task.positiveAssertions.map((assertion) => ({
+      assertion,
+      satisfied: fullPass
+    })),
+    negativeAssertions: task.negativeAssertions.map((assertion) => ({
+      assertion,
+      violated: !fullPass
+    }))
+  };
+}
+
 function buildObservedEvidence({
   contract,
   task,
@@ -1297,13 +1593,18 @@ function buildObservedEvidence({
 
   const violations = evaluateCandidateSource(contract, task, sourceText);
 
+  const commandsExecuted = ["tsc --noEmit"];
   const typecheckResult = runTypecheckInConsumer(consumerDir);
   let buildExitCode = "not-run";
+  let buildResult = null;
 
   if (typecheckResult.status === 0) {
-    const buildResult = runBuildInConsumer(consumerDir);
+    commandsExecuted.push("vite build");
+    buildResult = runBuildInConsumer(consumerDir);
     buildExitCode = buildResult.status;
   }
+
+  const commandExitCodes = { "tsc --noEmit": typecheckResult.status, "vite build": buildExitCode };
 
   const buildTypecheckPass = typecheckResult.status === 0 && buildExitCode === 0;
   const scoring = computeScoring(task, violations, buildTypecheckPass);
@@ -1318,19 +1619,31 @@ function buildObservedEvidence({
     (criterion) => criterion.applicable
   ).length;
 
+  const rawFiles = computeFileHashList(rawDir);
+  const toolchain = getInstalledToolchainVersions(consumerDir);
+  assertToolchainMatchesConsumerTuple(toolchain, contract, `raw output for task "${task.taskId}"`);
+
   return {
     taskId: task.taskId,
     contractVersion: contract.contractVersion,
+    promptTaskContractId: contract.contractVersion,
+    ownerIssue: "#406",
+    packageSource: "local packed tarball",
     repositoryBaselineCommit: manifest.baselineCommit,
+    environment: getEnvironmentMetadata(),
+    toolchain,
     packageName: tarballInfo.packageName,
     packageVersion: tarballInfo.packageVersion,
     tarballFilename: tarballInfo.filename,
     tarballSha256: tarballInfo.sha256,
     publicDocManifestId: manifest.manifestId,
     publicDocManifestHash: manifestHash,
-    rawFiles: computeFileHashList(rawDir),
+    rawFiles,
+    filesChanged: rawFiles.map((entry) => entry.path).sort(),
     publicApisUsed: [...analysis.packageRootImportNames].sort(),
     moduleSpecifiersUsed: [...analysis.moduleSpecifiers].sort(),
+    commandsExecuted,
+    commandExitCodes,
     violations,
     typecheckExitCode: typecheckResult.status,
     buildExitCode,
@@ -1338,6 +1651,8 @@ function buildObservedEvidence({
     hardGates: scoring.hardGates,
     score: { passedApplicableCriteria: passedApplicable, totalApplicableCriteria: totalApplicable },
     fullPass: scoring.fullPass,
+    warnings: deriveNormalizedWarnings([typecheckResult, buildResult], consumerDir),
+    ...deriveAssertionObservations(task, scoring.fullPass),
     ...deriveFindingGroups(violations)
   };
 }
@@ -1448,6 +1763,49 @@ function assertHumanCorrectionConsistency(
   );
 }
 
+function assertRunMetadataConsistency(evidence, approval, context) {
+  assertNonEmptyString(evidence.timestamp, "timestamp", context);
+
+  if (Number.isNaN(Date.parse(evidence.timestamp))) {
+    throw new PackedConsumerError(`${context}: "timestamp" must be a valid ISO-8601 string.`);
+  }
+
+  assertNonEmptyString(
+    evidence.exactEvaluatedModelIdentifier,
+    "exactEvaluatedModelIdentifier",
+    context
+  );
+  assertNonEmptyString(evidence.evaluatedService, "evaluatedService", context);
+
+  if (evidence.evaluatedService !== approval.approvedService) {
+    throw new PackedConsumerError(
+      `${context}: evaluatedService "${evidence.evaluatedService}" does not match approval.approvedService "${approval.approvedService}".`
+    );
+  }
+
+  const approvedModelNormalized = approval.approvedModel.toLowerCase();
+  const exactModelNormalized = evidence.exactEvaluatedModelIdentifier.toLowerCase();
+
+  if (
+    !exactModelNormalized.includes(approvedModelNormalized) &&
+    !approvedModelNormalized.includes(exactModelNormalized)
+  ) {
+    throw new PackedConsumerError(
+      `${context}: exactEvaluatedModelIdentifier "${evidence.exactEvaluatedModelIdentifier}" is not compatible with approval.approvedModel "${approval.approvedModel}".`
+    );
+  }
+
+  if (!Number.isInteger(evidence.approvedRunIndex) || evidence.approvedRunIndex < 1) {
+    throw new PackedConsumerError(`${context}: approvedRunIndex must be a positive integer.`);
+  }
+
+  if (evidence.approvedRunIndex > approval.maxRunCount) {
+    throw new PackedConsumerError(
+      `${context}: approvedRunIndex (${evidence.approvedRunIndex}) exceeds approval.maxRunCount (${approval.maxRunCount}).`
+    );
+  }
+}
+
 function replayTaskEvidence({
   contract,
   manifest,
@@ -1456,7 +1814,8 @@ function replayTaskEvidence({
   consumerDir,
   runId,
   taskId,
-  taskRunDir
+  taskRunDir,
+  approval
 }) {
   const context = `Committed run "${runId}" task "${taskId}"`;
   const evidencePath = join(taskRunDir, "evidence.json");
@@ -1490,7 +1849,12 @@ function replayTaskEvidence({
 
   const comparedFields = [
     "contractVersion",
+    "promptTaskContractId",
+    "ownerIssue",
+    "packageSource",
     "repositoryBaselineCommit",
+    "environment",
+    "toolchain",
     "packageName",
     "packageVersion",
     "tarballFilename",
@@ -1498,8 +1862,11 @@ function replayTaskEvidence({
     "publicDocManifestId",
     "publicDocManifestHash",
     "rawFiles",
+    "filesChanged",
     "publicApisUsed",
     "moduleSpecifiersUsed",
+    "commandsExecuted",
+    "commandExitCodes",
     "violations",
     "typecheckExitCode",
     "buildExitCode",
@@ -1507,6 +1874,9 @@ function replayTaskEvidence({
     "hardGates",
     "score",
     "fullPass",
+    "warnings",
+    "positiveAssertions",
+    "negativeAssertions",
     "unnecessaryDependencies",
     "inventedApiFindings",
     "boundaryFindings",
@@ -1517,10 +1887,7 @@ function replayTaskEvidence({
     assertFieldsEqual(evidence[field], observed[field], field, context);
   }
 
-  if (!Array.isArray(evidence.warnings)) {
-    throw new PackedConsumerError(`${context}: "warnings" must be an array.`);
-  }
-
+  assertRunMetadataConsistency(evidence, approval, context);
   assertHumanCorrectionConsistency(evidence, taskRunDir, task, contract, consumerDir, context);
   assertClassificationConsistency(evidence, observed.fullPass, context);
   assertNonEmptyString(evidence.reviewer, "reviewer", context);
@@ -1567,25 +1934,19 @@ function evaluateCommittedRuns(
 
     const runManifestData = readJsonFile(runManifestPath);
     const approval = validateRunManifest(runManifestData, runId, contract, manifest);
+    const runManifestContext = `Committed run "${runId}" run-manifest.json`;
 
     assertFieldsEqual(
       runManifestData.publicDocManifestHash,
       manifestHash,
       "publicDocManifestHash",
-      `Committed run "${runId}" run-manifest.json`
+      runManifestContext
     );
 
-    const commitCheck = runCommand(
-      "git",
-      ["cat-file", "-e", `${runManifestData.repositoryBaselineCommit}^{commit}`],
-      { cwd: repoRoot }
-    );
-
-    if (commitCheck.status !== 0) {
-      throw new PackedConsumerError(
-        `Committed run "${runId}" repositoryBaselineCommit does not resolve to a real commit.`
-      );
-    }
+    // repositoryBaselineCommit is already bound to manifest.baselineCommit by
+    // validateRunManifest(); manifest.baselineCommit is already proven to
+    // resolve to a real commit in verifyPublicDocManifest() (stage 2).
+    assertHarnessBaselineBinding(runManifestData, runManifestContext);
 
     const taskDirNames = readdirSync(runDir, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
@@ -1611,8 +1972,11 @@ function evaluateCommittedRuns(
       );
     }
 
+    const approvedRunIndexes = [];
+
     for (const taskId of taskDirNames) {
       const taskRunDir = join(runDir, taskId);
+      const taskContext = `Committed run "${runId}" task "${taskId}"`;
       const replay = replayTaskEvidence({
         contract,
         manifest,
@@ -1621,15 +1985,18 @@ function evaluateCommittedRuns(
         consumerDir,
         runId,
         taskId,
-        taskRunDir
+        taskRunDir,
+        approval
       });
 
       assertFieldsEqual(
         replay.evidence.phaseAHarnessCommit,
         runManifestData.phaseAHarnessCommit,
         "phaseAHarnessCommit",
-        `Committed run "${runId}" task "${taskId}"`
+        taskContext
       );
+
+      approvedRunIndexes.push(replay.evidence.approvedRunIndex);
 
       results.push({
         runId,
@@ -1637,6 +2004,12 @@ function evaluateCommittedRuns(
         classification: replay.evidence.classification,
         fullPass: replay.observed.fullPass
       });
+    }
+
+    if (new Set(approvedRunIndexes).size !== approvedRunIndexes.length) {
+      throw new PackedConsumerError(
+        `Committed run "${runId}" has duplicate approvedRunIndex values across its task evidence records: ${JSON.stringify(approvedRunIndexes)}.`
+      );
     }
   }
 
@@ -1646,6 +2019,34 @@ function evaluateCommittedRuns(
 // ---------------------------------------------------------------------------
 // --prepare-run helper mode
 // ---------------------------------------------------------------------------
+
+function buildInstructionsText(contract, task) {
+  return `# Task ${task.taskId} (contract ${contract.contractVersion})
+
+You are working inside an isolated, offline evaluation bundle. Read the files
+under "docs/" (the package's public README and user guides) and the starting
+project under "input/".
+
+## Rules
+
+- You may edit only these output files: ${task.allowedOutputFiles.join(", ")}.
+- Do not browse the repository or the internet.
+- Do not install any dependency.
+- Do not run any hidden repository tool or script.
+- Do not ask for another model or a second attempt.
+- Return code only in the requested output file(s) listed above.
+- You will not receive iterative compiler or build feedback.
+- You get exactly one attempt for this task.
+
+## Task
+
+${task.startingPoint}
+
+### Required behavior
+
+${task.requiredBehavior.map((line) => `- ${line}`).join("\n")}
+`;
+}
 
 function prepareRunBundle(outputDir, taskId) {
   if (!EXPECTED_TASK_IDS.includes(taskId)) {
@@ -1681,33 +2082,7 @@ function prepareRunBundle(outputDir, taskId) {
     join(outputDir, "input", "src", "App.tsx")
   );
 
-  const instructions = `# Task ${taskId} (contract ${contract.contractVersion})
-
-You are working inside an isolated, offline evaluation bundle. Read the files
-under "docs/" (the package's public README and user guides) and the starting
-project under "input/".
-
-## Rules
-
-- You may edit only these output files: ${task.allowedOutputFiles.join(", ")}.
-- Do not browse the repository or the internet.
-- Do not install any dependency.
-- Do not run any hidden repository tool or script.
-- Do not ask for another model or a second attempt.
-- Return code only in the requested output file(s) listed above.
-- You will not receive iterative compiler or build feedback.
-- You get exactly one attempt for this task.
-
-## Task
-
-${task.startingPoint}
-
-### Required behavior
-
-${task.requiredBehavior.map((line) => `- ${line}`).join("\n")}
-`;
-
-  writeFileSync(join(outputDir, "INSTRUCTIONS.md"), instructions);
+  writeFileSync(join(outputDir, "INSTRUCTIONS.md"), buildInstructionsText(contract, task));
 
   console.log(`Prepared sanitized evaluation bundle for ${taskId} at ${outputDir}`);
 
@@ -1720,6 +2095,7 @@ ${task.requiredBehavior.map((line) => `- ${line}`).join("\n")}
 
 function auditBundle(bundleDir) {
   const manifest = readJsonFile(manifestPath);
+  const contract = readJsonFile(contractPath);
   const expectedDocPaths = new Set(manifest.files.map((entry) => `docs/${entry.path}`));
   const expectedTopLevel = new Set([
     "public-docs-manifest.json",
@@ -1754,17 +2130,123 @@ function auditBundle(bundleDir) {
     );
   }
 
+  const auditContext = `Bundle audit ${bundleDir}`;
+
+  // 1. public-docs-manifest.json: parses, ID/hash match the committed
+  // manifest, and its own canonical hash verifies.
+  const bundledManifest = readJsonFile(join(bundleDir, "public-docs-manifest.json"));
+  assertFieldsEqual(bundledManifest, manifest, "public-docs-manifest.json", auditContext);
+
+  const bundledManifestHash = computeManifestContentHash(bundledManifest);
+  if (bundledManifestHash !== bundledManifest.manifestContentSha256) {
+    throw new PackedConsumerError(
+      `${auditContext}: bundled manifest canonical content SHA-256 does not verify.`
+    );
+  }
+
+  // 2. Every docs/<manifest path> file: exact byte length and SHA-256.
+  for (const entry of manifest.files) {
+    const bundledPath = join(bundleDir, "docs", entry.path);
+    const buffer = readFileSync(bundledPath);
+
+    if (buffer.length !== entry.byteLength) {
+      throw new PackedConsumerError(
+        `${auditContext}: docs/${entry.path} byte length mismatch (expected ${entry.byteLength}, found ${buffer.length}).`
+      );
+    }
+
+    const sha256 = createHash("sha256").update(buffer).digest("hex");
+
+    if (sha256 !== entry.sha256) {
+      throw new PackedConsumerError(`${auditContext}: docs/${entry.path} SHA-256 mismatch.`);
+    }
+  }
+
+  // 3. task-contract.json: exactly one task, one of the fixed five, and
+  // canonically equal to the corresponding committed task object.
+  const bundledTaskContract = readJsonFile(join(bundleDir, "task-contract.json"));
+
+  if (
+    !bundledTaskContract ||
+    Array.isArray(bundledTaskContract) ||
+    typeof bundledTaskContract.taskId !== "string"
+  ) {
+    throw new PackedConsumerError(
+      `${auditContext}: task-contract.json must be exactly one task object.`
+    );
+  }
+
+  if (!EXPECTED_TASK_IDS.includes(bundledTaskContract.taskId)) {
+    throw new PackedConsumerError(
+      `${auditContext}: task-contract.json taskId "${bundledTaskContract.taskId}" is not one of the fixed five.`
+    );
+  }
+
+  const realTask = contract.tasks.find(
+    (candidate) => candidate.taskId === bundledTaskContract.taskId
+  );
+  assertFieldsEqual(bundledTaskContract, realTask, "task-contract.json", auditContext);
+
+  // 4. input/src/App.tsx: exact byte length and SHA-256 of the immutable
+  // task input fixture.
+  const bundledAppBuffer = readFileSync(join(bundleDir, "input", "src", "App.tsx"));
+
+  if (bundledAppBuffer.length !== realTask.immutableInputFixture.byteLength) {
+    throw new PackedConsumerError(`${auditContext}: input/src/App.tsx byte length mismatch.`);
+  }
+
+  const bundledAppSha256 = createHash("sha256").update(bundledAppBuffer).digest("hex");
+
+  if (bundledAppSha256 !== realTask.immutableInputFixture.sha256) {
+    throw new PackedConsumerError(`${auditContext}: input/src/App.tsx SHA-256 mismatch.`);
+  }
+
+  // 5. Base consumer scaffold files: byte-for-byte against the committed
+  // base fixture.
+  const baseFileMap = {
+    "input/package.json": join(baseDir, "package.json"),
+    "input/tsconfig.json": join(baseDir, "tsconfig.json"),
+    "input/vite.config.ts": join(baseDir, "vite.config.ts"),
+    "input/index.html": join(baseDir, "index.html"),
+    "input/src/main.tsx": join(baseDir, "src", "main.tsx")
+  };
+
+  for (const [bundleRelative, committedPath] of Object.entries(baseFileMap)) {
+    const bundledSha256 = sha256File(join(bundleDir, bundleRelative));
+    const committedSha256 = sha256File(committedPath);
+
+    if (bundledSha256 !== committedSha256) {
+      throw new PackedConsumerError(
+        `${auditContext}: ${bundleRelative} does not byte-for-byte match the committed base fixture.`
+      );
+    }
+  }
+
+  // 6. INSTRUCTIONS.md: regenerated deterministically from the task
+  // contract, then compared exactly.
+  const expectedInstructions = buildInstructionsText(contract, realTask);
+  const bundledInstructions = readFileSync(join(bundleDir, "INSTRUCTIONS.md"), "utf8");
+
+  if (bundledInstructions !== expectedInstructions) {
+    throw new PackedConsumerError(
+      `${auditContext}: INSTRUCTIONS.md does not match the deterministically regenerated content.`
+    );
+  }
+
   const fileHashes = computeFileHashList(bundleDir);
   const bundleHash = createHash("sha256").update(JSON.stringify(fileHashes)).digest("hex");
 
   console.log(`Bundle audit passed for ${bundleDir}`);
+  console.log(`task ID: ${realTask.taskId}`);
+  console.log(`public-doc manifest ID: ${manifest.manifestId}`);
+  console.log(`public-doc manifest content SHA-256: ${bundledManifest.manifestContentSha256}`);
   console.log(`Sanitized file inventory (${allFiles.length} files):`);
   for (const relativePath of [...allFiles].sort()) {
     console.log(`  ${relativePath}`);
   }
   console.log(`Bundle content SHA-256: ${bundleHash}`);
 
-  return { bundleHash, fileCount: allFiles.length };
+  return { bundleHash, fileCount: allFiles.length, taskId: realTask.taskId };
 }
 
 // ---------------------------------------------------------------------------
@@ -1822,8 +2304,11 @@ function finalizeBaselineEvidence({
   const evidence = {
     evidenceSchemaId: "agent-public-docs-evidence-v1",
     runId,
+    timestamp: "2026-01-01T00:00:00.000Z",
+    evaluatedService: "self-test",
+    exactEvaluatedModelIdentifier: "self-test-model",
+    approvedRunIndex: 1,
     ...observed,
-    warnings: [],
     humanCorrectionCount: 0,
     humanCorrections: [],
     correctedOutput: null,
@@ -1851,6 +2336,7 @@ function writeBaselineRunManifest({
     contractVersion: contract.contractVersion,
     repositoryBaselineCommit: manifest.baselineCommit,
     phaseAHarnessCommit: harnessCommit,
+    phaseAHarnessArtifacts: computeHarnessArtifactHashesAtCommit(harnessCommit),
     publicDocManifestId: manifest.manifestId,
     publicDocManifestHash: manifestHash,
     approval: {
@@ -2116,6 +2602,129 @@ async function runSelfTest() {
         writeEvidence(scenarioTaskDir, evidence);
         evaluateScenarioRoot(scenarioRoot);
       })
+    });
+
+    // Scenario 10 (Finding 2): repositoryBaselineCommit differs from the
+    // public-doc manifest baseline.
+    outcomes.push({
+      kind: "rejection",
+      ...expectRejected("repository-baseline-commit-mismatch-is-rejected", () => {
+        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("baseline-mismatch");
+        const runManifestData = readRunManifest(scenarioRunDir);
+        runManifestData.repositoryBaselineCommit = "2ea5f11ac7baae100758578405d7dc1336ce77c6";
+        writeRunManifest(scenarioRunDir, runManifestData);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Scenario 11 (Finding 2): nonexistent phaseAHarnessCommit.
+    outcomes.push({
+      kind: "rejection",
+      ...expectRejected("nonexistent-harness-commit-is-rejected", () => {
+        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("nonexistent-harness-commit");
+        const runManifestData = readRunManifest(scenarioRunDir);
+        runManifestData.phaseAHarnessCommit = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
+        writeRunManifest(scenarioRunDir, runManifestData);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Scenario 12 (Finding 2): an existing but unrelated phaseAHarnessCommit
+    // (a real commit, not an ancestor of current HEAD).
+    outcomes.push({
+      kind: "rejection",
+      ...expectRejected("unrelated-harness-commit-is-rejected", () => {
+        const orphanCommit = createOrphanCommitFromCurrentHead();
+        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("unrelated-harness-commit");
+        const runManifestData = readRunManifest(scenarioRunDir);
+        runManifestData.phaseAHarnessCommit = orphanCommit;
+        runManifestData.phaseAHarnessArtifacts = computeHarnessArtifactHashesAtCommit(orphanCommit);
+        writeRunManifest(scenarioRunDir, runManifestData);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Scenario 13 (Finding 2): a tampered harness artifact hash (does not
+    // match the real content at the declared commit).
+    outcomes.push({
+      kind: "rejection",
+      ...expectRejected("changed-harness-artifact-hash-is-rejected", () => {
+        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("harness-artifact-hash");
+        const runManifestData = readRunManifest(scenarioRunDir);
+        runManifestData.phaseAHarnessArtifacts.files[0] = {
+          ...runManifestData.phaseAHarnessArtifacts.files[0],
+          sha256: "0".repeat(64)
+        };
+        writeRunManifest(scenarioRunDir, runManifestData);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Scenario 14 (Finding 2): phaseAHarnessCommit references a real
+    // ancestor commit whose harness-defining files differ from (predate)
+    // current HEAD — proves drift/incompleteness since approval is rejected.
+    outcomes.push({
+      kind: "rejection",
+      ...expectRejected("harness-artifacts-changed-since-approved-commit-is-rejected", () => {
+        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("harness-drift");
+        const runManifestData = readRunManifest(scenarioRunDir);
+        runManifestData.phaseAHarnessCommit = "2ea5f11ac7baae100758578405d7dc1336ce77c6";
+        writeRunManifest(scenarioRunDir, runManifestData);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Finding 3: bundle exact-content audit tamper scenarios.
+    function tamperAppendByte(filePath) {
+      const original = readFileSync(filePath);
+      writeFileSync(filePath, Buffer.concat([original, Buffer.from("X")]));
+    }
+
+    function bundleTamperScenario(scenarioName, relativePathInsideBundle) {
+      return expectRejected(scenarioName, () => {
+        const bundleDir = join(tempRoot, `bundle-${scenarioName}`);
+        prepareRunBundle(bundleDir, "AGENT-FOUNDATION");
+        tamperAppendByte(join(bundleDir, relativePathInsideBundle));
+        auditBundle(bundleDir);
+      });
+    }
+
+    outcomes.push({
+      kind: "baseline",
+      ...expectAccepted("baseline-valid-bundle-passes-audit", () => {
+        prepareRunBundle(join(tempRoot, "bundle-baseline"), "AGENT-FOUNDATION");
+      })
+    });
+
+    outcomes.push({
+      kind: "rejection",
+      ...bundleTamperScenario(
+        "bundle-audit-rejects-tampered-public-guide",
+        "docs/docs/guides/getting-started.md"
+      )
+    });
+
+    outcomes.push({
+      kind: "rejection",
+      ...bundleTamperScenario("bundle-audit-rejects-tampered-task-contract", "task-contract.json")
+    });
+
+    outcomes.push({
+      kind: "rejection",
+      ...bundleTamperScenario("bundle-audit-rejects-tampered-input-app", "input/src/App.tsx")
+    });
+
+    outcomes.push({
+      kind: "rejection",
+      ...bundleTamperScenario(
+        "bundle-audit-rejects-tampered-input-package-json",
+        "input/package.json"
+      )
+    });
+
+    outcomes.push({
+      kind: "rejection",
+      ...bundleTamperScenario("bundle-audit-rejects-tampered-instructions", "INSTRUCTIONS.md")
     });
   } finally {
     removeTempRoot(tempRoot);

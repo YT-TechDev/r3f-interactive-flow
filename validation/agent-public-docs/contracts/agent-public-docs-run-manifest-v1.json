@@ -1,0 +1,49 @@
+{
+  "schemaId": "agent-public-docs-run-manifest-v1",
+  "appliesToContractVersion": "agent-public-docs-v1",
+  "requiredFields": [
+    "runId",
+    "contractVersion",
+    "repositoryBaselineCommit",
+    "phaseAHarnessCommit",
+    "phaseAHarnessArtifacts",
+    "publicDocManifestId",
+    "publicDocManifestHash",
+    "approval"
+  ],
+  "harnessArtifactPaths": {
+    "files": [
+      "scripts/verify-agent-public-docs.mjs",
+      "validation/agent-public-docs/contracts/agent-public-docs-v1.json",
+      "validation/agent-public-docs/contracts/agent-public-docs-evidence-v1.json",
+      "validation/agent-public-docs/public-docs-manifest.json",
+      "docs/releases/v2.9.0-agent-evaluation-protocol.md"
+    ],
+    "directories": [
+      "validation/agent-public-docs/base",
+      "validation/agent-public-docs/tasks",
+      "validation/agent-public-docs/reference",
+      "validation/agent-public-docs/negative"
+    ]
+  },
+  "permittedPostApprovalChangePaths": [
+    "validation/agent-public-docs/runs",
+    "docs/releases/v2.9.0-agent-evaluation-report.md"
+  ],
+  "approvalRequiredFields": [
+    "approverRole",
+    "approvalTimestamp",
+    "approvedService",
+    "approvedModel",
+    "maxRunCount",
+    "approvedTaskIds",
+    "retryCount",
+    "iterativeFeedback",
+    "suppliedDataBoundary",
+    "privateRepositoryDataBoundary",
+    "secretsBoundary",
+    "spendBoundary",
+    "retentionBoundary",
+    "actualRunCount"
+  ]
+}
