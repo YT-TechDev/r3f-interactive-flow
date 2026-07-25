@@ -11,7 +11,8 @@
     "publicDocManifestHash",
     "approval"
   ],
-  "harnessArtifactPaths": {
+  "historicalHarnessArtifactPaths": {
+    "description": "The full path set recorded, once and immutably, into runManifest.phaseAHarnessArtifacts at Phase A approval time. Includes the verifier implementation and its maintainer documentation, so it is never recomputed against current HEAD — only against phaseAHarnessCommit itself, when that historical commit object is still locally available.",
     "files": [
       "scripts/verify-agent-public-docs.mjs",
       "validation/agent-public-docs/contracts/agent-public-docs-v1.json",
@@ -26,15 +27,35 @@
       "validation/agent-public-docs/negative"
     ]
   },
+  "immutableEvaluationContractPaths": {
+    "description": "A strict subset of historicalHarnessArtifactPaths: the task contract, evidence schema, public-doc manifest, and fixture data that define what a run was actually evaluated against. Excludes the verifier implementation and maintainer prose. This is the only subset ever recomputed against current HEAD, so it is the durable compatibility boundary after squash merge or source-branch deletion.",
+    "files": [
+      "validation/agent-public-docs/contracts/agent-public-docs-v1.json",
+      "validation/agent-public-docs/contracts/agent-public-docs-evidence-v1.json",
+      "validation/agent-public-docs/public-docs-manifest.json"
+    ],
+    "directories": [
+      "validation/agent-public-docs/base",
+      "validation/agent-public-docs/tasks",
+      "validation/agent-public-docs/reference",
+      "validation/agent-public-docs/negative"
+    ],
+    "excludes": [
+      "scripts/verify-agent-public-docs.mjs",
+      "docs/releases/v2.9.0-agent-evaluation-protocol.md",
+      "docs/releases/v2.9.0-agent-evaluation-report.md",
+      "validation/agent-public-docs/contracts/agent-public-docs-run-manifest-v1.json",
+      "validation/agent-public-docs/runs/**"
+    ]
+  },
   "phaseAHarnessCommitSemantics": {
-    "role": "provenance metadata, not the integrity boundary",
+    "role": "historical provenance metadata recorded at evaluation time, not the current-HEAD integrity boundary",
     "requiredShape": "exactly 40 lowercase or uppercase hexadecimal characters",
     "ancestryRequired": false,
     "localAvailabilityRequired": false,
-    "rationale": "A squash merge onto main creates one new commit and intentionally discards the source branch's commit ancestry; a provenance commit's ancestry or continued local presence must not be part of the merge-strategy-independent integrity check.",
-    "integrityBoundary": "Exact equality between runManifest.phaseAHarnessArtifacts and the harness artifact snapshot (sorted file paths, every per-file SHA-256, and the aggregate SHA-256) recomputed from current HEAD via Git object reads under harnessArtifactPaths.",
-    "whenProvenanceCommitIsLocallyAvailable": "Its harness artifact snapshot is additionally recomputed and must also equal runManifest.phaseAHarnessArtifacts; ancestry to current HEAD is still not required.",
-    "whenProvenanceCommitIsNotLocallyAvailable": "Verification does not fail solely for that reason, as long as the current-HEAD artifact snapshot equals runManifest.phaseAHarnessArtifacts."
+    "rationale": "A squash merge onto main creates one new commit and intentionally discards the source branch's commit ancestry; a provenance commit's ancestry or continued local presence must not be part of the merge-strategy-independent integrity check. Historical run data (runManifest.phaseAHarnessArtifacts) is immutable and is never rewritten to accommodate later replay-implementation changes.",
+    "historicalVerification": "When phaseAHarnessCommit is locally available, its full historicalHarnessArtifactPaths snapshot is recomputed via Git object reads and must exactly equal the recorded runManifest.phaseAHarnessArtifacts (sorted paths, every per-file SHA-256, and the aggregate SHA-256). When it is not locally available, verification does not fail solely for that reason.",
+    "currentHeadVerification": "Only the immutableEvaluationContractPaths subset is ever recomputed against current HEAD, and is compared against the matching subset of the recorded historical snapshot. This means the replay implementation (the verifier script) and maintainer documentation (the protocol doc) may evolve after a run is approved without invalidating that run's evidence, and without requiring phaseAHarnessCommit to remain an ancestor of, or even resolvable at, current HEAD."
   },
   "permittedPostApprovalChangePaths": [
     "validation/agent-public-docs/runs",
