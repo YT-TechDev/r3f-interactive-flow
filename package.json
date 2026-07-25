@@ -19,9 +19,6 @@
     "release": "pnpm release:check && changeset publish",
     "pack:dry-run": "pnpm --filter r3f-interactive-flow pack:dry-run",
     "consumer:published:verify": "node scripts/verify-published-package-consumer.mjs",
-    "consumer:packed:vite:verify": "node scripts/verify-packed-vite-consumer.mjs",
-    "consumer:packed:next:verify": "node scripts/verify-packed-next-consumer.mjs",
-    "consumer:agent:verify": "node scripts/verify-agent-public-docs.mjs",
     "test:browser:input": "pnpm --dir packages/r3f-interactive-flow exec vitest run --config vitest.browser.config.ts"
   },
   "devDependencies": {

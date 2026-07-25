@@ -1,5 +1,0 @@
-node_modules
-dist
-dist-runtime
-package-lock.json
-*.tgz
