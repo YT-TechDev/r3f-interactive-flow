@@ -504,6 +504,14 @@
       "basedOnTaskId": "AGENT-FOUNDATION",
       "seededDefect": "adds an unrelated runtime dependency (`gsap`) to the forbidden `package.json` file",
       "expectedViolation": "forbidden-file-changed"
+    },
+    {
+      "fixtureId": "nested-forbidden-file",
+      "path": "validation/agent-public-docs/negative/nested-forbidden-file",
+      "label": "HARNESS_NEGATIVE",
+      "basedOnTaskId": "AGENT-FOUNDATION",
+      "seededDefect": "adds an unexpected nested file (`src/helper.ts`) alongside an otherwise-valid `App.tsx`",
+      "expectedViolation": "forbidden-file-changed"
     }
   ]
 }

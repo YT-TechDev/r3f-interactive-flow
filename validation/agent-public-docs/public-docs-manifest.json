@@ -2,6 +2,7 @@
   "manifestId": "agent-public-docs-manifest-v1",
   "contractVersion": "agent-public-docs-v1",
   "baselineCommit": "da49ab28fd59e92149c0aeb77eba18ec82818144",
+  "manifestContentSha256": "b35af974b2af9e642372d43f1a3043b8e88c7a4a5904c89f87cd72b6b8e82cc2",
   "files": [
     {
       "path": "README.md",

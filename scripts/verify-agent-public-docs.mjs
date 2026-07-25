@@ -1,14 +1,6 @@
 import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
-import {
-  cpSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  statSync,
-  writeFileSync
-} from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import {
   PackedConsumerError,
@@ -22,13 +14,15 @@ import {
   readJsonFile,
   removeTempRoot,
   repoRoot,
-  runCommand
+  runCommand,
+  sha256File
 } from "./lib/packed-consumer-utils.mjs";
 
 const fixtureRoot = join(repoRoot, "validation", "agent-public-docs");
 const baseDir = join(fixtureRoot, "base");
 const contractPath = join(fixtureRoot, "contracts", "agent-public-docs-v1.json");
 const manifestPath = join(fixtureRoot, "public-docs-manifest.json");
+const evidenceSchemaPath = join(fixtureRoot, "contracts", "agent-public-docs-evidence-v1.json");
 const referenceDir = join(fixtureRoot, "reference");
 const negativeDir = join(fixtureRoot, "negative");
 const runsDir = join(fixtureRoot, "runs");
@@ -60,6 +54,8 @@ const VIOLATION_CRITERIA_MAP = {
   "canvas-required-missing": ["8-scope"],
   "missing-required-behavior": ["2-required-behavior"],
   "forbidden-file-changed": ["8-scope"],
+  "duplicate-output-path": ["8-scope"],
+  "missing-allowed-output-file": ["8-scope"],
   "secret-exposure": []
 };
 
@@ -90,6 +86,24 @@ function loadWorkspaceTypeScript() {
 // ---------------------------------------------------------------------------
 // Stage 2: public-doc manifest verification
 // ---------------------------------------------------------------------------
+
+function canonicalizeManifestForHash(manifest) {
+  const files = [...manifest.files]
+    .map((entry) => ({ path: entry.path, byteLength: entry.byteLength, sha256: entry.sha256 }))
+    .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+
+  return {
+    manifestId: manifest.manifestId,
+    contractVersion: manifest.contractVersion,
+    baselineCommit: manifest.baselineCommit,
+    files
+  };
+}
+
+function computeManifestContentHash(manifest) {
+  const canonical = canonicalizeManifestForHash(manifest);
+  return createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
+}
 
 function verifyPublicDocManifest() {
   const manifest = readJsonFile(manifestPath);
@@ -134,7 +148,22 @@ function verifyPublicDocManifest() {
     }
   }
 
-  return manifest;
+  const computedHash = computeManifestContentHash(manifest);
+
+  if (
+    typeof manifest.manifestContentSha256 !== "string" ||
+    manifest.manifestContentSha256.length === 0
+  ) {
+    throw new PackedConsumerError('Manifest is missing "manifestContentSha256".');
+  }
+
+  if (computedHash !== manifest.manifestContentSha256) {
+    throw new PackedConsumerError(
+      `Manifest canonical content SHA-256 mismatch: manifest says ${manifest.manifestContentSha256}, computed ${computedHash}.`
+    );
+  }
+
+  return { manifest, manifestHash: computedHash };
 }
 
 // ---------------------------------------------------------------------------
@@ -207,25 +236,78 @@ function verifyTaskInputImmutability(contract) {
 // Stage 5: allowed output-file sets and forbidden changes
 // ---------------------------------------------------------------------------
 
-function mapOverlayEntryToTargetFile(entryName) {
-  if (entryName === "App.tsx") {
+function walkFilesRecursive(rootDir, currentRelative = "") {
+  const currentAbsolute = currentRelative ? join(rootDir, currentRelative) : rootDir;
+  const entries = readdirSync(currentAbsolute, { withFileTypes: true });
+  const results = [];
+
+  for (const entry of entries) {
+    const entryRelative = currentRelative ? `${currentRelative}/${entry.name}` : entry.name;
+
+    if (entry.isSymbolicLink()) {
+      throw new PackedConsumerError(
+        `Symlink is not allowed in a fixture/output tree: ${entryRelative}`
+      );
+    }
+
+    if (entry.isDirectory()) {
+      results.push(...walkFilesRecursive(rootDir, entryRelative));
+      continue;
+    }
+
+    if (entry.isFile()) {
+      results.push(entryRelative);
+    }
+  }
+
+  return results;
+}
+
+function mapLegacyOverlayEntryToTargetFile(entryRelativePath) {
+  if (entryRelativePath === "App.tsx") {
     return "src/App.tsx";
   }
 
-  return entryName;
+  return entryRelativePath;
 }
 
-function checkOutputFileScope(task, overlayDir) {
-  const violations = [];
-  const entries = readdirSync(overlayDir).filter((name) =>
-    statSync(join(overlayDir, name)).isFile()
-  );
+function computeFileHashList(rootDir) {
+  return walkFilesRecursive(rootDir)
+    .map((relativePath) => ({
+      path: relativePath,
+      sha256: sha256File(join(rootDir, relativePath))
+    }))
+    .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+}
 
-  for (const entry of entries) {
-    const targetFile = mapOverlayEntryToTargetFile(entry);
+function checkOutputFileScope(task, overlayDir, options = {}) {
+  const { legacyFlatMapping = true, requireAllAllowedPresent = false } = options;
+  const violations = [];
+  const relativeFiles = walkFilesRecursive(overlayDir);
+  const seenTargets = new Set();
+
+  for (const relativePath of relativeFiles) {
+    const targetFile = legacyFlatMapping
+      ? mapLegacyOverlayEntryToTargetFile(relativePath)
+      : relativePath;
+
+    if (seenTargets.has(targetFile)) {
+      violations.push({ code: "duplicate-output-path", detail: targetFile });
+      continue;
+    }
+
+    seenTargets.add(targetFile);
 
     if (!task.allowedOutputFiles.includes(targetFile)) {
       violations.push({ code: "forbidden-file-changed", detail: targetFile });
+    }
+  }
+
+  if (requireAllAllowedPresent) {
+    for (const allowedFile of task.allowedOutputFiles) {
+      if (!seenTargets.has(allowedFile)) {
+        violations.push({ code: "missing-allowed-output-file", detail: allowedFile });
+      }
     }
   }
 
@@ -761,7 +843,10 @@ function runDependencyGraphCheck(consumerDir) {
 
 function evaluateReferenceTask(contract, task, consumerDir) {
   const overlayDir = join(referenceDir, task.taskId, "output");
-  const scopeViolations = checkOutputFileScope(task, overlayDir);
+  const scopeViolations = checkOutputFileScope(task, overlayDir, {
+    legacyFlatMapping: true,
+    requireAllAllowedPresent: true
+  });
 
   if (scopeViolations.length > 0) {
     throw new PackedConsumerError(
@@ -810,7 +895,10 @@ function evaluateReferenceTask(contract, task, consumerDir) {
 function evaluateNegativeFixture(contract, fixture, consumerDir) {
   const task = contract.tasks.find((candidate) => candidate.taskId === fixture.basedOnTaskId);
   const overlayDir = join(negativeDir, fixture.fixtureId);
-  const scopeViolations = checkOutputFileScope(task, overlayDir);
+  const scopeViolations = checkOutputFileScope(task, overlayDir, {
+    legacyFlatMapping: true,
+    requireAllAllowedPresent: false
+  });
 
   if (scopeViolations.some((violation) => violation.code === fixture.expectedViolation)) {
     return {
@@ -847,89 +935,708 @@ function evaluateNegativeFixture(contract, fixture, consumerDir) {
 }
 
 // ---------------------------------------------------------------------------
+// Stage 14 helpers: evidence schema, replay comparison, classification rules
+// ---------------------------------------------------------------------------
+
+function getCurrentHarnessCommit() {
+  const result = runCommand("git", ["rev-parse", "HEAD"], { cwd: repoRoot });
+  return result.status === 0 ? result.stdout.trim() : "unavailable";
+}
+
+function assertNonEmptyString(value, fieldName, context) {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new PackedConsumerError(`${context}: "${fieldName}" must be a non-empty string.`);
+  }
+}
+
+function assertFieldsEqual(observedValue, expectedValue, fieldName, context) {
+  const observedJson = JSON.stringify(observedValue);
+  const expectedJson = JSON.stringify(expectedValue);
+
+  if (observedJson !== expectedJson) {
+    throw new PackedConsumerError(
+      `${context}: field "${fieldName}" does not match deterministic observation.\n  observed:  ${observedJson}\n  committed: ${expectedJson}`
+    );
+  }
+}
+
+function deriveFindingGroups(violations) {
+  return {
+    unnecessaryDependencies: violations.filter(
+      (violation) => violation.code === "unexpected-dependency-import"
+    ),
+    inventedApiFindings: violations.filter((violation) => violation.code === "invented-api-import"),
+    boundaryFindings: violations.filter(
+      (violation) =>
+        violation.code === "canvas-boundary-violation" ||
+        violation.code === "input-hook-inside-canvas"
+    ),
+    scopeFindings: violations.filter((violation) =>
+      [
+        "forbidden-file-changed",
+        "duplicate-output-path",
+        "missing-allowed-output-file",
+        "provider-count",
+        "canvas-required-missing",
+        "missing-required-behavior"
+      ].includes(violation.code)
+    )
+  };
+}
+
+function loadEvidenceSchema() {
+  return readJsonFile(evidenceSchemaPath);
+}
+
+function validateEvidenceSchema(evidence, context) {
+  const schema = loadEvidenceSchema();
+
+  if (evidence.evidenceSchemaId !== schema.schemaId) {
+    throw new PackedConsumerError(
+      `${context}: evidenceSchemaId must be "${schema.schemaId}", found "${evidence.evidenceSchemaId}".`
+    );
+  }
+
+  for (const field of schema.requiredFields) {
+    if (!(field in evidence) || evidence[field] === undefined) {
+      throw new PackedConsumerError(
+        `${context}: evidence is missing required field "${field}" (schema ${schema.schemaId}).`
+      );
+    }
+
+    if (evidence[field] === null && !schema.nullableFields.includes(field)) {
+      throw new PackedConsumerError(`${context}: evidence field "${field}" must not be null.`);
+    }
+  }
+
+  if (!schema.classification.allowedValues.includes(evidence.classification)) {
+    throw new PackedConsumerError(
+      `${context}: classification "${evidence.classification}" is not one of the allowed values.`
+    );
+  }
+
+  const conditionalFields = schema.conditionalFields[evidence.classification];
+
+  if (conditionalFields) {
+    for (const field of conditionalFields) {
+      if (evidence[field] === undefined || evidence[field] === null) {
+        throw new PackedConsumerError(
+          `${context}: classification "${evidence.classification}" requires field "${field}".`
+        );
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Classification consistency rules
+// ---------------------------------------------------------------------------
+
+function assertClassificationConsistency(evidence, observedFullPass, context) {
+  const classification = evidence.classification;
+
+  if (observedFullPass) {
+    if (classification !== "VERIFIED") {
+      throw new PackedConsumerError(
+        `${context}: raw output achieved a full pass but classification is "${classification}"; expected "VERIFIED".`
+      );
+    }
+
+    if (evidence.humanCorrectionCount !== 0) {
+      throw new PackedConsumerError(
+        `${context}: VERIFIED raw output must have humanCorrectionCount 0.`
+      );
+    }
+
+    if (evidence.correctedOutput !== null) {
+      throw new PackedConsumerError(
+        `${context}: VERIFIED raw output must not carry a corrected output.`
+      );
+    }
+
+    return;
+  }
+
+  if (classification === "VERIFIED") {
+    throw new PackedConsumerError(
+      `${context}: raw output did not achieve a full pass; classification must not be VERIFIED.`
+    );
+  }
+
+  if (classification === "HARNESS_FAILURE") {
+    throw new PackedConsumerError(
+      `${context}: HARNESS_FAILURE is inconsistent with a successful reference/negative harness self-check in this run and cannot be committed.`
+    );
+  }
+
+  if (classification === "AGENT_FAILURE") {
+    if (evidence.packageFailureIndependentReproduction) {
+      throw new PackedConsumerError(
+        `${context}: AGENT_FAILURE must not carry independent package-failure reproduction evidence.`
+      );
+    }
+
+    if (evidence.documentationGap) {
+      throw new PackedConsumerError(
+        `${context}: AGENT_FAILURE must not carry a documentation-gap record.`
+      );
+    }
+
+    if (evidence.humanCorrectionCount > 0 && !evidence.correctedOutput) {
+      throw new PackedConsumerError(
+        `${context}: AGENT_FAILURE with human corrections requires a corrected output record.`
+      );
+    }
+  }
+
+  if (classification === "DOCUMENTATION_FAILURE") {
+    const gap = evidence.documentationGap;
+
+    if (
+      !gap ||
+      !Array.isArray(gap.suppliedDocPaths) ||
+      gap.suppliedDocPaths.length === 0 ||
+      typeof gap.missingOrAmbiguousGuidance !== "string" ||
+      gap.missingOrAmbiguousGuidance.trim().length === 0
+    ) {
+      throw new PackedConsumerError(
+        `${context}: DOCUMENTATION_FAILURE requires a documentationGap record with non-empty suppliedDocPaths and missingOrAmbiguousGuidance.`
+      );
+    }
+
+    if (evidence.followUpIssue !== "#407") {
+      throw new PackedConsumerError(
+        `${context}: DOCUMENTATION_FAILURE requires followUpIssue to be exactly "#407".`
+      );
+    }
+
+    if (!evidence.correctedOutput) {
+      throw new PackedConsumerError(
+        `${context}: DOCUMENTATION_FAILURE requires a corrected output that deterministically passes.`
+      );
+    }
+  }
+
+  if (classification === "PACKAGE_FAILURE") {
+    const reproduction = evidence.packageFailureIndependentReproduction;
+
+    if (
+      !reproduction ||
+      typeof reproduction.stage !== "string" ||
+      typeof reproduction.command !== "string" ||
+      reproduction.reproducedWithoutAgent !== true
+    ) {
+      throw new PackedConsumerError(
+        `${context}: PACKAGE_FAILURE requires a packageFailureIndependentReproduction record (stage, command, reproducedWithoutAgent: true). Stop for reviewer handling if this evidence does not exist yet.`
+      );
+    }
+  }
+
+  if (classification === "ENVIRONMENT_FAILURE") {
+    const failure = evidence.environmentFailure;
+
+    if (
+      !failure ||
+      typeof failure.stage !== "string" ||
+      typeof failure.sanitizedError !== "string" ||
+      failure.sanitizedError.trim().length === 0
+    ) {
+      throw new PackedConsumerError(
+        `${context}: ENVIRONMENT_FAILURE requires an environmentFailure record with stage and sanitizedError.`
+      );
+    }
+  }
+
+  if (classification === "MIXED_OR_UNRESOLVED") {
+    if (
+      typeof evidence.reviewerRationale !== "string" ||
+      evidence.reviewerRationale.trim().length === 0
+    ) {
+      throw new PackedConsumerError(
+        `${context}: MIXED_OR_UNRESOLVED requires a non-empty reviewerRationale.`
+      );
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Run-manifest / approval-record validation
+// ---------------------------------------------------------------------------
+
+function validateRunManifest(runManifestData, runId, contract, manifest) {
+  const context = `Committed run "${runId}" run-manifest.json`;
+
+  assertFieldsEqual(runManifestData.runId, runId, "runId", context);
+  assertFieldsEqual(
+    runManifestData.contractVersion,
+    contract.contractVersion,
+    "contractVersion",
+    context
+  );
+  assertNonEmptyString(
+    runManifestData.repositoryBaselineCommit,
+    "repositoryBaselineCommit",
+    context
+  );
+  assertNonEmptyString(runManifestData.phaseAHarnessCommit, "phaseAHarnessCommit", context);
+  assertFieldsEqual(
+    runManifestData.publicDocManifestId,
+    manifest.manifestId,
+    "publicDocManifestId",
+    context
+  );
+
+  const approval = runManifestData.approval;
+
+  if (!approval || typeof approval !== "object") {
+    throw new PackedConsumerError(`${context} is missing an "approval" record.`);
+  }
+
+  assertNonEmptyString(approval.approverRole, "approval.approverRole", context);
+  assertNonEmptyString(approval.approvalTimestamp, "approval.approvalTimestamp", context);
+  assertNonEmptyString(approval.approvedService, "approval.approvedService", context);
+  assertNonEmptyString(approval.approvedModel, "approval.approvedModel", context);
+
+  if (
+    !Number.isInteger(approval.maxRunCount) ||
+    approval.maxRunCount < 1 ||
+    approval.maxRunCount > 5
+  ) {
+    throw new PackedConsumerError(
+      `${context}: approval.maxRunCount must be an integer between 1 and 5.`
+    );
+  }
+
+  if (!Array.isArray(approval.approvedTaskIds) || approval.approvedTaskIds.length === 0) {
+    throw new PackedConsumerError(
+      `${context}: approval.approvedTaskIds must be a non-empty array.`
+    );
+  }
+
+  if (new Set(approval.approvedTaskIds).size !== approval.approvedTaskIds.length) {
+    throw new PackedConsumerError(
+      `${context}: approval.approvedTaskIds contains duplicate task IDs.`
+    );
+  }
+
+  for (const taskId of approval.approvedTaskIds) {
+    if (!EXPECTED_TASK_IDS.includes(taskId)) {
+      throw new PackedConsumerError(
+        `${context}: approval.approvedTaskIds contains unknown task ID "${taskId}".`
+      );
+    }
+  }
+
+  if (approval.retryCount !== 0) {
+    throw new PackedConsumerError(`${context}: approval.retryCount must be exactly 0.`);
+  }
+
+  if (approval.iterativeFeedback !== "none" && approval.iterativeFeedback !== false) {
+    throw new PackedConsumerError(
+      `${context}: approval.iterativeFeedback must be "none" or false.`
+    );
+  }
+
+  assertNonEmptyString(approval.suppliedDataBoundary, "approval.suppliedDataBoundary", context);
+
+  if (approval.privateRepositoryDataBoundary !== "none") {
+    throw new PackedConsumerError(
+      `${context}: approval.privateRepositoryDataBoundary must be "none".`
+    );
+  }
+
+  if (approval.secretsBoundary !== "none") {
+    throw new PackedConsumerError(`${context}: approval.secretsBoundary must be "none".`);
+  }
+
+  assertNonEmptyString(approval.spendBoundary, "approval.spendBoundary", context);
+  assertNonEmptyString(approval.retentionBoundary, "approval.retentionBoundary", context);
+
+  if (!Number.isInteger(approval.actualRunCount) || approval.actualRunCount < 0) {
+    throw new PackedConsumerError(
+      `${context}: approval.actualRunCount must be a non-negative integer.`
+    );
+  }
+
+  if (approval.actualRunCount > approval.maxRunCount) {
+    throw new PackedConsumerError(
+      `${context}: approval.actualRunCount (${approval.actualRunCount}) exceeds approval.maxRunCount (${approval.maxRunCount}).`
+    );
+  }
+
+  return approval;
+}
+
+// ---------------------------------------------------------------------------
+// Raw/corrected evidence replay
+// ---------------------------------------------------------------------------
+
+function buildObservedEvidence({
+  contract,
+  task,
+  manifest,
+  manifestHash,
+  tarballInfo,
+  consumerDir,
+  rawDir
+}) {
+  const rawScopeViolations = checkOutputFileScope(task, rawDir, {
+    legacyFlatMapping: false,
+    requireAllAllowedPresent: true
+  });
+
+  if (rawScopeViolations.length > 0) {
+    throw new PackedConsumerError(
+      `Raw output changed a forbidden file or is missing a required file: ${JSON.stringify(rawScopeViolations)}`
+    );
+  }
+
+  const rawAppPath = join(rawDir, "src", "App.tsx");
+  const sourceText = readFileSync(rawAppPath, "utf8");
+  writeAppSource(consumerDir, sourceText);
+
+  const violations = evaluateCandidateSource(contract, task, sourceText);
+
+  const typecheckResult = runTypecheckInConsumer(consumerDir);
+  let buildExitCode = "not-run";
+
+  if (typecheckResult.status === 0) {
+    const buildResult = runBuildInConsumer(consumerDir);
+    buildExitCode = buildResult.status;
+  }
+
+  const buildTypecheckPass = typecheckResult.status === 0 && buildExitCode === 0;
+  const scoring = computeScoring(task, violations, buildTypecheckPass);
+
+  const ts = loadWorkspaceTypeScript();
+  const analysis = analyzeSource(ts, sourceText);
+
+  const passedApplicable = Object.values(scoring.criteria).filter(
+    (criterion) => criterion.applicable && criterion.pass === true
+  ).length;
+  const totalApplicable = Object.values(scoring.criteria).filter(
+    (criterion) => criterion.applicable
+  ).length;
+
+  return {
+    taskId: task.taskId,
+    contractVersion: contract.contractVersion,
+    repositoryBaselineCommit: manifest.baselineCommit,
+    packageName: tarballInfo.packageName,
+    packageVersion: tarballInfo.packageVersion,
+    tarballFilename: tarballInfo.filename,
+    tarballSha256: tarballInfo.sha256,
+    publicDocManifestId: manifest.manifestId,
+    publicDocManifestHash: manifestHash,
+    rawFiles: computeFileHashList(rawDir),
+    publicApisUsed: [...analysis.packageRootImportNames].sort(),
+    moduleSpecifiersUsed: [...analysis.moduleSpecifiers].sort(),
+    violations,
+    typecheckExitCode: typecheckResult.status,
+    buildExitCode,
+    criteria: scoring.criteria,
+    hardGates: scoring.hardGates,
+    score: { passedApplicableCriteria: passedApplicable, totalApplicableCriteria: totalApplicable },
+    fullPass: scoring.fullPass,
+    ...deriveFindingGroups(violations)
+  };
+}
+
+function assertHumanCorrectionConsistency(
+  evidence,
+  taskRunDir,
+  task,
+  contract,
+  consumerDir,
+  context
+) {
+  const count = evidence.humanCorrectionCount;
+  const corrections = evidence.humanCorrections;
+
+  if (!Number.isInteger(count) || count < 0) {
+    throw new PackedConsumerError(
+      `${context}: humanCorrectionCount must be a non-negative integer.`
+    );
+  }
+
+  if (!Array.isArray(corrections) || corrections.length !== count) {
+    throw new PackedConsumerError(
+      `${context}: humanCorrections array length must equal humanCorrectionCount (${count}).`
+    );
+  }
+
+  for (const [index, correction] of corrections.entries()) {
+    if (
+      !correction ||
+      typeof correction.description !== "string" ||
+      correction.description.trim().length === 0
+    ) {
+      throw new PackedConsumerError(
+        `${context}: humanCorrections[${index}] must have a non-empty description.`
+      );
+    }
+  }
+
+  const correctedDir = join(taskRunDir, "corrected");
+  const correctedDirExists = existsSync(correctedDir);
+
+  if (count === 0) {
+    if (evidence.correctedOutput !== null) {
+      throw new PackedConsumerError(
+        `${context}: humanCorrectionCount is 0 but a correctedOutput claim is present.`
+      );
+    }
+
+    if (correctedDirExists) {
+      throw new PackedConsumerError(
+        `${context}: humanCorrectionCount is 0 but a "corrected" directory exists.`
+      );
+    }
+
+    return;
+  }
+
+  if (!correctedDirExists) {
+    throw new PackedConsumerError(
+      `${context}: humanCorrectionCount is ${count} but no "corrected" output directory exists.`
+    );
+  }
+
+  if (!evidence.correctedOutput || !Array.isArray(evidence.correctedOutput.files)) {
+    throw new PackedConsumerError(`${context}: correctedOutput record is missing or malformed.`);
+  }
+
+  const scopeViolations = checkOutputFileScope(task, correctedDir, {
+    legacyFlatMapping: false,
+    requireAllAllowedPresent: true
+  });
+
+  if (scopeViolations.length > 0) {
+    throw new PackedConsumerError(
+      `${context}: corrected output scope violation: ${JSON.stringify(scopeViolations)}`
+    );
+  }
+
+  const correctedAppPath = join(correctedDir, "src", "App.tsx");
+  const correctedSourceText = readFileSync(correctedAppPath, "utf8");
+  writeAppSource(consumerDir, correctedSourceText);
+
+  const correctedViolations = evaluateCandidateSource(contract, task, correctedSourceText);
+  const correctedTypecheck = runTypecheckInConsumer(consumerDir);
+  let correctedBuildExitCode = "not-run";
+
+  if (correctedTypecheck.status === 0) {
+    const correctedBuild = runBuildInConsumer(consumerDir);
+    correctedBuildExitCode = correctedBuild.status;
+  }
+
+  const correctedBuildTypecheckPass =
+    correctedTypecheck.status === 0 && correctedBuildExitCode === 0;
+  const correctedScoring = computeScoring(task, correctedViolations, correctedBuildTypecheckPass);
+
+  if (!correctedScoring.fullPass) {
+    throw new PackedConsumerError(
+      `${context}: corrected output does not achieve a deterministic full pass.`
+    );
+  }
+
+  assertFieldsEqual(
+    evidence.correctedOutput.files,
+    computeFileHashList(correctedDir),
+    "correctedOutput.files",
+    context
+  );
+}
+
+function replayTaskEvidence({
+  contract,
+  manifest,
+  manifestHash,
+  tarballInfo,
+  consumerDir,
+  runId,
+  taskId,
+  taskRunDir
+}) {
+  const context = `Committed run "${runId}" task "${taskId}"`;
+  const evidencePath = join(taskRunDir, "evidence.json");
+
+  if (!existsSync(evidencePath)) {
+    throw new PackedConsumerError(`${context} is missing evidence.json.`);
+  }
+
+  const evidence = readJsonFile(evidencePath);
+  validateEvidenceSchema(evidence, context);
+
+  const rawDir = join(taskRunDir, "raw");
+
+  if (!existsSync(rawDir)) {
+    throw new PackedConsumerError(`${context} is missing a "raw" output directory.`);
+  }
+
+  const task = contract.tasks.find((candidate) => candidate.taskId === taskId);
+  const observed = buildObservedEvidence({
+    contract,
+    task,
+    manifest,
+    manifestHash,
+    tarballInfo,
+    consumerDir,
+    rawDir
+  });
+
+  assertFieldsEqual(evidence.runId, runId, "runId", context);
+  assertFieldsEqual(evidence.taskId, taskId, "taskId", context);
+
+  const comparedFields = [
+    "contractVersion",
+    "repositoryBaselineCommit",
+    "packageName",
+    "packageVersion",
+    "tarballFilename",
+    "tarballSha256",
+    "publicDocManifestId",
+    "publicDocManifestHash",
+    "rawFiles",
+    "publicApisUsed",
+    "moduleSpecifiersUsed",
+    "violations",
+    "typecheckExitCode",
+    "buildExitCode",
+    "criteria",
+    "hardGates",
+    "score",
+    "fullPass",
+    "unnecessaryDependencies",
+    "inventedApiFindings",
+    "boundaryFindings",
+    "scopeFindings"
+  ];
+
+  for (const field of comparedFields) {
+    assertFieldsEqual(evidence[field], observed[field], field, context);
+  }
+
+  if (!Array.isArray(evidence.warnings)) {
+    throw new PackedConsumerError(`${context}: "warnings" must be an array.`);
+  }
+
+  assertHumanCorrectionConsistency(evidence, taskRunDir, task, contract, consumerDir, context);
+  assertClassificationConsistency(evidence, observed.fullPass, context);
+  assertNonEmptyString(evidence.reviewer, "reviewer", context);
+
+  return { runId, taskId, evidence, observed };
+}
+
+// ---------------------------------------------------------------------------
 // Stage 14: committed approved runs
 // ---------------------------------------------------------------------------
 
-function evaluateCommittedRuns(contract, consumerDir) {
-  if (!existsSync(runsDir)) {
+function evaluateCommittedRuns(
+  contract,
+  manifest,
+  manifestHash,
+  tarballInfo,
+  consumerDir,
+  runsDirOverride
+) {
+  const targetRunsDir = runsDirOverride ?? runsDir;
+
+  if (!existsSync(targetRunsDir)) {
     return [];
   }
 
-  const runDirs = readdirSync(runsDir).filter((name) =>
-    statSync(join(runsDir, name)).isDirectory()
-  );
+  const runDirNames = readdirSync(targetRunsDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name);
 
-  if (runDirs.length === 0) {
+  if (runDirNames.length === 0) {
     console.log("  (no committed approved runs found — Phase B has not been recorded yet)");
     return [];
   }
 
   const results = [];
 
-  for (const runId of runDirs) {
-    const runDir = join(runsDir, runId);
+  for (const runId of runDirNames) {
+    const runDir = join(targetRunsDir, runId);
     const runManifestPath = join(runDir, "run-manifest.json");
 
     if (!existsSync(runManifestPath)) {
       throw new PackedConsumerError(`Committed run "${runId}" is missing run-manifest.json.`);
     }
 
-    const runManifest = readJsonFile(runManifestPath);
+    const runManifestData = readJsonFile(runManifestPath);
+    const approval = validateRunManifest(runManifestData, runId, contract, manifest);
 
-    if (runManifest.contractVersion !== contract.contractVersion) {
+    assertFieldsEqual(
+      runManifestData.publicDocManifestHash,
+      manifestHash,
+      "publicDocManifestHash",
+      `Committed run "${runId}" run-manifest.json`
+    );
+
+    const commitCheck = runCommand(
+      "git",
+      ["cat-file", "-e", `${runManifestData.repositoryBaselineCommit}^{commit}`],
+      { cwd: repoRoot }
+    );
+
+    if (commitCheck.status !== 0) {
       throw new PackedConsumerError(
-        `Committed run "${runId}" run-manifest.json contractVersion "${runManifest.contractVersion}" does not match "${contract.contractVersion}".`
+        `Committed run "${runId}" repositoryBaselineCommit does not resolve to a real commit.`
       );
     }
 
-    if (!runManifest.approval || typeof runManifest.approval !== "object") {
+    const taskDirNames = readdirSync(runDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
+
+    for (const dirName of taskDirNames) {
+      if (!EXPECTED_TASK_IDS.includes(dirName)) {
+        throw new PackedConsumerError(
+          `Committed run "${runId}" contains unknown task directory "${dirName}".`
+        );
+      }
+
+      if (!approval.approvedTaskIds.includes(dirName)) {
+        throw new PackedConsumerError(
+          `Committed run "${runId}" contains unapproved task directory "${dirName}".`
+        );
+      }
+    }
+
+    if (taskDirNames.length !== approval.actualRunCount) {
       throw new PackedConsumerError(
-        `Committed run "${runId}" run-manifest.json is missing an "approval" record.`
+        `Committed run "${runId}" has ${taskDirNames.length} task directories on disk, but approval.actualRunCount declares ${approval.actualRunCount}.`
       );
     }
 
-    for (const taskId of EXPECTED_TASK_IDS) {
+    for (const taskId of taskDirNames) {
       const taskRunDir = join(runDir, taskId);
+      const replay = replayTaskEvidence({
+        contract,
+        manifest,
+        manifestHash,
+        tarballInfo,
+        consumerDir,
+        runId,
+        taskId,
+        taskRunDir
+      });
 
-      if (!existsSync(taskRunDir)) {
-        continue;
-      }
+      assertFieldsEqual(
+        replay.evidence.phaseAHarnessCommit,
+        runManifestData.phaseAHarnessCommit,
+        "phaseAHarnessCommit",
+        `Committed run "${runId}" task "${taskId}"`
+      );
 
-      const evidencePath = join(taskRunDir, "evidence.json");
-      const rawAppPath = join(taskRunDir, "raw", "App.tsx");
-
-      if (!existsSync(evidencePath) || !existsSync(rawAppPath)) {
-        throw new PackedConsumerError(
-          `Committed run "${runId}" task "${taskId}" is missing evidence.json or raw/App.tsx.`
-        );
-      }
-
-      const evidence = readJsonFile(evidencePath);
-      const task = contract.tasks.find((candidate) => candidate.taskId === taskId);
-      const sourceText = readFileSync(rawAppPath, "utf8");
-
-      writeAppSource(consumerDir, sourceText);
-
-      const typecheckResult = runTypecheckInConsumer(consumerDir);
-      const buildResult =
-        typecheckResult.status === 0 ? runBuildInConsumer(consumerDir) : { status: null };
-      const violations = evaluateCandidateSource(contract, task, sourceText);
-      const buildTypecheckPass = typecheckResult.status === 0 && buildResult.status === 0;
-      const scoring = computeScoring(task, violations, buildTypecheckPass);
-
-      if (JSON.stringify(scoring.criteria) !== JSON.stringify(evidence.criteria)) {
-        throw new PackedConsumerError(
-          `Committed evidence for "${runId}/${taskId}" does not match deterministic observation (criteria mismatch).`
-        );
-      }
-
-      if (JSON.stringify(scoring.hardGates) !== JSON.stringify(evidence.hardGates)) {
-        throw new PackedConsumerError(
-          `Committed evidence for "${runId}/${taskId}" does not match deterministic observation (hard gate mismatch).`
-        );
-      }
-
-      results.push({ runId, taskId, scoring, classification: evidence.classification });
+      results.push({
+        runId,
+        taskId,
+        classification: replay.evidence.classification,
+        fullPass: replay.observed.fullPass
+      });
     }
   }
 
@@ -1003,6 +1710,446 @@ ${task.requiredBehavior.map((line) => `- ${line}`).join("\n")}
   writeFileSync(join(outputDir, "INSTRUCTIONS.md"), instructions);
 
   console.log(`Prepared sanitized evaluation bundle for ${taskId} at ${outputDir}`);
+
+  auditBundle(outputDir);
+}
+
+// ---------------------------------------------------------------------------
+// Sanitized bundle self-audit
+// ---------------------------------------------------------------------------
+
+function auditBundle(bundleDir) {
+  const manifest = readJsonFile(manifestPath);
+  const expectedDocPaths = new Set(manifest.files.map((entry) => `docs/${entry.path}`));
+  const expectedTopLevel = new Set([
+    "public-docs-manifest.json",
+    "task-contract.json",
+    "INSTRUCTIONS.md",
+    "input/package.json",
+    "input/tsconfig.json",
+    "input/vite.config.ts",
+    "input/index.html",
+    "input/src/main.tsx",
+    "input/src/App.tsx"
+  ]);
+
+  const allFiles = walkFilesRecursive(bundleDir);
+  const unexpected = allFiles.filter(
+    (relativePath) => !expectedDocPaths.has(relativePath) && !expectedTopLevel.has(relativePath)
+  );
+
+  if (unexpected.length > 0) {
+    throw new PackedConsumerError(
+      `Bundle audit failed for ${bundleDir}: unexpected file(s) present:\n${unexpected.join("\n")}`
+    );
+  }
+
+  const missing = [...expectedDocPaths, ...expectedTopLevel].filter(
+    (expectedPath) => !allFiles.includes(expectedPath)
+  );
+
+  if (missing.length > 0) {
+    throw new PackedConsumerError(
+      `Bundle audit failed for ${bundleDir}: expected file(s) missing:\n${missing.join("\n")}`
+    );
+  }
+
+  const fileHashes = computeFileHashList(bundleDir);
+  const bundleHash = createHash("sha256").update(JSON.stringify(fileHashes)).digest("hex");
+
+  console.log(`Bundle audit passed for ${bundleDir}`);
+  console.log(`Sanitized file inventory (${allFiles.length} files):`);
+  for (const relativePath of [...allFiles].sort()) {
+    console.log(`  ${relativePath}`);
+  }
+  console.log(`Bundle content SHA-256: ${bundleHash}`);
+
+  return { bundleHash, fileCount: allFiles.length };
+}
+
+// ---------------------------------------------------------------------------
+// Temporary local self-test mode (--self-test)
+//
+// Proves that the evidence-replay logic in evaluateCommittedRuns() actually
+// rejects tampered/falsified committed evidence. Builds one valid synthetic
+// run entirely under the OS temp directory (never under validation/
+// agent-public-docs/runs/), then clones and tampers it per scenario.
+// ---------------------------------------------------------------------------
+
+function buildBaselineSyntheticRun({ contract, runsRoot, runId }) {
+  const task = contract.tasks.find((candidate) => candidate.taskId === "AGENT-FOUNDATION");
+  const sourceText = readFileSync(
+    join(referenceDir, "AGENT-FOUNDATION", "output", "App.tsx"),
+    "utf8"
+  );
+
+  const runDir = join(runsRoot, runId);
+  const taskRunDir = join(runDir, "AGENT-FOUNDATION");
+  mkdirSync(join(taskRunDir, "raw", "src"), { recursive: true });
+  writeFileSync(join(taskRunDir, "raw", "src", "App.tsx"), sourceText, "utf8");
+
+  return { runDir, taskRunDir, task, sourceText };
+}
+
+function finalizeBaselineEvidence({
+  contract,
+  task,
+  manifest,
+  manifestHash,
+  tarballInfo,
+  consumerDir,
+  taskRunDir,
+  runId,
+  harnessCommit
+}) {
+  const rawDir = join(taskRunDir, "raw");
+  const observed = buildObservedEvidence({
+    contract,
+    task,
+    manifest,
+    manifestHash,
+    tarballInfo,
+    consumerDir,
+    rawDir
+  });
+
+  if (!observed.fullPass) {
+    throw new PackedConsumerError(
+      "Self-test baseline synthetic run (AGENT-FOUNDATION reference output) did not achieve a full pass; cannot build a valid baseline."
+    );
+  }
+
+  const evidence = {
+    evidenceSchemaId: "agent-public-docs-evidence-v1",
+    runId,
+    ...observed,
+    warnings: [],
+    humanCorrectionCount: 0,
+    humanCorrections: [],
+    correctedOutput: null,
+    classification: "VERIFIED",
+    reviewer: "self-test",
+    followUpIssue: null,
+    phaseAHarnessCommit: harnessCommit
+  };
+
+  writeFileSync(join(taskRunDir, "evidence.json"), JSON.stringify(evidence, null, 2));
+
+  return evidence;
+}
+
+function writeBaselineRunManifest({
+  runDir,
+  runId,
+  contract,
+  manifest,
+  manifestHash,
+  harnessCommit
+}) {
+  const runManifestData = {
+    runId,
+    contractVersion: contract.contractVersion,
+    repositoryBaselineCommit: manifest.baselineCommit,
+    phaseAHarnessCommit: harnessCommit,
+    publicDocManifestId: manifest.manifestId,
+    publicDocManifestHash: manifestHash,
+    approval: {
+      approverRole: "repository owner",
+      approvalTimestamp: "2026-01-01T00:00:00Z",
+      approvedService: "self-test",
+      approvedModel: "self-test-model",
+      maxRunCount: 5,
+      approvedTaskIds: ["AGENT-FOUNDATION"],
+      retryCount: 0,
+      iterativeFeedback: "none",
+      suppliedDataBoundary: "self-test synthetic bundle only",
+      privateRepositoryDataBoundary: "none",
+      secretsBoundary: "none",
+      spendBoundary: "none (self-test)",
+      retentionBoundary: "self-test, discarded after this process exits",
+      actualRunCount: 1
+    }
+  };
+
+  writeFileSync(join(runDir, "run-manifest.json"), JSON.stringify(runManifestData, null, 2));
+
+  return runManifestData;
+}
+
+function expectRejected(scenarioName, fn) {
+  try {
+    fn();
+    return { scenarioName, rejected: false, message: "(no error thrown)" };
+  } catch (err) {
+    return {
+      scenarioName,
+      rejected: true,
+      message: err instanceof Error ? err.message : String(err)
+    };
+  }
+}
+
+function expectAccepted(scenarioName, fn) {
+  try {
+    fn();
+    return { scenarioName, accepted: true, message: "(passed as expected)" };
+  } catch (err) {
+    return {
+      scenarioName,
+      accepted: false,
+      message: err instanceof Error ? err.message : String(err)
+    };
+  }
+}
+
+async function runSelfTest() {
+  console.log("Running temporary local self-test (--self-test)...\n");
+
+  const { manifest, manifestHash } = verifyPublicDocManifest();
+  const contract = verifyContractShape();
+  const harnessCommit = getCurrentHarnessCommit();
+  const tempRoot = createTempRoot("r3f-agent-self-test-");
+
+  const outcomes = [];
+
+  try {
+    const tarballInfo = packTarball(packageDir, tempRoot);
+    const consumerDir = createBaseConsumer(tempRoot);
+    cpSync(tarballInfo.tarballPath, join(consumerDir, "r3f-interactive-flow.tgz"));
+
+    const installResult = runCommand(
+      "npm",
+      ["install", "--no-audit", "--no-fund", "--ignore-scripts"],
+      {
+        cwd: consumerDir
+      }
+    );
+    assertCommandSucceeded(installResult, "self-test npm install", "npm install ...");
+
+    const runsRoot = join(tempRoot, "runs-scratch");
+    const runId = "self-test-run";
+
+    const { runDir, taskRunDir, task } = buildBaselineSyntheticRun({
+      contract,
+      runsRoot,
+      runId
+    });
+
+    finalizeBaselineEvidence({
+      contract,
+      task,
+      manifest,
+      manifestHash,
+      tarballInfo,
+      consumerDir,
+      taskRunDir,
+      runId,
+      harnessCommit
+    });
+    writeBaselineRunManifest({ runDir, runId, contract, manifest, manifestHash, harnessCommit });
+
+    function evaluateScenarioRoot(scenarioRoot) {
+      evaluateCommittedRuns(
+        contract,
+        manifest,
+        manifestHash,
+        tarballInfo,
+        consumerDir,
+        scenarioRoot
+      );
+    }
+
+    function cloneBaselineInto(scenarioName) {
+      const scenarioRoot = join(tempRoot, `scenario-${scenarioName}`);
+      cpSync(runsRoot, scenarioRoot, { recursive: true });
+      return {
+        scenarioRoot,
+        scenarioRunDir: join(scenarioRoot, runId),
+        scenarioTaskDir: join(scenarioRoot, runId, "AGENT-FOUNDATION")
+      };
+    }
+
+    function readEvidence(scenarioTaskDir) {
+      return readJsonFile(join(scenarioTaskDir, "evidence.json"));
+    }
+
+    function writeEvidence(scenarioTaskDir, evidence) {
+      writeFileSync(join(scenarioTaskDir, "evidence.json"), JSON.stringify(evidence, null, 2));
+    }
+
+    function readRunManifest(scenarioRunDir) {
+      return readJsonFile(join(scenarioRunDir, "run-manifest.json"));
+    }
+
+    function writeRunManifest(scenarioRunDir, data) {
+      writeFileSync(join(scenarioRunDir, "run-manifest.json"), JSON.stringify(data, null, 2));
+    }
+
+    // Baseline sanity: the unmodified synthetic run must be ACCEPTED.
+    outcomes.push({
+      kind: "baseline",
+      ...expectAccepted("baseline-valid-run-is-accepted", () => evaluateScenarioRoot(runsRoot))
+    });
+
+    // Scenario 1: changed classification (while fullPass stays true).
+    outcomes.push({
+      kind: "rejection",
+      ...expectRejected("changed-classification-is-rejected", () => {
+        const { scenarioRoot, scenarioTaskDir } = cloneBaselineInto("classification");
+        const evidence = readEvidence(scenarioTaskDir);
+        evidence.classification = "AGENT_FAILURE";
+        writeEvidence(scenarioTaskDir, evidence);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Scenario 2: changed criteria value.
+    outcomes.push({
+      kind: "rejection",
+      ...expectRejected("changed-criteria-value-is-rejected", () => {
+        const { scenarioRoot, scenarioTaskDir } = cloneBaselineInto("criteria");
+        const evidence = readEvidence(scenarioTaskDir);
+        const firstKey = Object.keys(evidence.criteria)[0];
+        evidence.criteria[firstKey] = { ...evidence.criteria[firstKey], pass: false };
+        writeEvidence(scenarioTaskDir, evidence);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Scenario 3: changed build/typecheck exit code.
+    outcomes.push({
+      kind: "rejection",
+      ...expectRejected("changed-exit-code-is-rejected", () => {
+        const { scenarioRoot, scenarioTaskDir } = cloneBaselineInto("exit-code");
+        const evidence = readEvidence(scenarioTaskDir);
+        evidence.typecheckExitCode = 1;
+        writeEvidence(scenarioTaskDir, evidence);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Scenario 4: changed human-correction count without a matching corrections array.
+    outcomes.push({
+      kind: "rejection",
+      ...expectRejected("changed-human-correction-count-is-rejected", () => {
+        const { scenarioRoot, scenarioTaskDir } = cloneBaselineInto("correction-count");
+        const evidence = readEvidence(scenarioTaskDir);
+        evidence.humanCorrectionCount = 1;
+        writeEvidence(scenarioTaskDir, evidence);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Scenario 5: corrected-output claim without corrected files on disk.
+    outcomes.push({
+      kind: "rejection",
+      ...expectRejected("corrected-output-claim-without-files-is-rejected", () => {
+        const { scenarioRoot, scenarioTaskDir } = cloneBaselineInto("corrected-without-files");
+        const evidence = readEvidence(scenarioTaskDir);
+        evidence.humanCorrectionCount = 1;
+        evidence.humanCorrections = [{ description: "claimed fix" }];
+        evidence.correctedOutput = { files: [{ path: "src/App.tsx", sha256: "0".repeat(64) }] };
+        evidence.classification = "AGENT_FAILURE";
+        writeEvidence(scenarioTaskDir, evidence);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Scenario 6: a nested unexpected file is rejected (reuses the committed
+    // HARNESS_NEGATIVE fixture directly, not the run-replay mechanism).
+    {
+      const fixture = contract.negativeFixtures.find(
+        (f) => f.fixtureId === "nested-forbidden-file"
+      );
+      const fixtureTask = contract.tasks.find((t) => t.taskId === fixture.basedOnTaskId);
+      const violations = checkOutputFileScope(fixtureTask, join(negativeDir, fixture.fixtureId), {
+        legacyFlatMapping: true,
+        requireAllAllowedPresent: false
+      });
+      const matched = violations.some(
+        (violation) =>
+          violation.code === fixture.expectedViolation && violation.detail === "src/helper.ts"
+      );
+
+      outcomes.push({
+        kind: "rejection",
+        scenarioName: "nested-unexpected-file-is-rejected",
+        rejected: matched,
+        message: matched
+          ? "nested src/helper.ts correctly flagged as forbidden-file-changed"
+          : `nested-forbidden-file fixture did not produce the expected violation. Observed: ${JSON.stringify(violations)}`
+      });
+    }
+
+    // Scenario 7: an unapproved task directory is rejected.
+    outcomes.push({
+      kind: "rejection",
+      ...expectRejected("unapproved-task-directory-is-rejected", () => {
+        const { scenarioRoot, scenarioRunDir, scenarioTaskDir } =
+          cloneBaselineInto("unapproved-task");
+        const extraTaskDir = join(scenarioRunDir, "AGENT-CANVAS");
+        cpSync(scenarioTaskDir, extraTaskDir, { recursive: true });
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Scenario 8: a run count above approval is rejected (actualRunCount
+    // exceeding the approved maxRunCount).
+    outcomes.push({
+      kind: "rejection",
+      ...expectRejected("run-count-above-approval-is-rejected", () => {
+        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("run-count");
+        const runManifestData = readRunManifest(scenarioRunDir);
+        runManifestData.approval.actualRunCount = 6;
+        writeRunManifest(scenarioRunDir, runManifestData);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Scenario 9: a manifest hash mismatch is rejected.
+    outcomes.push({
+      kind: "rejection",
+      ...expectRejected("manifest-hash-mismatch-is-rejected", () => {
+        const { scenarioRoot, scenarioTaskDir } = cloneBaselineInto("manifest-hash");
+        const evidence = readEvidence(scenarioTaskDir);
+        evidence.publicDocManifestHash = "0".repeat(64);
+        writeEvidence(scenarioTaskDir, evidence);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+  } finally {
+    removeTempRoot(tempRoot);
+  }
+
+  console.log("--- Self-test results ---");
+  let allGood = true;
+
+  for (const outcome of outcomes) {
+    if (outcome.kind === "baseline") {
+      const ok = outcome.accepted === true;
+      allGood = allGood && ok;
+      console.log(
+        `${ok ? "✔" : "✘"} ${outcome.scenarioName}: ${ok ? "accepted as expected" : "FAILED — " + outcome.message}`
+      );
+      continue;
+    }
+
+    const ok = outcome.rejected === true;
+    allGood = allGood && ok;
+    console.log(
+      `${ok ? "✔" : "✘"} ${outcome.scenarioName}: ${ok ? "rejected as expected" : "FAILED — evidence was NOT rejected"}`
+    );
+  }
+
+  if (!allGood) {
+    throw new PackedConsumerError(
+      "Self-test failed: one or more scenarios did not behave as expected."
+    );
+  }
+
+  console.log(
+    "\nSelf-test passed: all tamper scenarios were rejected and the valid baseline was accepted."
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1011,6 +2158,27 @@ ${task.requiredBehavior.map((line) => `- ${line}`).join("\n")}
 
 async function main() {
   const args = process.argv.slice(2);
+
+  if (args.includes("--self-test")) {
+    await runSelfTest();
+    return;
+  }
+
+  const auditBundleIndex = args.indexOf("--audit-bundle");
+
+  if (auditBundleIndex !== -1) {
+    const bundleDir = args[auditBundleIndex + 1];
+
+    if (!bundleDir) {
+      throw new PackedConsumerError(
+        "Usage: node scripts/verify-agent-public-docs.mjs --audit-bundle <bundle-directory>"
+      );
+    }
+
+    auditBundle(bundleDir);
+    return;
+  }
+
   const prepareRunIndex = args.indexOf("--prepare-run");
 
   if (prepareRunIndex !== -1) {
@@ -1037,7 +2205,7 @@ async function main() {
     ])
   );
 
-  const manifest = step("verify public-doc manifest", verifyPublicDocManifest);
+  const { manifest, manifestHash } = step("verify public-doc manifest", verifyPublicDocManifest);
   const contract = step("verify contract version and task IDs", verifyContractShape);
   step("verify task input fixtures are immutable", () => verifyTaskInputImmutability(contract));
 
@@ -1092,13 +2260,15 @@ async function main() {
 
     console.log("\n--- Committed approved runs (Phase B evidence) ---");
     const committedRunResults = step("evaluate committed approved runs", () =>
-      evaluateCommittedRuns(contract, consumerDir)
+      evaluateCommittedRuns(contract, manifest, manifestHash, tarballInfo, consumerDir)
     );
 
     console.log("\n--- Evidence summary ---");
     console.log(`contract version: ${contract.contractVersion}`);
     console.log(`public-doc manifest ID: ${manifest.manifestId}`);
+    console.log(`public-doc manifest content SHA-256: ${manifestHash}`);
     console.log(`repository baseline commit: ${manifest.baselineCommit}`);
+    console.log(`Phase A harness commit (current checkout): ${getCurrentHarnessCommit()}`);
     console.log(`source package: ${tarballInfo.packageName}@${tarballInfo.packageVersion}`);
     console.log(`tarball filename: ${tarballInfo.filename}`);
     console.log(`tarball SHA-256: ${tarballInfo.sha256}`);

@@ -1,0 +1,57 @@
+{
+  "schemaId": "agent-public-docs-evidence-v1",
+  "appliesToContractVersion": "agent-public-docs-v1",
+  "classification": {
+    "allowedValues": [
+      "PACKAGE_FAILURE",
+      "DOCUMENTATION_FAILURE",
+      "AGENT_FAILURE",
+      "HARNESS_FAILURE",
+      "ENVIRONMENT_FAILURE",
+      "MIXED_OR_UNRESOLVED",
+      "VERIFIED"
+    ]
+  },
+  "requiredFields": [
+    "evidenceSchemaId",
+    "runId",
+    "taskId",
+    "contractVersion",
+    "repositoryBaselineCommit",
+    "phaseAHarnessCommit",
+    "packageName",
+    "packageVersion",
+    "tarballFilename",
+    "tarballSha256",
+    "publicDocManifestId",
+    "publicDocManifestHash",
+    "rawFiles",
+    "publicApisUsed",
+    "moduleSpecifiersUsed",
+    "violations",
+    "typecheckExitCode",
+    "buildExitCode",
+    "criteria",
+    "hardGates",
+    "score",
+    "fullPass",
+    "unnecessaryDependencies",
+    "inventedApiFindings",
+    "boundaryFindings",
+    "scopeFindings",
+    "warnings",
+    "humanCorrectionCount",
+    "humanCorrections",
+    "correctedOutput",
+    "classification",
+    "reviewer",
+    "followUpIssue"
+  ],
+  "nullableFields": ["correctedOutput", "followUpIssue"],
+  "conditionalFields": {
+    "PACKAGE_FAILURE": ["packageFailureIndependentReproduction"],
+    "DOCUMENTATION_FAILURE": ["documentationGap"],
+    "ENVIRONMENT_FAILURE": ["environmentFailure"],
+    "MIXED_OR_UNRESOLVED": ["reviewerRationale"]
+  }
+}
