@@ -4,3 +4,5 @@ node_modules
 packages/r3f-interactive-flow/dist
 examples/vite-basic/dist
 pnpm-lock.yaml
+validation/agent-public-docs/runs/**/raw
+validation/agent-public-docs/runs/**/corrected

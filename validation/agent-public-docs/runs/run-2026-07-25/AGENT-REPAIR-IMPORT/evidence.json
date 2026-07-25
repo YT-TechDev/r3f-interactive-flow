@@ -1,0 +1,146 @@
+{
+  "evidenceSchemaId": "agent-public-docs-evidence-v1",
+  "runId": "run-2026-07-25",
+  "timestamp": "2026-07-25T06:14:24Z",
+  "evaluatedService": "Claude Code through the repository owner's existing account",
+  "exactEvaluatedModelIdentifier": "claude-sonnet-5",
+  "approvedRunIndex": 4,
+  "taskId": "AGENT-REPAIR-IMPORT",
+  "contractVersion": "agent-public-docs-v1",
+  "promptTaskContractId": "agent-public-docs-v1",
+  "ownerIssue": "#406",
+  "packageSource": "local packed tarball",
+  "repositoryBaselineCommit": "da49ab28fd59e92149c0aeb77eba18ec82818144",
+  "environment": {
+    "os": "linux",
+    "arch": "x64",
+    "nodeVersion": "v22.22.2",
+    "pnpmVersion": "11.5.0"
+  },
+  "toolchain": {
+    "react": "19.2.8",
+    "reactDom": "19.2.8",
+    "r3f": "9.6.1",
+    "three": "0.185.1",
+    "typescript": "6.0.3",
+    "vite": "8.1.5"
+  },
+  "packageName": "r3f-interactive-flow",
+  "packageVersion": "2.8.0",
+  "tarballFilename": "r3f-interactive-flow-2.8.0.tgz",
+  "tarballSha256": "e048d0e10f317ae3cc1b3321f9c32b782fa2ed3dfd273419f49a27a8fda210a5",
+  "publicDocManifestId": "agent-public-docs-manifest-v1",
+  "publicDocManifestHash": "b35af974b2af9e642372d43f1a3043b8e88c7a4a5904c89f87cd72b6b8e82cc2",
+  "rawFiles": [
+    {
+      "path": "src/App.tsx",
+      "sha256": "989de8f147589795e2de4fc051ec777330444fc31116e1efba2c60882e37a74f"
+    }
+  ],
+  "filesChanged": ["src/App.tsx"],
+  "publicApisUsed": ["FlowProvider", "useFlow"],
+  "moduleSpecifiersUsed": ["r3f-interactive-flow"],
+  "commandsExecuted": ["tsc --noEmit", "vite build"],
+  "commandExitCodes": {
+    "tsc --noEmit": 0,
+    "vite build": 0
+  },
+  "violations": [],
+  "typecheckExitCode": 0,
+  "buildExitCode": 0,
+  "criteria": {
+    "1-build-typecheck": {
+      "applicable": true,
+      "pass": true
+    },
+    "2-required-behavior": {
+      "applicable": true,
+      "pass": true
+    },
+    "3-package-root-imports": {
+      "applicable": true,
+      "pass": true
+    },
+    "4-client-boundary": {
+      "applicable": false,
+      "pass": null,
+      "reason": "plain Vite consumer with no Server/Client Component split"
+    },
+    "5-canvas-boundary": {
+      "applicable": false,
+      "pass": null,
+      "reason": "fixture has no Canvas"
+    },
+    "6-no-invented-api": {
+      "applicable": true,
+      "pass": true
+    },
+    "7-no-dependency": {
+      "applicable": true,
+      "pass": true
+    },
+    "8-scope": {
+      "applicable": true,
+      "pass": true
+    }
+  },
+  "hardGates": {
+    "build-typecheck-succeeds": {
+      "applicable": true,
+      "pass": true
+    },
+    "package-root-imports-only": {
+      "applicable": true,
+      "pass": true
+    },
+    "no-invented-api-or-export": {
+      "applicable": true,
+      "pass": true
+    },
+    "canvas-boundary-correct": {
+      "applicable": false,
+      "pass": null
+    },
+    "no-secret-or-private-repo-exposure": {
+      "applicable": true,
+      "pass": true
+    }
+  },
+  "score": {
+    "passedApplicableCriteria": 6,
+    "totalApplicableCriteria": 6
+  },
+  "fullPass": true,
+  "warnings": [],
+  "positiveAssertions": [
+    {
+      "assertion": "`useFlow` is imported from exactly `\"r3f-interactive-flow\"`",
+      "satisfied": true
+    },
+    {
+      "assertion": "the `FlowProvider` + `useFlow` next/prev behavior from the input fixture is preserved",
+      "satisfied": true
+    }
+  ],
+  "negativeAssertions": [
+    {
+      "assertion": "no occurrence of `r3f-interactive-flow/` anywhere in the file",
+      "violated": false
+    },
+    {
+      "assertion": "no import outside the allowed module specifier list",
+      "violated": false
+    }
+  ],
+  "unnecessaryDependencies": [],
+  "inventedApiFindings": [],
+  "boundaryFindings": [],
+  "scopeFindings": [],
+  "humanCorrectionCount": 0,
+  "humanCorrections": [],
+  "correctedOutput": null,
+  "classification": "VERIFIED",
+  "reviewer": "repository owner",
+  "followUpIssue": null,
+  "phaseAHarnessCommit": "d84573d9b90d1bc4618c071473a309516821143c"
+}
