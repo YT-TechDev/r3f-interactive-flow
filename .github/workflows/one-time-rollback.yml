@@ -10,18 +10,16 @@ on:
       - synchronize
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   EXPECTED_BASE: b5de5df765e7330127da56502ba81917558ad15f
   TARGET_COMMIT: 3187d2e819f3cbcdb0c26aea6142a79afb4d4ae9
-  TARGET_BRANCH: revert/to-v2.8.0-baseline
-  WORKFLOW_PATH: .github/workflows/one-time-rollback.yml
 
 jobs:
   rollback:
-    name: Restore v2.8.0 baseline tree
-    if: github.head_ref == 'revert/to-v2.8.0-baseline' && github.actor != 'github-actions[bot]'
+    name: Resolve v2.8.0 baseline tree
+    if: github.head_ref == 'revert/to-v2.8.0-baseline'
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
@@ -32,31 +30,20 @@ jobs:
           fetch-depth: 0
           ref: revert/to-v2.8.0-baseline
 
-      - name: Verify source commits
+      - name: Verify source and record exact target tree
         run: |
           set -euo pipefail
           git fetch origin main --no-tags
           test "$(git merge-base HEAD origin/main)" = "$EXPECTED_BASE"
           test "$(git rev-parse origin/main)" = "$EXPECTED_BASE"
           git cat-file -e "$TARGET_COMMIT^{commit}"
+          git rev-parse "$TARGET_COMMIT^{tree}" > rollback-target-tree.txt
+          test -s rollback-target-tree.txt
 
-      - name: Stage exact target tree
-        run: |
-          set -euo pipefail
-          cp "$WORKFLOW_PATH" /tmp/one-time-rollback.yml
-          git restore --source="$TARGET_COMMIT" --staged --worktree -- .
-          test "$(git write-tree)" = "$(git rev-parse "$TARGET_COMMIT^{tree}")"
-          mkdir -p "$(dirname "$WORKFLOW_PATH")"
-          cp /tmp/one-time-rollback.yml "$WORKFLOW_PATH"
-          git add "$WORKFLOW_PATH"
-
-      - name: Commit rollback tree
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "revert: restore v2.8.0 baseline"
-          test "$(git diff --name-only "$TARGET_COMMIT" HEAD)" = "$WORKFLOW_PATH"
-
-      - name: Push rollback commit
-        run: git push origin "HEAD:$TARGET_BRANCH"
+      - name: Upload target tree SHA
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollback-target-tree
+          path: rollback-target-tree.txt
+          if-no-files-found: error
+          retention-days: 1
