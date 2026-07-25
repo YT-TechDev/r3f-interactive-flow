@@ -944,10 +944,26 @@ function getCurrentHarnessCommit() {
 }
 
 // ---------------------------------------------------------------------------
-// Finding 2: baseline binding via Git-object reads (never the working tree)
+// Finding 2 / squash-merge hotfix: two distinct artifact concepts.
+//
+// HISTORICAL_HARNESS_ARTIFACT_* is the full path set that existed at Phase A
+// approval time (the harness implementation itself plus its task/fixture
+// data). It is recorded, once, into an approved run's immutable
+// `phaseAHarnessArtifacts` and is never recomputed against current HEAD —
+// only against `phaseAHarnessCommit` itself, when that historical commit
+// object is still locally available. This is provenance: proof that the
+// recorded snapshot is not lying about what existed at that commit.
+//
+// IMMUTABLE_EVALUATION_CONTRACT_* is a strict subset of the historical set:
+// the task contract, evidence schema, public-doc manifest, and fixture data
+// that define what a run was actually evaluated against. Because it excludes
+// the verifier script and maintainer prose, it can be — and is — checked for
+// exact equality against current HEAD, regardless of merge strategy or
+// source-branch deletion, without requiring the harness implementation or
+// its documentation to stay byte-identical forever.
 // ---------------------------------------------------------------------------
 
-const HARNESS_ARTIFACT_FILES = [
+const HISTORICAL_HARNESS_ARTIFACT_FILES = [
   "scripts/verify-agent-public-docs.mjs",
   "validation/agent-public-docs/contracts/agent-public-docs-v1.json",
   "validation/agent-public-docs/contracts/agent-public-docs-evidence-v1.json",
@@ -955,7 +971,20 @@ const HARNESS_ARTIFACT_FILES = [
   "docs/releases/v2.9.0-agent-evaluation-protocol.md"
 ];
 
-const HARNESS_ARTIFACT_DIRECTORIES = [
+const HISTORICAL_HARNESS_ARTIFACT_DIRECTORIES = [
+  "validation/agent-public-docs/base",
+  "validation/agent-public-docs/tasks",
+  "validation/agent-public-docs/reference",
+  "validation/agent-public-docs/negative"
+];
+
+const IMMUTABLE_EVALUATION_CONTRACT_FILES = [
+  "validation/agent-public-docs/contracts/agent-public-docs-v1.json",
+  "validation/agent-public-docs/contracts/agent-public-docs-evidence-v1.json",
+  "validation/agent-public-docs/public-docs-manifest.json"
+];
+
+const IMMUTABLE_EVALUATION_CONTRACT_DIRECTORIES = [
   "validation/agent-public-docs/base",
   "validation/agent-public-docs/tasks",
   "validation/agent-public-docs/reference",
@@ -987,10 +1016,14 @@ function listGitTreeFiles(commit, dirPrefix) {
     .filter((line) => line.length > 0);
 }
 
-function computeHarnessArtifactHashesAtCommit(commit) {
-  const paths = new Set(HARNESS_ARTIFACT_FILES);
+function computeFilesAggregateSha256(files) {
+  return createHash("sha256").update(JSON.stringify(files)).digest("hex");
+}
 
-  for (const dir of HARNESS_ARTIFACT_DIRECTORIES) {
+function computeArtifactSnapshotAtCommit(commit, fixedFiles, directories, snapshotLabel) {
+  const paths = new Set(fixedFiles);
+
+  for (const dir of directories) {
     for (const path of listGitTreeFiles(commit, dir)) {
       paths.add(path);
     }
@@ -1003,70 +1036,234 @@ function computeHarnessArtifactHashesAtCommit(commit) {
 
     if (sha256 === null) {
       throw new PackedConsumerError(
-        `Commit "${commit}" does not contain required harness artifact "${path}".`
+        `Commit "${commit}" does not contain required ${snapshotLabel} artifact "${path}".`
       );
     }
 
     files.push({ path, sha256 });
   }
 
-  const aggregateSha256 = createHash("sha256").update(JSON.stringify(files)).digest("hex");
-
-  return { files, aggregateSha256 };
+  return { files, aggregateSha256: computeFilesAggregateSha256(files) };
 }
 
-function assertHarnessBaselineBinding(runManifestData, context) {
-  const declaredCommit = runManifestData.phaseAHarnessCommit;
+// The full historical snapshot: everything recorded into an approved run's
+// `phaseAHarnessArtifacts` at Phase A approval time.
+function computeHistoricalHarnessSnapshot(commit) {
+  return computeArtifactSnapshotAtCommit(
+    commit,
+    HISTORICAL_HARNESS_ARTIFACT_FILES,
+    HISTORICAL_HARNESS_ARTIFACT_DIRECTORIES,
+    "historical harness"
+  );
+}
 
-  const commitExists = runCommand("git", ["cat-file", "-e", `${declaredCommit}^{commit}`], {
-    cwd: repoRoot
-  });
+// The durable compatibility boundary: only the task contract, evidence
+// schema, public-doc manifest, and fixture data — never the verifier script
+// or maintainer prose.
+function computeImmutableContractSnapshot(commit) {
+  return computeArtifactSnapshotAtCommit(
+    commit,
+    IMMUTABLE_EVALUATION_CONTRACT_FILES,
+    IMMUTABLE_EVALUATION_CONTRACT_DIRECTORIES,
+    "immutable evaluation-contract"
+  );
+}
 
-  if (commitExists.status !== 0) {
+function isPathWithinAllowlist(path, fixedFiles, directories) {
+  if (fixedFiles.includes(path)) {
+    return true;
+  }
+
+  return directories.some((dir) => path === dir || path.startsWith(`${dir}/`));
+}
+
+function isHistoricalHarnessPath(path) {
+  return isPathWithinAllowlist(
+    path,
+    HISTORICAL_HARNESS_ARTIFACT_FILES,
+    HISTORICAL_HARNESS_ARTIFACT_DIRECTORIES
+  );
+}
+
+function isImmutableEvaluationContractPath(path) {
+  return isPathWithinAllowlist(
+    path,
+    IMMUTABLE_EVALUATION_CONTRACT_FILES,
+    IMMUTABLE_EVALUATION_CONTRACT_DIRECTORIES
+  );
+}
+
+// Validates the shape of a recorded historical snapshot on its own terms —
+// no Git access, so this always runs regardless of whether
+// phaseAHarnessCommit is locally available: every path is inside the
+// historical allowlist, every required fixed file is present, paths are
+// unique and sorted, and the aggregate is self-consistent with the files it
+// claims to summarize.
+function assertHistoricalSnapshotShape(historicalSnapshot, context) {
+  const files = historicalSnapshot?.files;
+  const aggregateSha256 = historicalSnapshot?.aggregateSha256;
+
+  if (!Array.isArray(files) || files.length === 0) {
     throw new PackedConsumerError(
-      `${context}: phaseAHarnessCommit "${declaredCommit}" does not resolve to a real commit.`
+      `${context}: phaseAHarnessArtifacts.files must be a non-empty array.`
     );
   }
+
+  const seenPaths = new Set();
+
+  for (const entry of files) {
+    if (!entry || typeof entry.path !== "string" || entry.path.length === 0) {
+      throw new PackedConsumerError(
+        `${context}: phaseAHarnessArtifacts.files contains an entry with an invalid "path".`
+      );
+    }
+
+    if (typeof entry.sha256 !== "string" || !/^[0-9a-f]{64}$/.test(entry.sha256)) {
+      throw new PackedConsumerError(
+        `${context}: phaseAHarnessArtifacts.files["${entry.path}"] does not have a valid lowercase SHA-256 hex digest.`
+      );
+    }
+
+    if (seenPaths.has(entry.path)) {
+      throw new PackedConsumerError(
+        `${context}: phaseAHarnessArtifacts.files contains duplicate path "${entry.path}".`
+      );
+    }
+
+    seenPaths.add(entry.path);
+
+    if (!isHistoricalHarnessPath(entry.path)) {
+      throw new PackedConsumerError(
+        `${context}: phaseAHarnessArtifacts.files contains unexpected path "${entry.path}" outside the historical harness artifact allowlist.`
+      );
+    }
+  }
+
+  for (const fixedFile of HISTORICAL_HARNESS_ARTIFACT_FILES) {
+    if (!seenPaths.has(fixedFile)) {
+      throw new PackedConsumerError(
+        `${context}: phaseAHarnessArtifacts.files is missing required historical path "${fixedFile}".`
+      );
+    }
+  }
+
+  const actualPaths = files.map((entry) => entry.path);
+  const sortedPaths = [...actualPaths].sort();
+
+  if (JSON.stringify(actualPaths) !== JSON.stringify(sortedPaths)) {
+    throw new PackedConsumerError(
+      `${context}: phaseAHarnessArtifacts.files must be sorted by path.`
+    );
+  }
+
+  const recomputedAggregate = computeFilesAggregateSha256(files);
+
+  if (typeof aggregateSha256 !== "string" || aggregateSha256 !== recomputedAggregate) {
+    throw new PackedConsumerError(
+      `${context}: phaseAHarnessArtifacts.aggregateSha256 does not match the recomputed aggregate over "files".`
+    );
+  }
+}
+
+// Derives the expected immutable evaluation-contract subset from the frozen
+// historical snapshot, using the same canonical serialization
+// (computeFilesAggregateSha256) as computeImmutableContractSnapshot() so the
+// two sides are directly comparable.
+function selectRecordedImmutableContractSnapshot(historicalSnapshot) {
+  const files = historicalSnapshot.files
+    .filter((entry) => isImmutableEvaluationContractPath(entry.path))
+    .slice()
+    .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+
+  return { files, aggregateSha256: computeFilesAggregateSha256(files) };
+}
+
+// Exactly 40 hex characters (upper or lower case), matching the shape of a
+// full Git commit SHA-1. This is a provenance shape check only: it does not
+// imply the commit is reachable, locally present, or an ancestor of HEAD.
+const HARNESS_COMMIT_SHA_PATTERN = /^[0-9a-fA-F]{40}$/;
+
+function assertHarnessCommitShape(declaredCommit, context) {
+  assertNonEmptyString(declaredCommit, "phaseAHarnessCommit", context);
+
+  if (!HARNESS_COMMIT_SHA_PATTERN.test(declaredCommit.trim())) {
+    throw new PackedConsumerError(
+      `${context}: phaseAHarnessCommit "${declaredCommit}" is not a 40-character hexadecimal commit SHA.`
+    );
+  }
+}
+
+// Historical provenance and current replay compatibility are two separate
+// properties, and this function verifies them separately:
+//
+//   1. The recorded historical snapshot (`runManifestData.phaseAHarnessArtifacts`)
+//      is immutable evidence. Its shape is always validated. When
+//      `phaseAHarnessCommit` is still locally available, its own full
+//      snapshot is recomputed via Git object reads and must exactly equal
+//      the recorded one — proof the record isn't lying about what existed
+//      at that commit. Ancestry to current HEAD is never required, and
+//      local unavailability (e.g. after a squash merge deletes the source
+//      branch) never fails the run on its own.
+//   2. The durable compatibility boundary — the task contract, evidence
+//      schema, public-doc manifest, and fixture data, but never the
+//      verifier script or maintainer prose — is recomputed at current HEAD
+//      and compared against the matching subset of the recorded historical
+//      snapshot. This is the only check that runs against current HEAD, so
+//      the verifier script and its documentation can keep evolving after a
+//      run is approved without rewriting that run's historical evidence.
+function assertHarnessBaselineBinding(runManifestData, context) {
+  const declaredCommit = runManifestData.phaseAHarnessCommit;
+  assertHarnessCommitShape(declaredCommit, context);
+  const normalizedDeclaredCommit = declaredCommit.trim().toLowerCase();
+
+  const historicalSnapshot = runManifestData.phaseAHarnessArtifacts;
+  assertHistoricalSnapshotShape(historicalSnapshot, context);
 
   const headResult = runCommand("git", ["rev-parse", "HEAD"], { cwd: repoRoot });
   assertCommandSucceeded(headResult, "resolve current HEAD", "git rev-parse HEAD");
   const currentHead = headResult.stdout.trim();
 
-  const isAncestor = runCommand(
-    "git",
-    ["merge-base", "--is-ancestor", declaredCommit, currentHead],
-    { cwd: repoRoot }
-  );
+  const recomputedImmutableContractAtHead = computeImmutableContractSnapshot(currentHead);
+  const recordedImmutableContractSubset =
+    selectRecordedImmutableContractSnapshot(historicalSnapshot);
 
-  if (isAncestor.status !== 0) {
-    throw new PackedConsumerError(
-      `${context}: phaseAHarnessCommit "${declaredCommit}" is not an ancestor of the current branch HEAD (${currentHead}).`
-    );
-  }
-
-  const recomputedAtCommit = computeHarnessArtifactHashesAtCommit(declaredCommit);
   assertFieldsEqual(
-    runManifestData.phaseAHarnessArtifacts,
-    recomputedAtCommit,
-    "phaseAHarnessArtifacts",
+    recomputedImmutableContractAtHead,
+    recordedImmutableContractSubset,
+    "immutable evaluation-contract artifact subset (current HEAD)",
     context
   );
 
-  const recomputedAtHead = computeHarnessArtifactHashesAtCommit(currentHead);
+  const commitExists = runCommand(
+    "git",
+    ["cat-file", "-e", `${normalizedDeclaredCommit}^{commit}`],
+    { cwd: repoRoot }
+  );
+
+  if (commitExists.status !== 0) {
+    console.log(
+      `${context}: Phase A provenance commit is not locally available; recorded historical snapshot shape is valid and the current-HEAD immutable evaluation-contract subset matches it.`
+    );
+    return;
+  }
+
+  const recomputedHistoricalAtProvenanceCommit =
+    computeHistoricalHarnessSnapshot(normalizedDeclaredCommit);
   assertFieldsEqual(
-    recomputedAtCommit,
-    recomputedAtHead,
-    "phaseAHarnessArtifacts (unchanged between phaseAHarnessCommit and current HEAD)",
+    recomputedHistoricalAtProvenanceCommit,
+    historicalSnapshot,
+    "phaseAHarnessArtifacts (historical, phaseAHarnessCommit provenance)",
     context
   );
 }
 
 // Creates a real, addressable commit object that reuses the current HEAD's
-// tree (so its content matches HEAD exactly) but has no parent, so it is
-// never reachable as an ancestor of HEAD. Used only by --self-test to prove
-// the ancestor check rejects an "unrelated existing commit"; it is never
-// referenced by any branch/tag, never pushed, and becomes an ordinary
-// unreferenced object once this process exits.
+// tree (so its harness artifact content matches HEAD exactly) but has no
+// parent, so it is never reachable as an ancestor of HEAD. Used only by
+// --self-test to prove the squash-merge shape (a locally available,
+// non-ancestor provenance commit whose artifact snapshot still matches) is
+// accepted; it is never referenced by any branch/tag, never pushed, and
+// becomes an ordinary unreferenced object once this process exits.
 function createOrphanCommitFromCurrentHead() {
   const treeResult = runCommand("git", ["rev-parse", "HEAD^{tree}"], { cwd: repoRoot });
   assertCommandSucceeded(treeResult, "resolve current HEAD tree", "git rev-parse HEAD^{tree}");
@@ -2336,7 +2533,7 @@ function writeBaselineRunManifest({
     contractVersion: contract.contractVersion,
     repositoryBaselineCommit: manifest.baselineCommit,
     phaseAHarnessCommit: harnessCommit,
-    phaseAHarnessArtifacts: computeHarnessArtifactHashesAtCommit(harnessCommit),
+    phaseAHarnessArtifacts: computeHistoricalHarnessSnapshot(harnessCommit),
     publicDocManifestId: manifest.manifestId,
     publicDocManifestHash: manifestHash,
     approval: {
@@ -2617,58 +2814,291 @@ async function runSelfTest() {
       })
     });
 
-    // Scenario 11 (Finding 2): nonexistent phaseAHarnessCommit.
-    outcomes.push({
-      kind: "rejection",
-      ...expectRejected("nonexistent-harness-commit-is-rejected", () => {
-        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("nonexistent-harness-commit");
-        const runManifestData = readRunManifest(scenarioRunDir);
-        runManifestData.phaseAHarnessCommit = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
-        writeRunManifest(scenarioRunDir, runManifestData);
-        evaluateScenarioRoot(scenarioRoot);
-      })
-    });
+    // A stable well-formed, but never-fetched, 40-hex commit identifier used
+    // to simulate "the provenance commit is not locally available" (e.g.
+    // after a squash merge deletes the source branch).
+    const UNAVAILABLE_PROVENANCE_COMMIT = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
 
-    // Scenario 12 (Finding 2): an existing but unrelated phaseAHarnessCommit
-    // (a real commit, not an ancestor of current HEAD).
+    function retamperAggregate(historicalSnapshot) {
+      historicalSnapshot.aggregateSha256 = computeFilesAggregateSha256(historicalSnapshot.files);
+      return historicalSnapshot;
+    }
+
+    // Required scenario 2: squash-merge equivalent. The declared provenance
+    // commit is real and locally available, its full historical snapshot
+    // equals the recorded snapshot, but it is deliberately NOT an ancestor
+    // of current HEAD — exactly what squash merge produces on `main` after
+    // discarding source-branch ancestry. Must be ACCEPTED.
     outcomes.push({
-      kind: "rejection",
-      ...expectRejected("unrelated-harness-commit-is-rejected", () => {
+      kind: "baseline",
+      ...expectAccepted("squash-merge-provenance-commit-is-accepted", () => {
         const orphanCommit = createOrphanCommitFromCurrentHead();
-        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("unrelated-harness-commit");
+        const { scenarioRoot, scenarioRunDir, scenarioTaskDir } =
+          cloneBaselineInto("squash-merge-provenance");
         const runManifestData = readRunManifest(scenarioRunDir);
         runManifestData.phaseAHarnessCommit = orphanCommit;
-        runManifestData.phaseAHarnessArtifacts = computeHarnessArtifactHashesAtCommit(orphanCommit);
         writeRunManifest(scenarioRunDir, runManifestData);
+        const evidence = readEvidence(scenarioTaskDir);
+        evidence.phaseAHarnessCommit = orphanCommit;
+        writeEvidence(scenarioTaskDir, evidence);
         evaluateScenarioRoot(scenarioRoot);
       })
     });
 
-    // Scenario 13 (Finding 2): a tampered harness artifact hash (does not
-    // match the real content at the declared commit).
+    // Required scenario 3: unavailable provenance commit. A well-formed
+    // 40-hex commit identifier that is not present in the local object
+    // database. Must be ACCEPTED as long as the current-HEAD immutable
+    // evaluation-contract subset matches the recorded historical snapshot;
+    // local unavailability alone must never cause rejection.
     outcomes.push({
-      kind: "rejection",
-      ...expectRejected("changed-harness-artifact-hash-is-rejected", () => {
-        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("harness-artifact-hash");
+      kind: "baseline",
+      ...expectAccepted("unavailable-provenance-commit-is-accepted", () => {
+        const { scenarioRoot, scenarioRunDir, scenarioTaskDir } = cloneBaselineInto(
+          "unavailable-provenance-commit"
+        );
         const runManifestData = readRunManifest(scenarioRunDir);
-        runManifestData.phaseAHarnessArtifacts.files[0] = {
-          ...runManifestData.phaseAHarnessArtifacts.files[0],
-          sha256: "0".repeat(64)
-        };
+        runManifestData.phaseAHarnessCommit = UNAVAILABLE_PROVENANCE_COMMIT;
+        writeRunManifest(scenarioRunDir, runManifestData);
+        const evidence = readEvidence(scenarioTaskDir);
+        evidence.phaseAHarnessCommit = UNAVAILABLE_PROVENANCE_COMMIT;
+        writeEvidence(scenarioTaskDir, evidence);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Required scenario 4: current verifier-script drift alone is accepted.
+    // The recorded historical hash for scripts/verify-agent-public-docs.mjs
+    // no longer matches reality (simulating the script having legitimately
+    // changed since Phase A approval), and the provenance commit is
+    // unavailable so the historical cross-check is skipped. Because the
+    // verifier script is excluded from the immutable evaluation-contract
+    // subset, this must still be ACCEPTED — proving the replay
+    // implementation can evolve without rewriting historical evidence.
+    outcomes.push({
+      kind: "baseline",
+      ...expectAccepted("current-verifier-script-drift-alone-is-accepted", () => {
+        const { scenarioRoot, scenarioRunDir, scenarioTaskDir } =
+          cloneBaselineInto("verifier-script-drift");
+        const runManifestData = readRunManifest(scenarioRunDir);
+        runManifestData.phaseAHarnessCommit = UNAVAILABLE_PROVENANCE_COMMIT;
+        const scriptEntry = runManifestData.phaseAHarnessArtifacts.files.find(
+          (entry) => entry.path === "scripts/verify-agent-public-docs.mjs"
+        );
+        scriptEntry.sha256 = "0".repeat(64);
+        retamperAggregate(runManifestData.phaseAHarnessArtifacts);
+        writeRunManifest(scenarioRunDir, runManifestData);
+        const evidence = readEvidence(scenarioTaskDir);
+        evidence.phaseAHarnessCommit = UNAVAILABLE_PROVENANCE_COMMIT;
+        writeEvidence(scenarioTaskDir, evidence);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Required scenario 5: current protocol-document drift alone is
+    // accepted. Same shape as scenario 4, but targeting
+    // docs/releases/v2.9.0-agent-evaluation-protocol.md.
+    outcomes.push({
+      kind: "baseline",
+      ...expectAccepted("current-protocol-document-drift-alone-is-accepted", () => {
+        const { scenarioRoot, scenarioRunDir, scenarioTaskDir } =
+          cloneBaselineInto("protocol-document-drift");
+        const runManifestData = readRunManifest(scenarioRunDir);
+        runManifestData.phaseAHarnessCommit = UNAVAILABLE_PROVENANCE_COMMIT;
+        const protocolEntry = runManifestData.phaseAHarnessArtifacts.files.find(
+          (entry) => entry.path === "docs/releases/v2.9.0-agent-evaluation-protocol.md"
+        );
+        protocolEntry.sha256 = "0".repeat(64);
+        retamperAggregate(runManifestData.phaseAHarnessArtifacts);
+        writeRunManifest(scenarioRunDir, runManifestData);
+        const evidence = readEvidence(scenarioTaskDir);
+        evidence.phaseAHarnessCommit = UNAVAILABLE_PROVENANCE_COMMIT;
+        writeEvidence(scenarioTaskDir, evidence);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Required scenario 6: malformed provenance commit identifier (not a
+    // 40-character hexadecimal string). Must be REJECTED regardless of
+    // artifact snapshot content.
+    outcomes.push({
+      kind: "rejection",
+      ...expectRejected("malformed-provenance-commit-identifier-is-rejected", () => {
+        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("malformed-harness-commit");
+        const runManifestData = readRunManifest(scenarioRunDir);
+        runManifestData.phaseAHarnessCommit = "not-a-valid-commit-sha";
         writeRunManifest(scenarioRunDir, runManifestData);
         evaluateScenarioRoot(scenarioRoot);
       })
     });
 
-    // Scenario 14 (Finding 2): phaseAHarnessCommit references a real
-    // ancestor commit whose harness-defining files differ from (predate)
-    // current HEAD — proves drift/incompleteness since approval is rejected.
+    // Required scenario 7: available provenance commit whose own full
+    // historical snapshot differs from the recorded snapshot (a real,
+    // locally available commit that predates the approved hardening pass).
+    // Must be REJECTED.
     outcomes.push({
       kind: "rejection",
-      ...expectRejected("harness-artifacts-changed-since-approved-commit-is-rejected", () => {
-        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("harness-drift");
+      ...expectRejected("available-provenance-full-snapshot-mismatch-is-rejected", () => {
+        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("provenance-snapshot-mismatch");
         const runManifestData = readRunManifest(scenarioRunDir);
         runManifestData.phaseAHarnessCommit = "2ea5f11ac7baae100758578405d7dc1336ce77c6";
+        writeRunManifest(scenarioRunDir, runManifestData);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Required scenario 8: a tampered historical per-file hash that is kept
+    // internally self-consistent (the aggregate is recomputed to match), so
+    // only a real Git-based cross-check against the available provenance
+    // commit can catch it. Must be REJECTED.
+    outcomes.push({
+      kind: "rejection",
+      ...expectRejected("tampered-historical-per-file-hash-is-rejected", () => {
+        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("historical-per-file-hash");
+        const runManifestData = readRunManifest(scenarioRunDir);
+        const scriptEntry = runManifestData.phaseAHarnessArtifacts.files.find(
+          (entry) => entry.path === "scripts/verify-agent-public-docs.mjs"
+        );
+        scriptEntry.sha256 = "0".repeat(64);
+        retamperAggregate(runManifestData.phaseAHarnessArtifacts);
+        writeRunManifest(scenarioRunDir, runManifestData);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Required scenario 9: a tampered historical aggregate hash, with the
+    // per-file entries left untouched — caught by shape self-consistency
+    // alone, no Git access required. Must be REJECTED.
+    outcomes.push({
+      kind: "rejection",
+      ...expectRejected("tampered-historical-aggregate-hash-is-rejected", () => {
+        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("historical-aggregate-hash");
+        const runManifestData = readRunManifest(scenarioRunDir);
+        runManifestData.phaseAHarnessArtifacts.aggregateSha256 = "0".repeat(64);
+        writeRunManifest(scenarioRunDir, runManifestData);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Required scenario 10: a missing historical path — one of the five
+    // fixed historical files is removed from the recorded snapshot. Caught
+    // by shape validation alone. Must be REJECTED.
+    outcomes.push({
+      kind: "rejection",
+      ...expectRejected("missing-historical-path-is-rejected", () => {
+        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("missing-historical-path");
+        const runManifestData = readRunManifest(scenarioRunDir);
+        runManifestData.phaseAHarnessArtifacts.files =
+          runManifestData.phaseAHarnessArtifacts.files.filter(
+            (entry) => entry.path !== "docs/releases/v2.9.0-agent-evaluation-protocol.md"
+          );
+        retamperAggregate(runManifestData.phaseAHarnessArtifacts);
+        writeRunManifest(scenarioRunDir, runManifestData);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Required scenario 11: an unexpected historical path — a fabricated
+    // entry outside the entire historical allowlist. Caught by shape
+    // validation alone. Must be REJECTED.
+    outcomes.push({
+      kind: "rejection",
+      ...expectRejected("unexpected-historical-path-is-rejected", () => {
+        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("unexpected-historical-path");
+        const runManifestData = readRunManifest(scenarioRunDir);
+        runManifestData.phaseAHarnessArtifacts.files.push({
+          path: "validation/agent-public-docs/EVIL-FILE-OUTSIDE-ALLOWLIST.txt",
+          sha256: "1".repeat(64)
+        });
+        retamperAggregate(runManifestData.phaseAHarnessArtifacts);
+        writeRunManifest(scenarioRunDir, runManifestData);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Required scenario 12: current immutable-contract file drift — a
+    // nested fixture file's recorded hash no longer matches current HEAD's
+    // real content. Provenance is unavailable, isolating rejection to the
+    // current-HEAD immutable-contract comparison alone. Must be REJECTED.
+    outcomes.push({
+      kind: "rejection",
+      ...expectRejected("current-immutable-contract-file-drift-is-rejected", () => {
+        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("immutable-contract-drift");
+        const runManifestData = readRunManifest(scenarioRunDir);
+        runManifestData.phaseAHarnessCommit = UNAVAILABLE_PROVENANCE_COMMIT;
+        const referenceEntry = runManifestData.phaseAHarnessArtifacts.files.find((entry) =>
+          entry.path.startsWith("validation/agent-public-docs/reference/")
+        );
+        referenceEntry.sha256 = "0".repeat(64);
+        retamperAggregate(runManifestData.phaseAHarnessArtifacts);
+        writeRunManifest(scenarioRunDir, runManifestData);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Required scenario 13: a missing current immutable-contract path — a
+    // nested fixture entry is removed from the recorded snapshot (shape
+    // validation does not enumerate nested directory contents, so this
+    // passes shape but fails the current-HEAD path-list comparison, since
+    // the file still physically exists at HEAD). Provenance is unavailable.
+    // Must be REJECTED.
+    outcomes.push({
+      kind: "rejection",
+      ...expectRejected("missing-current-immutable-contract-path-is-rejected", () => {
+        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto(
+          "missing-immutable-contract-path"
+        );
+        const runManifestData = readRunManifest(scenarioRunDir);
+        runManifestData.phaseAHarnessCommit = UNAVAILABLE_PROVENANCE_COMMIT;
+        runManifestData.phaseAHarnessArtifacts.files =
+          runManifestData.phaseAHarnessArtifacts.files.filter(
+            (entry) => !entry.path.startsWith("validation/agent-public-docs/negative/")
+          );
+        retamperAggregate(runManifestData.phaseAHarnessArtifacts);
+        writeRunManifest(scenarioRunDir, runManifestData);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Required scenario 14: an unexpected current immutable-contract path —
+    // a fabricated entry inside an immutable-contract directory (passes
+    // shape, since it matches an allowlisted directory prefix, but fails
+    // the current-HEAD path-list comparison since HEAD has no such file).
+    // Provenance is unavailable. Must be REJECTED.
+    outcomes.push({
+      kind: "rejection",
+      ...expectRejected("unexpected-current-immutable-contract-path-is-rejected", () => {
+        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto(
+          "unexpected-immutable-contract-path"
+        );
+        const runManifestData = readRunManifest(scenarioRunDir);
+        runManifestData.phaseAHarnessCommit = UNAVAILABLE_PROVENANCE_COMMIT;
+        runManifestData.phaseAHarnessArtifacts.files.push({
+          path: "validation/agent-public-docs/base/FAKE-IMMUTABLE-FILE.txt",
+          sha256: "1".repeat(64)
+        });
+        retamperAggregate(runManifestData.phaseAHarnessArtifacts);
+        writeRunManifest(scenarioRunDir, runManifestData);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Required scenario 15: a tampered expected immutable-subset hash — one
+    // of the three fixed immutable-contract files (distinct from the nested
+    // fixture file used in scenario 12) has a recorded hash that no longer
+    // matches current HEAD, so the derived subset comparison — including
+    // its independently recomputed aggregate — must fail. Provenance is
+    // unavailable. Must be REJECTED.
+    outcomes.push({
+      kind: "rejection",
+      ...expectRejected("tampered-expected-immutable-subset-hash-is-rejected", () => {
+        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("immutable-subset-hash");
+        const runManifestData = readRunManifest(scenarioRunDir);
+        runManifestData.phaseAHarnessCommit = UNAVAILABLE_PROVENANCE_COMMIT;
+        const manifestEntry = runManifestData.phaseAHarnessArtifacts.files.find(
+          (entry) => entry.path === "validation/agent-public-docs/public-docs-manifest.json"
+        );
+        manifestEntry.sha256 = "0".repeat(64);
+        retamperAggregate(runManifestData.phaseAHarnessArtifacts);
         writeRunManifest(scenarioRunDir, runManifestData);
         evaluateScenarioRoot(scenarioRoot);
       })
