@@ -1,9 +1,13 @@
 name: One-time v2.8.0 baseline rollback
 
 on:
-  push:
+  pull_request:
     branches:
-      - revert/to-v2.8.0-baseline
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
 
 permissions:
   contents: write
@@ -11,7 +15,7 @@ permissions:
 jobs:
   rollback:
     name: Restore v2.8.0 baseline tree
-    if: github.actor != 'github-actions[bot]'
+    if: github.head_ref == 'revert/to-v2.8.0-baseline' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
@@ -24,13 +28,15 @@ jobs:
 
       - name: Verify rollback source and restore exact target tree
         env:
-          EXPECTED_PARENT: b5de5df765e7330127da56502ba81917558ad15f
+          EXPECTED_BASE: b5de5df765e7330127da56502ba81917558ad15f
           TARGET_COMMIT: 3187d2e819f3cbcdb0c26aea6142a79afb4d4ae9
           TARGET_BRANCH: revert/to-v2.8.0-baseline
         run: |
           set -euo pipefail
 
-          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+          git fetch origin main --no-tags
+          test "$(git merge-base HEAD origin/main)" = "$EXPECTED_BASE"
+          test "$(git rev-parse origin/main)" = "$EXPECTED_BASE"
           git cat-file -e "$TARGET_COMMIT^{commit}"
 
           git config user.name "github-actions[bot]"
