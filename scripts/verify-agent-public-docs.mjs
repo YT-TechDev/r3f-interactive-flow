@@ -1015,58 +1015,76 @@ function computeHarnessArtifactHashesAtCommit(commit) {
   return { files, aggregateSha256 };
 }
 
-function assertHarnessBaselineBinding(runManifestData, context) {
-  const declaredCommit = runManifestData.phaseAHarnessCommit;
+// Exactly 40 hex characters (upper or lower case), matching the shape of a
+// full Git commit SHA-1. This is a provenance shape check only: it does not
+// imply the commit is reachable, locally present, or an ancestor of HEAD.
+const HARNESS_COMMIT_SHA_PATTERN = /^[0-9a-fA-F]{40}$/;
 
-  const commitExists = runCommand("git", ["cat-file", "-e", `${declaredCommit}^{commit}`], {
-    cwd: repoRoot
-  });
+function assertHarnessCommitShape(declaredCommit, context) {
+  assertNonEmptyString(declaredCommit, "phaseAHarnessCommit", context);
 
-  if (commitExists.status !== 0) {
+  if (!HARNESS_COMMIT_SHA_PATTERN.test(declaredCommit.trim())) {
     throw new PackedConsumerError(
-      `${context}: phaseAHarnessCommit "${declaredCommit}" does not resolve to a real commit.`
+      `${context}: phaseAHarnessCommit "${declaredCommit}" is not a 40-character hexadecimal commit SHA.`
     );
   }
+}
+
+// The integrity boundary that must survive any merge strategy (including
+// squash merge, which discards source-branch commit ancestry) is exact
+// equality between the recorded harness artifact snapshot and the current
+// HEAD's harness artifact snapshot, both recomputed via Git object reads.
+// phaseAHarnessCommit is retained as provenance metadata: its shape is
+// validated, and when the commit object happens to still be locally
+// available its own snapshot is additionally cross-checked, but neither its
+// local availability nor its ancestry relationship to HEAD is required.
+function assertHarnessBaselineBinding(runManifestData, context) {
+  const declaredCommit = runManifestData.phaseAHarnessCommit;
+  assertHarnessCommitShape(declaredCommit, context);
+  const normalizedDeclaredCommit = declaredCommit.trim().toLowerCase();
 
   const headResult = runCommand("git", ["rev-parse", "HEAD"], { cwd: repoRoot });
   assertCommandSucceeded(headResult, "resolve current HEAD", "git rev-parse HEAD");
   const currentHead = headResult.stdout.trim();
 
-  const isAncestor = runCommand(
-    "git",
-    ["merge-base", "--is-ancestor", declaredCommit, currentHead],
-    { cwd: repoRoot }
-  );
-
-  if (isAncestor.status !== 0) {
-    throw new PackedConsumerError(
-      `${context}: phaseAHarnessCommit "${declaredCommit}" is not an ancestor of the current branch HEAD (${currentHead}).`
-    );
-  }
-
-  const recomputedAtCommit = computeHarnessArtifactHashesAtCommit(declaredCommit);
+  const recomputedAtHead = computeHarnessArtifactHashesAtCommit(currentHead);
   assertFieldsEqual(
+    recomputedAtHead,
     runManifestData.phaseAHarnessArtifacts,
-    recomputedAtCommit,
-    "phaseAHarnessArtifacts",
+    "phaseAHarnessArtifacts (current HEAD)",
     context
   );
 
-  const recomputedAtHead = computeHarnessArtifactHashesAtCommit(currentHead);
+  const commitExists = runCommand(
+    "git",
+    ["cat-file", "-e", `${normalizedDeclaredCommit}^{commit}`],
+    { cwd: repoRoot }
+  );
+
+  if (commitExists.status !== 0) {
+    console.log(
+      `${context}: Phase A provenance commit is not locally available; recorded and current harness artifact snapshots match.`
+    );
+    return;
+  }
+
+  const recomputedAtProvenanceCommit =
+    computeHarnessArtifactHashesAtCommit(normalizedDeclaredCommit);
   assertFieldsEqual(
-    recomputedAtCommit,
-    recomputedAtHead,
-    "phaseAHarnessArtifacts (unchanged between phaseAHarnessCommit and current HEAD)",
+    recomputedAtProvenanceCommit,
+    runManifestData.phaseAHarnessArtifacts,
+    "phaseAHarnessArtifacts (phaseAHarnessCommit provenance)",
     context
   );
 }
 
 // Creates a real, addressable commit object that reuses the current HEAD's
-// tree (so its content matches HEAD exactly) but has no parent, so it is
-// never reachable as an ancestor of HEAD. Used only by --self-test to prove
-// the ancestor check rejects an "unrelated existing commit"; it is never
-// referenced by any branch/tag, never pushed, and becomes an ordinary
-// unreferenced object once this process exits.
+// tree (so its harness artifact content matches HEAD exactly) but has no
+// parent, so it is never reachable as an ancestor of HEAD. Used only by
+// --self-test to prove the squash-merge shape (a locally available,
+// non-ancestor provenance commit whose artifact snapshot still matches) is
+// accepted; it is never referenced by any branch/tag, never pushed, and
+// becomes an ordinary unreferenced object once this process exits.
 function createOrphanCommitFromCurrentHead() {
   const treeResult = runCommand("git", ["rev-parse", "HEAD^{tree}"], { cwd: repoRoot });
   assertCommandSucceeded(treeResult, "resolve current HEAD tree", "git rev-parse HEAD^{tree}");
@@ -2617,38 +2635,83 @@ async function runSelfTest() {
       })
     });
 
-    // Scenario 11 (Finding 2): nonexistent phaseAHarnessCommit.
+    // Required scenario 2: squash-merge equivalent. The declared provenance
+    // commit is real and locally available, its harness artifact snapshot
+    // equals the recorded snapshot, but it is deliberately NOT an ancestor
+    // of current HEAD — exactly what squash merge produces on `main` after
+    // discarding source-branch ancestry. Must be ACCEPTED.
     outcomes.push({
-      kind: "rejection",
-      ...expectRejected("nonexistent-harness-commit-is-rejected", () => {
-        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("nonexistent-harness-commit");
+      kind: "baseline",
+      ...expectAccepted("squash-merge-provenance-commit-is-accepted", () => {
+        const orphanCommit = createOrphanCommitFromCurrentHead();
+        const { scenarioRoot, scenarioRunDir, scenarioTaskDir } =
+          cloneBaselineInto("squash-merge-provenance");
+        const runManifestData = readRunManifest(scenarioRunDir);
+        runManifestData.phaseAHarnessCommit = orphanCommit;
+        writeRunManifest(scenarioRunDir, runManifestData);
+        const evidence = readEvidence(scenarioTaskDir);
+        evidence.phaseAHarnessCommit = orphanCommit;
+        writeEvidence(scenarioTaskDir, evidence);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Required scenario 3: unavailable provenance commit. A well-formed
+    // 40-hex commit identifier that is not present in the local object
+    // database (e.g. after the source branch has been deleted). Must be
+    // ACCEPTED as long as recorded and current-HEAD artifact snapshots
+    // match; local unavailability alone must never cause rejection.
+    outcomes.push({
+      kind: "baseline",
+      ...expectAccepted("unavailable-provenance-commit-is-accepted", () => {
+        const { scenarioRoot, scenarioRunDir, scenarioTaskDir } = cloneBaselineInto(
+          "unavailable-provenance-commit"
+        );
         const runManifestData = readRunManifest(scenarioRunDir);
         runManifestData.phaseAHarnessCommit = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
         writeRunManifest(scenarioRunDir, runManifestData);
+        const evidence = readEvidence(scenarioTaskDir);
+        evidence.phaseAHarnessCommit = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
+        writeEvidence(scenarioTaskDir, evidence);
         evaluateScenarioRoot(scenarioRoot);
       })
     });
 
-    // Scenario 12 (Finding 2): an existing but unrelated phaseAHarnessCommit
-    // (a real commit, not an ancestor of current HEAD).
+    // Required scenario 4: malformed provenance commit identifier (not a
+    // 40-character hexadecimal string). Must be REJECTED regardless of
+    // artifact snapshot content.
     outcomes.push({
       kind: "rejection",
-      ...expectRejected("unrelated-harness-commit-is-rejected", () => {
-        const orphanCommit = createOrphanCommitFromCurrentHead();
-        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("unrelated-harness-commit");
+      ...expectRejected("malformed-harness-commit-identifier-is-rejected", () => {
+        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("malformed-harness-commit");
         const runManifestData = readRunManifest(scenarioRunDir);
-        runManifestData.phaseAHarnessCommit = orphanCommit;
-        runManifestData.phaseAHarnessArtifacts = computeHarnessArtifactHashesAtCommit(orphanCommit);
+        runManifestData.phaseAHarnessCommit = "not-a-valid-commit-sha";
         writeRunManifest(scenarioRunDir, runManifestData);
         evaluateScenarioRoot(scenarioRoot);
       })
     });
 
-    // Scenario 13 (Finding 2): a tampered harness artifact hash (does not
-    // match the real content at the declared commit).
+    // Required scenario 5: available provenance commit whose own harness
+    // artifact snapshot differs from the recorded snapshot (a real, locally
+    // available commit that predates the approved hardening pass), while
+    // the current-HEAD snapshot still matches the recorded snapshot. Must
+    // be REJECTED.
     outcomes.push({
       kind: "rejection",
-      ...expectRejected("changed-harness-artifact-hash-is-rejected", () => {
+      ...expectRejected("available-provenance-commit-with-mismatched-artifacts-is-rejected", () => {
+        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("provenance-artifact-mismatch");
+        const runManifestData = readRunManifest(scenarioRunDir);
+        runManifestData.phaseAHarnessCommit = "2ea5f11ac7baae100758578405d7dc1336ce77c6";
+        writeRunManifest(scenarioRunDir, runManifestData);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Required scenario 6: a tampered per-file artifact hash. Must be
+    // REJECTED.
+    outcomes.push({
+      kind: "rejection",
+      ...expectRejected("tampered-per-file-artifact-hash-is-rejected", () => {
         const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("harness-artifact-hash");
         const runManifestData = readRunManifest(scenarioRunDir);
         runManifestData.phaseAHarnessArtifacts.files[0] = {
@@ -2660,15 +2723,63 @@ async function runSelfTest() {
       })
     });
 
-    // Scenario 14 (Finding 2): phaseAHarnessCommit references a real
-    // ancestor commit whose harness-defining files differ from (predate)
-    // current HEAD — proves drift/incompleteness since approval is rejected.
+    // Required scenario 7: a tampered aggregate artifact hash, with the
+    // per-file entries left untouched. Must be REJECTED.
     outcomes.push({
       kind: "rejection",
-      ...expectRejected("harness-artifacts-changed-since-approved-commit-is-rejected", () => {
-        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("harness-drift");
+      ...expectRejected("tampered-aggregate-artifact-hash-is-rejected", () => {
+        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("harness-aggregate-hash");
         const runManifestData = readRunManifest(scenarioRunDir);
-        runManifestData.phaseAHarnessCommit = "2ea5f11ac7baae100758578405d7dc1336ce77c6";
+        runManifestData.phaseAHarnessArtifacts.aggregateSha256 = "0".repeat(64);
+        writeRunManifest(scenarioRunDir, runManifestData);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Required scenario 8: a missing expected artifact path (one recorded
+    // file entry removed). Must be REJECTED.
+    outcomes.push({
+      kind: "rejection",
+      ...expectRejected("missing-expected-artifact-path-is-rejected", () => {
+        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("missing-artifact-path");
+        const runManifestData = readRunManifest(scenarioRunDir);
+        runManifestData.phaseAHarnessArtifacts.files =
+          runManifestData.phaseAHarnessArtifacts.files.slice(1);
+        writeRunManifest(scenarioRunDir, runManifestData);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Required scenario 9: an unexpected artifact path (an extra recorded
+    // file entry outside the fixed allowlist). Must be REJECTED.
+    outcomes.push({
+      kind: "rejection",
+      ...expectRejected("unexpected-artifact-path-is-rejected", () => {
+        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("unexpected-artifact-path");
+        const runManifestData = readRunManifest(scenarioRunDir);
+        runManifestData.phaseAHarnessArtifacts.files.push({
+          path: "validation/agent-public-docs/base/UNEXPECTED-FILE.txt",
+          sha256: "1".repeat(64)
+        });
+        writeRunManifest(scenarioRunDir, runManifestData);
+        evaluateScenarioRoot(scenarioRoot);
+      })
+    });
+
+    // Required scenario 10: current-HEAD harness artifact drift. The
+    // recorded snapshot is set to a real but different commit's actual
+    // snapshot (predating the approved hardening pass) while the declared
+    // provenance commit is left pointing at the trivially valid baseline
+    // commit — isolating a mismatch between current HEAD and the recorded
+    // snapshot. Must be REJECTED.
+    outcomes.push({
+      kind: "rejection",
+      ...expectRejected("current-head-artifact-drift-is-rejected", () => {
+        const { scenarioRoot, scenarioRunDir } = cloneBaselineInto("current-head-drift");
+        const runManifestData = readRunManifest(scenarioRunDir);
+        runManifestData.phaseAHarnessArtifacts = computeHarnessArtifactHashesAtCommit(
+          "2ea5f11ac7baae100758578405d7dc1336ce77c6"
+        );
         writeRunManifest(scenarioRunDir, runManifestData);
         evaluateScenarioRoot(scenarioRoot);
       })

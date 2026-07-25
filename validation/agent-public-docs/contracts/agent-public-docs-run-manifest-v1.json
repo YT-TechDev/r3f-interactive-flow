@@ -26,6 +26,16 @@
       "validation/agent-public-docs/negative"
     ]
   },
+  "phaseAHarnessCommitSemantics": {
+    "role": "provenance metadata, not the integrity boundary",
+    "requiredShape": "exactly 40 lowercase or uppercase hexadecimal characters",
+    "ancestryRequired": false,
+    "localAvailabilityRequired": false,
+    "rationale": "A squash merge onto main creates one new commit and intentionally discards the source branch's commit ancestry; a provenance commit's ancestry or continued local presence must not be part of the merge-strategy-independent integrity check.",
+    "integrityBoundary": "Exact equality between runManifest.phaseAHarnessArtifacts and the harness artifact snapshot (sorted file paths, every per-file SHA-256, and the aggregate SHA-256) recomputed from current HEAD via Git object reads under harnessArtifactPaths.",
+    "whenProvenanceCommitIsLocallyAvailable": "Its harness artifact snapshot is additionally recomputed and must also equal runManifest.phaseAHarnessArtifacts; ancestry to current HEAD is still not required.",
+    "whenProvenanceCommitIsNotLocallyAvailable": "Verification does not fail solely for that reason, as long as the current-HEAD artifact snapshot equals runManifest.phaseAHarnessArtifacts."
+  },
   "permittedPostApprovalChangePaths": [
     "validation/agent-public-docs/runs",
     "docs/releases/v2.9.0-agent-evaluation-report.md"
