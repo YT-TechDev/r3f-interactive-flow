@@ -14,9 +14,7 @@ export default tseslint.config(
   {
     files: [
       "scripts/fixtures/packed-package-consumer/**/*.cjs",
-      "scripts/fixtures/packed-package-consumer/**/*.cts",
-      "scripts/fixtures/peer-compatibility-consumer/**/*.cjs",
-      "scripts/fixtures/peer-compatibility-consumer/**/*.cts"
+      "scripts/fixtures/packed-package-consumer/**/*.cts"
     ],
     rules: {
       "@typescript-eslint/no-require-imports": "off"

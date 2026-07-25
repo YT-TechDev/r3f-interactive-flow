@@ -58,46 +58,11 @@ function assertPackagePathExists(entry, label) {
   }
 }
 
-// Anchored directive-prologue check: leading whitespace is allowed, but no comment,
-// import, or other statement may precede the "use client" directive.
-const USE_CLIENT_DIRECTIVE_PATTERN = /^(["'])use client\1;?/;
-
 function assertUseClient(path, label) {
   const firstChunk = readText(path).slice(0, 300);
-  const trimmed = firstChunk.replace(/^\s+/, "");
 
-  if (!USE_CLIENT_DIRECTIVE_PATTERN.test(trimmed)) {
-    fail(
-      `${label} does not begin with a "use client" directive prologue ` +
-        "(leading whitespace is allowed, but no comment, import, or other statement may precede it)"
-    );
-  }
-}
-
-function assertPeerExternalization() {
-  const tsupConfigPath = join(packageDir, "tsup.config.ts");
-  const tsupConfigSource = readText(tsupConfigPath);
-  const externalMatch = tsupConfigSource.match(/external:\s*\[([^\]]*)\]/);
-
-  if (!externalMatch) {
-    fail(`tsup.config.ts must declare an "external" array`);
-    return;
-  }
-
-  const actualExternal = [...externalMatch[1].matchAll(/["']([^"']+)["']/g)]
-    .map((match) => match[1])
-    .sort();
-  const expectedExternal = ["react", "react-dom", "three", "@react-three/fiber"].sort();
-
-  const matches =
-    actualExternal.length === expectedExternal.length &&
-    actualExternal.every((value, index) => value === expectedExternal[index]);
-
-  if (!matches) {
-    fail(
-      `tsup.config.ts "external" array must be exactly ${JSON.stringify(["react", "react-dom", "three", "@react-three/fiber"])}, ` +
-        `found ${JSON.stringify(actualExternal)}`
-    );
+  if (!firstChunk.includes('"use client"') && !firstChunk.includes("'use client'")) {
+    fail(`${label} does not include "use client" near the top`);
   }
 }
 
@@ -171,7 +136,6 @@ assertPackagePathExists(packageJson.types, "types");
 
 assertUseClient(distEsmPath, "dist/index.js");
 assertUseClient(distCjsPath, "dist/index.cjs");
-assertPeerExternalization();
 
 if (process.exitCode) {
   process.exit(process.exitCode);

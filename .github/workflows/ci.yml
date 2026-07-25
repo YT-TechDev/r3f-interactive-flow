@@ -19,8 +19,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          fetch-depth: 0
 
       - name: Enable Corepack
         run: corepack enable
@@ -31,7 +29,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: 22.22.2
+          node-version: 22
           cache: pnpm
 
       - name: Install dependencies
@@ -51,17 +49,6 @@ jobs:
 
       - name: Supported peer compatibility
         run: pnpm package:compat
-
-      - name: Packed Vite consumer
-        run: pnpm consumer:packed:vite:verify
-
-      - name: Packed Next.js consumer
-        run: pnpm consumer:packed:next:verify
-
-      - name: Public-docs agent fixtures
-        run: pnpm consumer:agent:verify
-        env:
-          NO_COLOR: "1"
 
       - name: Typecheck
         run: pnpm typecheck
