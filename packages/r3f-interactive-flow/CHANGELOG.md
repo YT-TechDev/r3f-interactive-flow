@@ -1,5 +1,30 @@
 # r3f-interactive-flow
 
+## 2.9.0
+
+`r3f-interactive-flow@2.9.0` is a focused, backward-compatible correction to
+multi-touch handling in `useTouchInput`. Multi-touch sequences are no longer
+interpreted as phase-navigation swipes, while existing one-touch behavior and
+public contracts remain unchanged.
+
+### Fixed
+
+- Accept phase navigation only from a touch sequence that begins with exactly
+  one active touch.
+- Preserve single-touch eligibility for the lifetime of that sequence: a
+  sequence that starts or becomes multi-touch is invalidated until all touches
+  end, even if it later returns to one active touch.
+- Leave invalid multi-touch sequences unhandled, without navigation or
+  `preventDefault()`, and allow a fresh later single-touch gesture to work
+  normally.
+
+### Compatibility
+
+- The public API, public TypeScript types, and package exports are unchanged.
+- Runtime dependencies and peer dependency ranges are unchanged.
+- Existing one-touch behavior is unchanged.
+- No migration is required for existing v2 consumers.
+
 ## 2.8.0
 
 `r3f-interactive-flow@2.8.0` is a transition-contract completeness minor
