@@ -12,8 +12,7 @@ In scope:
 - transition progress
 - `next`, `prev`, and `goTo`
 - wheel, touch, and keyboard input
-- cooldown and input lock behavior
-- `lockDuringTransition`
+- manual lock, provider cooldown, and hook-local input cooldown behavior
 - DOM/UI to R3F Canvas connection
 - `useFlowFrame`
 - TypeScript safety
