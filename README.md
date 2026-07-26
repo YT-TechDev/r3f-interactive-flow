@@ -41,7 +41,29 @@ The package intentionally has no `sourcePhase`, `targetPhase`, or `previousPhase
 
 A known target (in-bounds `next`/`prev`, or a `goTo` target from the typed phase union) is always rejected safely with no snapshot mutation when blocked by a lock, an active transition, cooldown, or the same phase — it never throws. A `goTo()` target outside the known phase list throws instead; ordinary application code using a closed phase union does not reach that path.
 
-See [Core concepts](docs/guides/core-concepts.md), [React Three Fiber usage](docs/guides/r3f-usage.md), and the [package README](packages/r3f-interactive-flow/README.md) for the full transition contract.
+`next()`, `prev()`, and `goTo()` return a boolean that callers may ignore. `true` means the request was accepted, not that its transition has completed; `false` is a normal safe rejection. Unknown `goTo()` targets continue to throw rather than returning `false`.
+
+Use the result when application-owned feedback should run only for an accepted request:
+
+```tsx
+function NextButton() {
+  const { next } = useFlow<Phase>();
+
+  const handleClick = () => {
+    if (next()) {
+      // Application-owned feedback for an accepted request.
+    }
+  };
+
+  return (
+    <button type="button" onClick={handleClick}>
+      Next
+    </button>
+  );
+}
+```
+
+See [Core concepts](docs/guides/core-concepts.md) for detailed navigation-result behavior, [React Three Fiber usage](docs/guides/r3f-usage.md), and the [package README](packages/r3f-interactive-flow/README.md) for the full transition contract.
 
 ## Public API
 

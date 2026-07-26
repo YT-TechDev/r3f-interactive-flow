@@ -95,6 +95,16 @@ This section is the complete public transition contract and stands on its own. I
 
 On mount, the snapshot reports the configured `initialPhase` (or the first phase in `phases`), `progress: 0`, `direction: "none"`, and `isTransitioning: false`.
 
+The navigation controls have these signatures:
+
+```ts
+next: () => boolean;
+prev: () => boolean;
+goTo: (phase: TPhase) => boolean;
+```
+
+Accepted known navigation returns `true`; known safe rejection returns `false`. The result reports request acceptance, not transition completion. Existing statement-position calls such as `next()` remain valid because callers may ignore the result. `lock()` and `unlock()` remain `void`.
+
 ### Accepted navigation start (positive duration)
 
 Immediately after an accepted `next()`, `prev()`, or different-phase `goTo()` with a positive `duration`:
@@ -136,14 +146,14 @@ Intermediate phases (`"overview"`, `"detail"`) are neither visited nor queued. `
 
 ### Rejection and errors
 
-| Request                            | Blocking condition          | Result                  |
-| ---------------------------------- | --------------------------- | ----------------------- |
-| `next`/`prev`                      | out of bounds               | rejected, no mutation   |
-| `goTo(known target)`               | same as current phase       | rejected, no mutation   |
-| `next`/`prev`/`goTo(known target)` | manual lock active          | rejected, no mutation   |
-| `next`/`prev`/`goTo(known target)` | active transition           | rejected, no mutation   |
-| `next`/`prev`/`goTo(known target)` | provider cooldown remaining | rejected, no mutation   |
-| `goTo(unknown target)`             | any state                   | **throws**, no mutation |
+| Request                            | Blocking condition          | Result                       |
+| ---------------------------------- | --------------------------- | ---------------------------- |
+| `next`/`prev`                      | out of bounds               | returns `false`, no mutation |
+| `goTo(known target)`               | same as current phase       | returns `false`, no mutation |
+| `next`/`prev`/`goTo(known target)` | manual lock active          | returns `false`, no mutation |
+| `next`/`prev`/`goTo(known target)` | active transition           | returns `false`, no mutation |
+| `next`/`prev`/`goTo(known target)` | provider cooldown remaining | returns `false`, no mutation |
+| `goTo(unknown target)`             | any state                   | **throws**, no mutation      |
 
 An unknown `goTo()` target throws before the normal lock/transition/cooldown rejection path — this happens even while locked, transitioning, or in cooldown. With a properly typed closed phase union (an `as const` phase tuple), ordinary application code cannot construct an unknown target; an unsafe cast or an unvalidated dynamic string is what reaches this path. Known targets never throw — they are rejected as a safe no-op instead.
 
@@ -162,7 +172,7 @@ A `byPhase` override for one field (say, `duration`) does not replace the other 
 
 ### Zero-duration transitions
 
-An accepted transition with `duration: 0` completes synchronously in the same call: `phase`/`phaseIndex` update immediately, `progress` is `1` immediately, `direction` is `"none"` immediately, and `isTransitioning` stays `false` — there is no observable active-transition frame. Provider cooldown (if configured) starts immediately.
+An accepted transition with `duration: 0` returns `true` and completes synchronously in the same call: `phase`/`phaseIndex` update immediately, `progress` is `1` immediately, `direction` is `"none"` immediately, and `isTransitioning` stays `false` — there is no observable active-transition frame. Provider cooldown (if configured) starts immediately. The `true` result still reports acceptance rather than serving as a completion signal.
 
 ### Manual lock and cooldown composition
 
