@@ -108,6 +108,18 @@ You move between phases with three controls from `useFlow`:
 - `prev()` steps back to the previous phase.
 - `goTo(target)` jumps directly to a named phase.
 
+Their exact signatures are:
+
+```ts
+next: () => boolean;
+prev: () => boolean;
+goTo: (phase: TPhase) => boolean;
+```
+
+The returned boolean reports whether this request was accepted. Existing callers
+may continue to use these controls as statements and ignore the result. `lock()`
+and `unlock()` remain `void`.
+
 `next()` and `prev()` always reject safely at the tuple's boundaries — calling
 `next()` on the last phase or `prev()` on the first is a no-op, never a throw.
 A `goTo()` call with a **known** phase (any value from your `as const` tuple)
@@ -190,14 +202,16 @@ to select options by target phase or by a source/target pair.
 
 ## Navigation rejection and errors
 
-| Request                             | Blocking condition          | Result                  |
-| ----------------------------------- | --------------------------- | ----------------------- |
-| `next()` / `prev()`                 | out of bounds               | rejected, no mutation   |
-| `goTo(knownTarget)`                 | same as current phase       | rejected, no mutation   |
-| `next()` / `prev()` / `goTo(known)` | manual lock active          | rejected, no mutation   |
-| `next()` / `prev()` / `goTo(known)` | active transition           | rejected, no mutation   |
-| `next()` / `prev()` / `goTo(known)` | provider cooldown remaining | rejected, no mutation   |
-| `goTo(unknownTarget)`               | any state                   | **throws**, no mutation |
+| Request                             | Condition                   | Result                           |
+| ----------------------------------- | --------------------------- | -------------------------------- |
+| known navigation                    | accepted                    | returns `true`, snapshot updates |
+| `prev()`                            | first phase                 | returns `false`, no mutation     |
+| `next()`                            | final phase                 | returns `false`, no mutation     |
+| `goTo(knownTarget)`                 | same as current phase       | returns `false`, no mutation     |
+| `next()` / `prev()` / `goTo(known)` | manual lock active          | returns `false`, no mutation     |
+| `next()` / `prev()` / `goTo(known)` | active transition           | returns `false`, no mutation     |
+| `next()` / `prev()` / `goTo(known)` | provider cooldown remaining | returns `false`, no mutation     |
+| `goTo(unknownTarget)`               | any state                   | **throws**, no mutation          |
 
 A rejected call never mutates the snapshot — `phase`, `progress`, and
 `direction` are exactly what they were before the call. An unknown `goTo()`
@@ -205,7 +219,40 @@ target throws _before_ the lock/transition/cooldown checks run, so it throws
 even while locked, mid-transition, or in cooldown. A closed `as const` phase
 union is what keeps ordinary application code out of that throwing path in the
 first place; treat it as a programmer-error guard, not a runtime condition your
-UI needs to branch on.
+UI needs to branch on. Unknown-target validation happens before same-phase,
+manual-lock, active-transition, and provider-cooldown rejection checks.
+
+When application-owned UI messages, sound, analytics, focus, or visual feedback
+should run only for an accepted request, branch directly on the result. There is
+no need to compare snapshots merely to learn whether the request was accepted:
+
+```tsx
+function NextButton() {
+  const { next } = useFlow<Phase>();
+
+  const handleClick = () => {
+    if (next()) {
+      // Application-owned feedback for an accepted request.
+    }
+  };
+
+  return (
+    <button type="button" onClick={handleClick}>
+      Next
+    </button>
+  );
+}
+```
+
+`true` is not a transition-completion signal. For a positive duration, it is
+returned when the transition starts; continue to observe `isTransitioning` and
+`progress` for transition state. An accepted zero-duration request also returns
+`true`, even though it completes synchronously with no active-transition frame.
+
+The boolean deliberately does not expose a rejection reason, cooldown remaining,
+future navigation availability, transition completion, or lifecycle events. It
+is not a result object or reason enum, and this contract does not add `canNext`,
+`canPrev`, `canGoTo`, or `canNavigate` APIs.
 
 ## Transition progress
 
