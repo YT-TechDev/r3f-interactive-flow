@@ -1,5 +1,50 @@
 # r3f-interactive-flow
 
+## 2.9.0
+
+`r3f-interactive-flow@2.9.0` is a focused, backward-compatible minor release.
+`next()`, `prev()`, and `goTo()` now synchronously report whether a phase
+navigation request was accepted, so consumers can distinguish acceptance from
+a known safe rejection without comparing snapshots manually.
+
+### Added
+
+- `next()`, `prev()`, and `goTo()` return a `boolean` acceptance result.
+- Accepted known navigation returns `true`.
+- A known safe rejection (boundary, same-phase `goTo()`, manual lock, active
+  transition, or provider cooldown) returns `false`.
+- An accepted zero-duration navigation returns `true`.
+- Existing statement-position calls that ignore the returned value remain
+  compatible.
+
+### Internal alignment
+
+- The internal input-navigation helper now uses the machine-owned boolean
+  result directly.
+- Snapshot comparison is no longer used to infer request acceptance.
+- Input thresholds, `preventDefault()` timing, cooldown handling, target
+  resolution, and cleanup semantics are unchanged.
+
+### Documentation
+
+- The root README, the package README, and the core concepts guide now
+  document the navigation result contract.
+- Documentation distinguishes request acceptance from transition completion.
+- Unknown-target `goTo()` behavior remains documented as the exception path.
+
+### Compatibility
+
+- Unknown `goTo()` targets continue to throw.
+- `lock()` and `unlock()` remain `void`.
+- The public snapshot shape is unchanged.
+- `FlowFrameState` is unchanged.
+- `FlowProviderProps` is unchanged.
+- Runtime exports and package subpaths are unchanged.
+- No dependency or peer dependency range changed.
+- No migration is required for existing consumers.
+- No rejection-reason, result-object, callback, event, queue, router, or
+  controlled-state API was added.
+
 ## 2.8.1
 
 `r3f-interactive-flow@2.8.1` is a focused, backward-compatible correction to
