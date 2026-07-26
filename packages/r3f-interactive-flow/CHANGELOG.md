@@ -1,8 +1,8 @@
 # r3f-interactive-flow
 
-## 2.9.0
+## 2.8.1
 
-`r3f-interactive-flow@2.9.0` is a focused, backward-compatible correction to
+`r3f-interactive-flow@2.8.1` is a focused, backward-compatible correction to
 multi-touch handling in `useTouchInput`. Multi-touch sequences are no longer
 interpreted as phase-navigation swipes, while existing one-touch behavior and
 public contracts remain unchanged.
