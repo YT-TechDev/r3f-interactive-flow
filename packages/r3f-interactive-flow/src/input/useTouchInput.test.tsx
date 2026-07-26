@@ -703,6 +703,128 @@ describe("useTouchInput", () => {
     expect(latestControls?.direction).toBe("none");
   });
 
+  it("ignores a multi-touch sequence until every touch ends, then accepts a fresh swipe", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    const first = { clientX: 0, clientY: 100 };
+    const second = { clientX: 10, clientY: 100 };
+    const startEvent = dispatchTouch("touchstart", { touches: [first, second] });
+    const multiMove = dispatchTouch("touchmove", {
+      touches: [{ clientX: 0, clientY: 40 }, second]
+    });
+    const partialEnd = dispatchTouch("touchend", {
+      touches: [{ clientX: 0, clientY: 30 }],
+      changedTouches: [second]
+    });
+    const singleMove = dispatchTouch("touchmove", { touches: [{ clientX: 0, clientY: 20 }] });
+    const finalEnd = dispatchTouch("touchend", {
+      touches: [],
+      changedTouches: [{ clientX: 0, clientY: 10 }]
+    });
+
+    for (const event of [startEvent, multiMove, partialEnd, singleMove, finalEnd]) {
+      expect(event.defaultPrevented).toBe(false);
+    }
+    expect(latestControls?.phase).toBe("intro");
+
+    const freshEnd = swipe(100, 59);
+
+    expect(freshEnd.defaultPrevented).toBe(true);
+    expect(latestControls?.phase).toBe("work");
+  });
+
+  it("stickily invalidates a single-touch sequence when another touch joins", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] });
+    const joined = dispatchTouch("touchstart", {
+      touches: [
+        { clientX: 0, clientY: 100 },
+        { clientX: 10, clientY: 100 }
+      ]
+    });
+    const returnedToOne = dispatchTouch("touchmove", {
+      touches: [{ clientX: 0, clientY: 40 }]
+    });
+    const end = dispatchTouch("touchend", {
+      touches: [],
+      changedTouches: [{ clientX: 0, clientY: 20 }]
+    });
+
+    expect(joined.defaultPrevented).toBe(false);
+    expect(returnedToOne.defaultPrevented).toBe(false);
+    expect(end.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("intro");
+  });
+
+  it("touchcancel clears multi-touch invalidation", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchTouch("touchstart", {
+      touches: [
+        { clientX: 0, clientY: 100 },
+        { clientX: 10, clientY: 100 }
+      ]
+    });
+    dispatchTouch("touchcancel");
+    const freshEnd = swipe(100, 59);
+
+    expect(freshEnd.defaultPrevented).toBe(true);
+    expect(latestControls?.phase).toBe("work");
+  });
+
+  it("keeps committed navigation but stops prevention after multi-touch begins", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+      </>
+    );
+
+    dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] });
+    const committed = dispatchTouch("touchmove", { touches: [{ clientX: 0, clientY: 59 }] });
+    const joined = dispatchTouch("touchstart", {
+      touches: [
+        { clientX: 0, clientY: 59 },
+        { clientX: 10, clientY: 59 }
+      ]
+    });
+    const laterMove = dispatchTouch("touchmove", { touches: [{ clientX: 0, clientY: 0 }] });
+    const end = dispatchTouch("touchend", {
+      touches: [],
+      changedTouches: [{ clientX: 0, clientY: 0 }]
+    });
+
+    expect(committed.defaultPrevented).toBe(true);
+    expect(joined.defaultPrevented).toBe(false);
+    expect(laterMove.defaultPrevented).toBe(false);
+    expect(end.defaultPrevented).toBe(false);
+    expect(latestControls?.phase).toBe("work");
+  });
+
   it("preserves a committed gesture across equivalent inline ignore rerenders", () => {
     let latestControls: FlowControls<TestPhase> | undefined;
     let machine: FlowMachine<TestPhase> | undefined;

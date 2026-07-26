@@ -195,7 +195,13 @@ export function FlowInputLayer() {
 }
 ```
 
-`useTouchInput` tracks single-touch position on the `y` axis by default. An
+`useTouchInput` tracks single-touch position on the `y` axis by default. A
+gesture is eligible only when it starts with exactly one active touch and stays
+single-touch until navigation commits or the sequence ends. A sequence that
+starts with multiple touches or later becomes multi-touch is ignored without
+preventing its events. That invalidation is sticky even if the sequence returns
+to one active touch; after all touches end, a fresh single-touch gesture is
+eligible normally. An
 upward swipe farther than `threshold` calls `next`; a downward swipe farther
 than `threshold` calls `prev`; a short movement at or within the threshold does
 nothing. Touch gesture distance is position-based and does not use a clock.
@@ -218,9 +224,9 @@ state. Equivalent ignore rerenders preserve a committed touch gesture after the
 #423 fix, while materially changed selectors intentionally replace the Effect
 and reset relevant pending touch state.
 
-No multi-touch identity tracking is promised. There is no pinch, rotate,
-velocity, inertia, long-press, pointer-event, or general gesture-framework
-contract.
+The hook does not recognize pinch or rotate gestures and does not track touch
+identity. There is no velocity, inertia, long-press, pointer-event, or general
+gesture-recognition contract.
 
 Useful options:
 

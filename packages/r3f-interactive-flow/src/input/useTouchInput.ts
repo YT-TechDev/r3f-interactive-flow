@@ -58,6 +58,7 @@ export function useTouchInput<TPhase extends string>(options: UseTouchInputOptio
   const startPositionRef = useRef<number | null>(null);
   const gestureIgnoredRef = useRef(false);
   const gestureCommittedRef = useRef(false);
+  const gestureInvalidRef = useRef(false);
   const lastNavigationAtRef = useRef<number | null>(null);
   const ignoreSignature = JSON.stringify(options.ignore ?? []);
   useEffect(() => {
@@ -93,6 +94,7 @@ export function useTouchInput<TPhase extends string>(options: UseTouchInputOptio
       startPositionRef.current = null;
       gestureIgnoredRef.current = false;
       gestureCommittedRef.current = false;
+      gestureInvalidRef.current = false;
     };
 
     const attemptNavigation = (delta: number): boolean => {
@@ -129,6 +131,17 @@ export function useTouchInput<TPhase extends string>(options: UseTouchInputOptio
 
     const handleTouchStart: EventListener = (event): void => {
       const touchEvent = event as TouchEvent;
+
+      if (touchEvent.touches.length !== 1) {
+        gestureInvalidRef.current = true;
+        startPositionRef.current = null;
+        return;
+      }
+
+      if (gestureInvalidRef.current) {
+        return;
+      }
+
       const touch = touchEvent.touches[0];
 
       gestureIgnoredRef.current =
@@ -147,7 +160,17 @@ export function useTouchInput<TPhase extends string>(options: UseTouchInputOptio
     const handleTouchMove: EventListener = (event): void => {
       const touchEvent = event as TouchEvent;
 
-      if (startPositionRef.current === null || gestureIgnoredRef.current) {
+      if (touchEvent.touches.length > 1) {
+        gestureInvalidRef.current = true;
+        startPositionRef.current = null;
+        return;
+      }
+
+      if (
+        gestureInvalidRef.current ||
+        startPositionRef.current === null ||
+        gestureIgnoredRef.current
+      ) {
         return;
       }
 
@@ -184,6 +207,17 @@ export function useTouchInput<TPhase extends string>(options: UseTouchInputOptio
 
     const handleTouchEnd: EventListener = (event): void => {
       const touchEvent = event as TouchEvent;
+
+      if (gestureInvalidRef.current || touchEvent.touches.length > 0) {
+        gestureInvalidRef.current = true;
+
+        if (touchEvent.touches.length === 0) {
+          resetTouch();
+        }
+
+        return;
+      }
+
       const startPosition = startPositionRef.current;
       const gestureIgnored = gestureIgnoredRef.current;
       const gestureCommitted = gestureCommittedRef.current;
