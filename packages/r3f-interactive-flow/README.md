@@ -87,9 +87,28 @@ yarn add r3f-interactive-flow three @react-three/fiber react react-dom
 
 The package does not add Next.js, `@react-three/drei`, GSAP, Framer Motion, or any visual-effect library as a dependency.
 
+## Consumer and compatibility policy
+
+The peer ranges above are the allowed installation ranges, not evidence that every version combination has been tested. The peer compatibility check exercises these exact representative configurations:
+
+| React / React DOM | React Three Fiber | Three.js |
+| ----------------- | ----------------- | -------- |
+| 18.3.1            | 8.18.0            | 0.150.1  |
+| 19.2.7            | 9.6.1             | 0.185.1  |
+
+The regular repository checks use the versions resolved by the lockfile. These checks and the package audits prove package-root TypeScript resolution, ESM `import`, CommonJS `require`, and matching declarations for the exercised configurations. They do not guarantee every TypeScript version, compiler mode, bundler, or resolver. The eight types listed under [Public API](#public-api) are intentional named root exports; types that appear only structurally in public signatures are not additional named exports. Consumer imports are package-root only, and internal source, build, and responsibility paths remain private.
+
+`FlowProvider`, `useFlow`, `useFlowProgress`, and the input hooks belong to client-side React/DOM work. Input listeners attach in client-side effects rather than at module import time. `useFlowFrame` is Canvas-bound and must run in an R3F `<Canvas>` subtree under `FlowProvider`. Keep DOM input handling separate from scene logic, and keep frame-driven scene values in refs, mutable Three.js objects, or Canvas-local frame logic rather than per-frame React state.
+
+Browser evidence is bounded to the Node/minimal-DOM tests, the headless Chromium smoke described above, and the historically scoped physical-device checks linked above. It is not a cross-browser, physical-device, native-scroll, screen-reader, WCAG, accessibility, or performance certification. Accessible controls, focus behavior, reduced motion, responsive layout, and application UX remain application responsibilities.
+
+The maintained Vite example and temporary Vite/Rolldown consumer checks demonstrate representative package consumption, not a promise for every Vite, bundler, or framework configuration. Next.js App Router usage is limited to Client Components as described below; the package does not support hooks in Server Components or provide router, deployment-platform, SSR-framework, or hosting integration. Next.js is not a package dependency.
+
+Security fixes are prioritized for the latest stable release; this is not an LTS commitment for older release lines. Changes to peer ranges, compiler or module-resolution expectations, browser or framework coverage, or support duration require concrete evidence, a focused Issue, compatibility and maintenance-cost review, and an explicit documentation update.
+
 ## Transition semantics
 
-This section is the complete public transition contract and stands on its own. It is validated against the v2.8.0 test suite (`createFlowMachine.transition-regressions.test.ts`, `FlowProvider.test.tsx`, `useFlowFrame.test.tsx`).
+This section is the complete public transition contract and stands on its own. Current regression coverage includes `createFlowMachine.transition-regressions.test.ts`, `FlowProvider.test.tsx`, and `useFlowFrame.test.tsx`.
 
 ### Initial snapshot
 

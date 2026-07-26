@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-Security fixes are prioritized for the latest released version.
+Security fixes are prioritized for the latest released version. This policy does not establish long-term support (LTS) for older release lines.
 
 | Version | Supported |
 | ------- | --------- |

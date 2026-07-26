@@ -136,6 +136,8 @@ yarn add r3f-interactive-flow three @react-three/fiber react react-dom
 
 The package does not add Next.js, `@react-three/drei`, GSAP, Framer Motion, or visual-effect libraries as dependencies.
 
+The declared ranges are allowed installation ranges, not proof that every combination has been tested. See the package README's [consumer and compatibility policy](packages/r3f-interactive-flow/README.md#consumer-and-compatibility-policy) for the exact representative peer configurations exercised and the package-root, React/Canvas, browser, framework, module-resolution, security, and future-policy boundaries.
+
 ## Basic usage
 
 Define phases as a stable const tuple, pass them to `FlowProvider`, and use hooks inside the provider.
