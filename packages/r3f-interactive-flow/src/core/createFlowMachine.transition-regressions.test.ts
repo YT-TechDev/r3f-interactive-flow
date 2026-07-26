@@ -18,7 +18,7 @@ describe("createFlowMachine transition regressions", () => {
       isLocked: false
     });
 
-    nextMachine.next();
+    expect(nextMachine.next()).toBe(true);
 
     expect(nextMachine.getSnapshot()).toEqual({
       phase: "work",
@@ -44,7 +44,7 @@ describe("createFlowMachine transition regressions", () => {
       isLocked: false
     });
 
-    prevMachine.prev();
+    expect(prevMachine.prev()).toBe(true);
 
     expect(prevMachine.getSnapshot()).toEqual({
       phase: "work",
@@ -69,7 +69,8 @@ describe("createFlowMachine transition regressions", () => {
       isLocked: false
     });
 
-    goToMachine.goTo("contact");
+    // intro (index 0) -> goTo("contact") (index 2): a non-adjacent forward skip.
+    expect(goToMachine.goTo("contact")).toBe(true);
 
     expect(goToMachine.getSnapshot()).toEqual({
       phase: "contact",
@@ -96,7 +97,7 @@ describe("createFlowMachine transition regressions", () => {
       isLocked: false
     });
 
-    machine.next();
+    expect(machine.next()).toBe(true);
 
     expect(machine.getSnapshot()).toEqual({
       phase: "work",
@@ -171,11 +172,11 @@ describe("createFlowMachine transition regressions", () => {
 
     const boundarySnapshot = machine.getSnapshot();
 
-    machine.prev();
+    expect(machine.prev()).toBe(false);
 
     expect(machine.getSnapshot()).toEqual(boundarySnapshot);
 
-    machine.next();
+    expect(machine.next()).toBe(true);
 
     expect(machine.getSnapshot()).toMatchObject({
       phase: "work",
@@ -200,11 +201,11 @@ describe("createFlowMachine transition regressions", () => {
 
     const boundarySnapshot = machine.getSnapshot();
 
-    machine.next();
+    expect(machine.next()).toBe(false);
 
     expect(machine.getSnapshot()).toEqual(boundarySnapshot);
 
-    machine.prev();
+    expect(machine.prev()).toBe(true);
 
     expect(machine.getSnapshot()).toMatchObject({
       phase: "work",
@@ -223,22 +224,23 @@ describe("createFlowMachine transition regressions", () => {
       cooldownMs: 300
     });
 
-    machine.next();
+    expect(machine.next()).toBe(true);
     machine.update(100);
 
     const completedSnapshot = machine.getSnapshot();
 
-    machine.goTo("work");
+    // goTo targeting the current phase is rejected.
+    expect(machine.goTo("work")).toBe(false);
 
     expect(machine.getSnapshot()).toEqual(completedSnapshot);
 
     machine.update(299);
-    machine.next();
+    expect(machine.next()).toBe(false);
 
     expect(machine.getSnapshot()).toEqual(completedSnapshot);
 
     machine.update(1);
-    machine.next();
+    expect(machine.next()).toBe(true);
 
     expect(machine.getSnapshot()).toMatchObject({
       phase: "contact",
@@ -264,8 +266,9 @@ describe("createFlowMachine transition regressions", () => {
     const firstPhaseSnapshot = firstPhaseMachine.getSnapshot();
     const lastPhaseSnapshot = lastPhaseMachine.getSnapshot();
 
-    firstPhaseMachine.prev();
-    lastPhaseMachine.next();
+    // prev at the first phase and next at the last phase are both rejected.
+    expect(firstPhaseMachine.prev()).toBe(false);
+    expect(lastPhaseMachine.next()).toBe(false);
 
     expect(firstPhaseMachine.getSnapshot()).toEqual(firstPhaseSnapshot);
     expect(lastPhaseMachine.getSnapshot()).toEqual(lastPhaseSnapshot);
@@ -277,7 +280,7 @@ describe("createFlowMachine transition regressions", () => {
       transitionDurationMs: 100
     });
 
-    machine.next();
+    expect(machine.next()).toBe(true);
     expect(machine.getSnapshot()).toMatchObject({
       phase: "work",
       phaseIndex: 1,
@@ -287,7 +290,7 @@ describe("createFlowMachine transition regressions", () => {
     });
 
     machine.update(100);
-    machine.prev();
+    expect(machine.prev()).toBe(true);
     expect(machine.getSnapshot()).toMatchObject({
       phase: "intro",
       phaseIndex: 0,
@@ -297,7 +300,7 @@ describe("createFlowMachine transition regressions", () => {
     });
 
     machine.update(100);
-    machine.goTo("contact");
+    expect(machine.goTo("contact")).toBe(true);
     expect(machine.getSnapshot()).toMatchObject({
       phase: "contact",
       phaseIndex: 2,
@@ -316,7 +319,7 @@ describe("createFlowMachine transition regressions", () => {
 
     const snapshot = machine.getSnapshot();
 
-    machine.goTo("work");
+    expect(machine.goTo("work")).toBe(false);
 
     expect(machine.getSnapshot()).toEqual(snapshot);
     expect(snapshot).toEqual({
@@ -328,7 +331,7 @@ describe("createFlowMachine transition regressions", () => {
       isLocked: false
     });
 
-    machine.next();
+    expect(machine.next()).toBe(true);
 
     expect(machine.getSnapshot()).toMatchObject({
       phase: "contact",
@@ -347,17 +350,25 @@ describe("createFlowMachine transition regressions", () => {
       phases: ["intro", "work"],
       transitionDurationMs: 100
     });
+    const lockedMachine = createFlowMachine<"intro" | "work" | "missing">({
+      phases: ["intro", "work"]
+    });
 
     transitioningMachine.next();
     transitioningMachine.update(50);
+    lockedMachine.lock();
 
     const idleSnapshot = idleMachine.getSnapshot();
     const transitioningSnapshot = transitioningMachine.getSnapshot();
+    const lockedSnapshot = lockedMachine.getSnapshot();
 
     expect(() => idleMachine.goTo("missing")).toThrow(/Unknown phase/);
     expect(() => transitioningMachine.goTo("missing")).toThrow(/Unknown phase/);
+    // Unknown-target validation runs before the manual lock check too.
+    expect(() => lockedMachine.goTo("missing")).toThrow(/Unknown phase/);
     expect(idleMachine.getSnapshot()).toEqual(idleSnapshot);
     expect(transitioningMachine.getSnapshot()).toEqual(transitioningSnapshot);
+    expect(lockedMachine.getSnapshot()).toEqual(lockedSnapshot);
   });
 
   it("rejects next, prev, and goTo while a transition is active", () => {
@@ -367,20 +378,20 @@ describe("createFlowMachine transition regressions", () => {
       cooldownMs: 200
     });
 
-    machine.next();
+    expect(machine.next()).toBe(true);
     machine.update(50);
 
     const activeTransitionSnapshot = machine.getSnapshot();
 
-    machine.next();
-    machine.prev();
-    machine.goTo("contact");
+    expect(machine.next()).toBe(false);
+    expect(machine.prev()).toBe(false);
+    expect(machine.goTo("contact")).toBe(false);
 
     expect(machine.getSnapshot()).toEqual(activeTransitionSnapshot);
 
     machine.update(50);
     machine.update(200);
-    machine.next();
+    expect(machine.next()).toBe(true);
 
     expect(machine.getSnapshot()).toMatchObject({
       phase: "contact",
@@ -399,13 +410,13 @@ describe("createFlowMachine transition regressions", () => {
     machine.lock();
     const lockedSnapshot = machine.getSnapshot();
 
-    machine.next();
-    machine.goTo("contact");
+    expect(machine.next()).toBe(false);
+    expect(machine.goTo("contact")).toBe(false);
 
     expect(machine.getSnapshot()).toEqual(lockedSnapshot);
 
     machine.unlock();
-    machine.goTo("contact");
+    expect(machine.goTo("contact")).toBe(true);
 
     expect(machine.getSnapshot()).toMatchObject({
       phase: "contact",
@@ -423,18 +434,18 @@ describe("createFlowMachine transition regressions", () => {
       transitionDurationMs: 100
     });
 
-    machine.next();
+    expect(machine.next()).toBe(true);
     machine.lock();
     machine.update(100);
 
     const lockedCompletedSnapshot = machine.getSnapshot();
 
-    machine.next();
+    expect(machine.next()).toBe(false);
 
     expect(machine.getSnapshot()).toEqual(lockedCompletedSnapshot);
 
     machine.unlock();
-    machine.next();
+    expect(machine.next()).toBe(true);
 
     expect(machine.getSnapshot()).toMatchObject({
       phase: "contact",
@@ -452,15 +463,15 @@ describe("createFlowMachine transition regressions", () => {
       transitionDurationMs: 100
     });
 
-    machine.next();
+    expect(machine.next()).toBe(true);
     const transitioningSnapshot = machine.getSnapshot();
 
-    machine.goTo("contact");
+    expect(machine.goTo("contact")).toBe(false);
 
     expect(machine.getSnapshot()).toEqual(transitioningSnapshot);
 
     machine.update(100);
-    machine.goTo("contact");
+    expect(machine.goTo("contact")).toBe(true);
 
     expect(machine.getSnapshot()).toMatchObject({
       phase: "contact",
@@ -478,19 +489,19 @@ describe("createFlowMachine transition regressions", () => {
       cooldownMs: 300
     });
 
-    machine.next();
+    expect(machine.next()).toBe(true);
     machine.update(100);
 
     const completedSnapshot = machine.getSnapshot();
 
-    machine.next();
+    expect(machine.next()).toBe(false);
     machine.update(299);
-    machine.next();
+    expect(machine.next()).toBe(false);
 
     expect(machine.getSnapshot()).toEqual(completedSnapshot);
 
     machine.update(1);
-    machine.next();
+    expect(machine.next()).toBe(true);
 
     expect(machine.getSnapshot()).toMatchObject({
       phase: "contact",
@@ -766,7 +777,8 @@ describe("createFlowMachine transition regressions", () => {
       cooldownMs: 300
     });
 
-    positiveCooldown.next();
+    // An accepted zero-duration navigation still returns true even though it settles synchronously.
+    expect(positiveCooldown.next()).toBe(true);
 
     const acceptedZeroDurationSnapshot = {
       phase: "work",
@@ -782,30 +794,30 @@ describe("createFlowMachine transition regressions", () => {
 
     // Rejected navigation up to the exact cooldown boundary must not mutate the snapshot.
     positiveCooldown.update(299);
-    positiveCooldown.next();
+    expect(positiveCooldown.next()).toBe(false);
     expect(positiveCooldown.getSnapshot()).toEqual(acceptedZeroDurationSnapshot);
     expect(positiveCooldown.isSettling).toBe(true);
 
     // The same navigation is accepted at the exact cooldown boundary, and isSettling clears.
     positiveCooldown.update(1);
     expect(positiveCooldown.isSettling).toBe(false);
-    positiveCooldown.next();
+    expect(positiveCooldown.next()).toBe(true);
     expect(positiveCooldown.phase).toBe("contact");
 
     const zeroCooldown = createFlowMachine({
       phases: ["intro", "work", "contact"] as const,
       transition: { duration: 0, cooldown: 0 }
     });
-    zeroCooldown.next();
+    expect(zeroCooldown.next()).toBe(true);
     expect(zeroCooldown.isSettling).toBe(false);
-    zeroCooldown.next();
+    expect(zeroCooldown.next()).toBe(true);
     expect(zeroCooldown.getSnapshot()).toMatchObject({ phase: "contact", progress: 1 });
 
     const byPhase = createFlowMachine({
       phases: ["intro", "work"] as const,
       transition: { duration: 100, byPhase: { intro: { duration: 0 } } }
     });
-    byPhase.next();
+    expect(byPhase.next()).toBe(true);
     expect(byPhase.getSnapshot()).toMatchObject({ phase: "work", progress: 1 });
   });
 
@@ -815,8 +827,8 @@ describe("createFlowMachine transition regressions", () => {
       transitionDurationMs: 500
     });
 
-    // intro (index 0) -> goTo("contact") (index 3): a direct two-index skip.
-    forwardMachine.goTo("contact");
+    // intro (index 0) -> goTo("contact") (index 3): a direct two-index skip, accepted forward.
+    expect(forwardMachine.goTo("contact")).toBe(true);
 
     expect(forwardMachine.getSnapshot()).toEqual({
       phase: "contact",
@@ -833,8 +845,8 @@ describe("createFlowMachine transition regressions", () => {
       transitionDurationMs: 500
     });
 
-    // contact (index 3) -> goTo("overview") (index 1): a direct two-index skip in reverse.
-    reverseMachine.goTo("overview");
+    // contact (index 3) -> goTo("overview") (index 1): a direct two-index skip, accepted reverse.
+    expect(reverseMachine.goTo("overview")).toBe(true);
 
     expect(reverseMachine.getSnapshot()).toEqual({
       phase: "overview",
@@ -904,14 +916,14 @@ describe("createFlowMachine transition regressions", () => {
 
     // intro's cooldown is 300ms; navigation stays rejected up to the exact boundary.
     machine.update(299);
-    machine.goTo("overview");
+    expect(machine.goTo("overview")).toBe(false);
 
     expect(machine.getSnapshot()).toEqual(completedForwardSnapshot);
 
     machine.update(1);
 
     // Reverse: source "contact" must select contact's byPhase, not overview's (the target).
-    machine.goTo("overview");
+    expect(machine.goTo("overview")).toBe(true);
 
     expect(machine.getSnapshot()).toEqual({
       phase: "overview",
@@ -948,12 +960,12 @@ describe("createFlowMachine transition regressions", () => {
 
     // contact's cooldown is 600ms; navigation stays rejected up to the exact boundary.
     machine.update(599);
-    machine.goTo("intro");
+    expect(machine.goTo("intro")).toBe(false);
 
     expect(machine.getSnapshot()).toEqual(completedReverseSnapshot);
 
     machine.update(1);
-    machine.goTo("intro");
+    expect(machine.goTo("intro")).toBe(true);
 
     expect(machine.getSnapshot()).toMatchObject({
       phase: "intro",
@@ -1105,7 +1117,7 @@ describe("createFlowMachine transition regressions", () => {
     // Unlocking before the cooldown boundary does not permit navigation yet.
     machine.unlock();
     machine.update(99);
-    machine.next();
+    expect(machine.next()).toBe(false);
 
     expect(machine.getSnapshot()).toEqual(completedSnapshot);
     expect(machine.isSettling).toBe(true);
@@ -1114,7 +1126,7 @@ describe("createFlowMachine transition regressions", () => {
     // provider cooldown has completed.
     machine.update(1);
     expect(machine.isSettling).toBe(false);
-    machine.next();
+    expect(machine.next()).toBe(true);
 
     expect(machine.getSnapshot()).toMatchObject({
       phase: "contact",
@@ -1148,12 +1160,12 @@ describe("createFlowMachine transition regressions", () => {
     });
     expect(machine.isSettling).toBe(false);
 
-    machine.next();
+    expect(machine.next()).toBe(false);
 
     expect(machine.getSnapshot()).toEqual(lockedAfterCooldownSnapshot);
 
     machine.unlock();
-    machine.next();
+    expect(machine.next()).toBe(true);
 
     expect(machine.getSnapshot()).toMatchObject({
       phase: "contact",

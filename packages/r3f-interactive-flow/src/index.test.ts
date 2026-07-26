@@ -242,18 +242,32 @@ describe("public API", () => {
       direction: "next",
       isTransitioning: true,
       isLocked: false,
-      next: vi.fn(),
-      prev: vi.fn(),
-      goTo: vi.fn<(phase: Phase) => void>(),
-      lock: vi.fn(),
-      unlock: vi.fn()
+      next: vi.fn<() => boolean>(() => true),
+      prev: vi.fn<() => boolean>(() => false),
+      goTo: vi.fn<(phase: Phase) => boolean>(() => true),
+      lock: vi.fn<() => void>(),
+      unlock: vi.fn<() => void>()
     } satisfies PublicFlowControls;
 
+    // Navigation controls return boolean, and statement-position usage that
+    // ignores the return value remains valid.
+    const goToResult: boolean = controls.goTo("work");
+    const nextResult: boolean = controls.next();
+    const prevResult: boolean = controls.prev();
+    controls.next();
+    controls.prev();
     controls.goTo("work");
+    const lockResult: void = controls.lock();
+    const unlockResult: void = controls.unlock();
 
     expect(controls.phase).toBe("intro");
     expect(controls.progress).toBe(0.25);
     expect(controls.goTo).toHaveBeenCalledWith("work");
+    expect(goToResult).toBe(true);
+    expect(nextResult).toBe(true);
+    expect(prevResult).toBe(false);
+    expect(lockResult).toBeUndefined();
+    expect(unlockResult).toBeUndefined();
   });
 
   it("exposes useFlowProgress as a numeric progress hook", () => {

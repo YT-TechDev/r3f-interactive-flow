@@ -22,9 +22,9 @@ export type FlowSnapshot<TPhase extends string> = {
 };
 
 export type FlowControls<TPhase extends string> = FlowSnapshot<TPhase> & {
-  next: () => void;
-  prev: () => void;
-  goTo: (phase: TPhase) => void;
+  next: () => boolean;
+  prev: () => boolean;
+  goTo: (phase: TPhase) => boolean;
   lock: () => void;
   unlock: () => void;
 };
