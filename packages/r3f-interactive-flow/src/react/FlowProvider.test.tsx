@@ -387,10 +387,13 @@ describe("FlowProvider and hooks", () => {
 
     renderFlow(<ControlsProbe onRender={(controls) => (latestControls = controls)} />);
 
+    let accepted: boolean | undefined;
+
     act(() => {
-      latestControls?.next();
+      accepted = latestControls?.next();
     });
 
+    expect(accepted).toBe(true);
     expect(latestControls).toMatchObject({
       phase: "work",
       phaseIndex: 1,
@@ -407,10 +410,13 @@ describe("FlowProvider and hooks", () => {
 
     renderFlow(<ControlsProbe onRender={(controls) => (latestControls = controls)} />);
 
+    let accepted: boolean | undefined;
+
     act(() => {
-      latestControls?.goTo("contact");
+      accepted = latestControls?.goTo("contact");
     });
 
+    expect(accepted).toBe(true);
     expect(latestControls).toMatchObject({
       phase: "contact",
       phaseIndex: 2,
@@ -420,6 +426,27 @@ describe("FlowProvider and hooks", () => {
       isLocked: false
     });
     expect(container.textContent).toContain('"phase":"contact"');
+  });
+
+  it("continues to throw for an unknown goTo target through the public controls", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+
+    renderFlow(<ControlsProbe onRender={(controls) => (latestControls = controls)} />);
+
+    expect(() => {
+      act(() => {
+        latestControls?.goTo("missing" as TestPhase);
+      });
+    }).toThrow(/Unknown phase/);
+
+    expect(latestControls).toMatchObject({
+      phase: "intro",
+      phaseIndex: 0,
+      progress: 0,
+      direction: "none",
+      isTransitioning: false,
+      isLocked: false
+    });
   });
 
   it("updates isLocked when lock and unlock are called", () => {
@@ -447,12 +474,17 @@ describe("FlowProvider and hooks", () => {
 
     renderFlow(<ControlsProbe onRender={(controls) => (latestControls = controls)} />);
 
+    let lockedNextAccepted: boolean | undefined;
+    let lockedGoToAccepted: boolean | undefined;
+
     act(() => {
       latestControls?.lock();
-      latestControls?.next();
-      latestControls?.goTo("contact");
+      lockedNextAccepted = latestControls?.next();
+      lockedGoToAccepted = latestControls?.goTo("contact");
     });
 
+    expect(lockedNextAccepted).toBe(false);
+    expect(lockedGoToAccepted).toBe(false);
     expect(latestControls).toMatchObject({
       phase: "intro",
       phaseIndex: 0,
@@ -470,11 +502,14 @@ describe("FlowProvider and hooks", () => {
       isLocked: true
     });
 
+    let unlockedNextAccepted: boolean | undefined;
+
     act(() => {
       latestControls?.unlock();
-      latestControls?.next();
+      unlockedNextAccepted = latestControls?.next();
     });
 
+    expect(unlockedNextAccepted).toBe(true);
     expect(latestControls).toMatchObject({
       phase: "work",
       phaseIndex: 1,
@@ -673,17 +708,23 @@ describe("FlowProvider and hooks", () => {
 
     const initialSnapshot = getRenderedSnapshot();
 
+    let prevAccepted: boolean | undefined;
+
     act(() => {
-      latestControls?.prev();
+      prevAccepted = latestControls?.prev();
     });
 
+    expect(prevAccepted).toBe(false);
     expect(getRenderedSnapshot()).toEqual(initialSnapshot);
     expect(latestControls).toMatchObject(initialSnapshot);
 
+    let nextAccepted: boolean | undefined;
+
     act(() => {
-      latestControls?.next();
+      nextAccepted = latestControls?.next();
     });
 
+    expect(nextAccepted).toBe(true);
     expect(getRenderedSnapshot()).toEqual({
       phase: "work",
       phaseIndex: 1,
@@ -715,17 +756,23 @@ describe("FlowProvider and hooks", () => {
 
     const completedSnapshot = getRenderedSnapshot();
 
+    let nextAccepted: boolean | undefined;
+
     act(() => {
-      latestControls?.next();
+      nextAccepted = latestControls?.next();
     });
 
+    expect(nextAccepted).toBe(false);
     expect(getRenderedSnapshot()).toEqual(completedSnapshot);
     expect(latestControls).toMatchObject(completedSnapshot);
 
+    let prevAccepted: boolean | undefined;
+
     act(() => {
-      latestControls?.prev();
+      prevAccepted = latestControls?.prev();
     });
 
+    expect(prevAccepted).toBe(true);
     expect(getRenderedSnapshot()).toEqual({
       phase: "work",
       phaseIndex: 1,
@@ -757,10 +804,13 @@ describe("FlowProvider and hooks", () => {
 
     const completedSnapshot = getRenderedSnapshot();
 
+    let goToAccepted: boolean | undefined;
+
     act(() => {
-      latestControls?.goTo("work");
+      goToAccepted = latestControls?.goTo("work");
     });
 
+    expect(goToAccepted).toBe(false);
     expect(getRenderedSnapshot()).toEqual(completedSnapshot);
     expect(latestControls).toMatchObject(completedSnapshot);
   });
@@ -1118,10 +1168,14 @@ describe("FlowProvider provider-owned transition clock", () => {
       transition: { duration: 100 }
     });
 
+    let accepted: boolean | undefined;
+
     act(() => {
-      latestControls?.next();
+      accepted = latestControls?.next();
     });
 
+    // Accepted positive-duration navigation still starts the provider-owned clock.
+    expect(accepted).toBe(true);
     expect(pendingFrameCount()).toBe(1);
 
     // Provider transition and cooldown time comes from RAF timestamp differences; the first timestamp is only the baseline.
@@ -1215,10 +1269,14 @@ describe("FlowProvider provider-owned transition clock", () => {
       transition: { duration: 0, cooldown: 300 }
     });
 
+    let firstAccepted: boolean | undefined;
+
     act(() => {
-      latestControls?.next();
+      firstAccepted = latestControls?.next();
     });
 
+    // An accepted zero-duration navigation still returns true through the public controls.
+    expect(firstAccepted).toBe(true);
     expect(latestControls).toMatchObject({
       phase: "work",
       progress: 1,
@@ -1230,10 +1288,14 @@ describe("FlowProvider provider-owned transition clock", () => {
     runFrameAt(1000);
     runFrameAt(1299);
 
+    let cooldownAccepted: boolean | undefined;
+
     act(() => {
-      latestControls?.next();
+      cooldownAccepted = latestControls?.next();
     });
 
+    // Provider cooldown behavior is unchanged: navigation stays rejected until it elapses.
+    expect(cooldownAccepted).toBe(false);
     expect(latestControls).toMatchObject({ phase: "work", isTransitioning: false });
     expect(pendingFrameCount()).toBe(1);
 
@@ -1241,10 +1303,13 @@ describe("FlowProvider provider-owned transition clock", () => {
 
     expect(pendingFrameCount()).toBe(0);
 
+    let afterCooldownAccepted: boolean | undefined;
+
     act(() => {
-      latestControls?.next();
+      afterCooldownAccepted = latestControls?.next();
     });
 
+    expect(afterCooldownAccepted).toBe(true);
     expect(latestControls).toMatchObject({
       phase: "contact",
       progress: 1,

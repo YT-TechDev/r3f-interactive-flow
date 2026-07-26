@@ -177,13 +177,13 @@ export function createFlowMachine<TPhase extends string>(
     };
   };
 
-  const navigateToIndex = (targetPhaseIndex: number): void => {
+  const navigateToIndex = (targetPhaseIndex: number): boolean => {
     if (targetPhaseIndex < 0 || targetPhaseIndex >= phases.length) {
-      return;
+      return false;
     }
 
     if (isLocked || isTransitioning || cooldownRemainingMs > 0 || targetPhaseIndex === phaseIndex) {
-      return;
+      return false;
     }
 
     const sourcePhase = getCurrentPhase();
@@ -204,10 +204,12 @@ export function createFlowMachine<TPhase extends string>(
       isTransitioning = false;
       cooldownRemainingMs = activeCooldownMs;
 
-      return;
+      return true;
     }
 
     isTransitioning = true;
+
+    return true;
   };
 
   const update = (deltaMs: number): void => {
@@ -266,10 +268,10 @@ export function createFlowMachine<TPhase extends string>(
       return isTransitioning || cooldownRemainingMs > 0;
     },
     next() {
-      navigateToIndex(phaseIndex + 1);
+      return navigateToIndex(phaseIndex + 1);
     },
     prev() {
-      navigateToIndex(phaseIndex - 1);
+      return navigateToIndex(phaseIndex - 1);
     },
     goTo(phase) {
       const targetPhaseIndex = phases.indexOf(phase);
@@ -278,7 +280,7 @@ export function createFlowMachine<TPhase extends string>(
         throw new Error(`Unknown phase: ${phase}.`);
       }
 
-      navigateToIndex(targetPhaseIndex);
+      return navigateToIndex(targetPhaseIndex);
     },
     lock() {
       isLocked = true;

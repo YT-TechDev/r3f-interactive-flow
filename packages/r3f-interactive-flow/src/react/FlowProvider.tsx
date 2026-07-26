@@ -149,16 +149,22 @@ export function FlowProvider<TPhase extends string>({
     () => ({
       ...snapshot,
       next: () => {
-        machine.next();
+        const accepted = machine.next();
         requestSync();
+
+        return accepted;
       },
       prev: () => {
-        machine.prev();
+        const accepted = machine.prev();
         requestSync();
+
+        return accepted;
       },
       goTo: (phase) => {
-        machine.goTo(phase);
+        const accepted = machine.goTo(phase);
         requestSync();
+
+        return accepted;
       },
       lock: () => {
         machine.lock();
