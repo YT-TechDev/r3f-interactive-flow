@@ -250,22 +250,23 @@ function dispatchWheel(target: Element, deltaY: number): { event: WheelEvent; re
   return { event, result };
 }
 
-function createTouch(target: EventTarget, clientY: number): Touch {
-  return new Touch({ identifier: 1, target, clientX: 0, clientY });
+function createTouch(target: EventTarget, clientY: number, identifier = 1): Touch {
+  return new Touch({ identifier, target, clientX: 0, clientY });
 }
 
 function dispatchTouch(
   target: Element,
-  type: "touchstart" | "touchmove",
-  clientY: number
+  type: "touchstart" | "touchmove" | "touchend" | "touchcancel",
+  clientY: number | number[]
 ): { event: TouchEvent; result: boolean } {
-  const touch = createTouch(target, clientY);
+  const positions = Array.isArray(clientY) ? clientY : [clientY];
+  const touches = positions.map((position, index) => createTouch(target, position, index + 1));
   const event = new TouchEvent(type, {
     bubbles: true,
     cancelable: true,
-    touches: [touch],
-    targetTouches: [touch],
-    changedTouches: [touch]
+    touches,
+    targetTouches: touches,
+    changedTouches: type === "touchend" ? [createTouch(target, positions[0] ?? 0)] : touches
   });
   let result = true;
 
@@ -355,6 +356,36 @@ describe("Chromium input event smoke coverage", () => {
     expect(readSnapshot().phase).toBe("intro");
     expect(rejected.event.defaultPrevented).toBe(false);
     expect(rejected.result).toBe(true);
+  });
+
+  it("ignores a sticky multi-touch sequence and accepts a later single-touch swipe", () => {
+    mount(
+      <App inputOptions={{ touch: true, wheel: false }}>
+        <Targets />
+      </App>
+    );
+
+    const target = getByTestId("neutral-child");
+    const start = dispatchTouch(target, "touchstart", [100, 100]);
+    const multiMove = dispatchTouch(target, "touchmove", [40, 100]);
+    const oneTouchEnd = dispatchTouch(target, "touchend", [40]);
+    const stickyMove = dispatchTouch(target, "touchmove", 20);
+
+    expect(readSnapshot().phase).toBe("intro");
+    for (const dispatched of [start, multiMove, oneTouchEnd, stickyMove]) {
+      expect(dispatched.event.defaultPrevented).toBe(false);
+      expect(dispatched.result).toBe(true);
+    }
+
+    const allTouchesEnd = dispatchTouch(target, "touchend", []);
+    dispatchTouch(target, "touchstart", 100);
+    const accepted = dispatchTouch(target, "touchmove", 59);
+
+    expect(allTouchesEnd.event.defaultPrevented).toBe(false);
+    expect(allTouchesEnd.result).toBe(true);
+    expect(readSnapshot().phase).toBe("work");
+    expect(accepted.event.defaultPrevented).toBe(true);
+    expect(accepted.result).toBe(false);
   });
 
   it("preserves nested actionable, editable, and ignored ancestry while accepting neutral wheel input", () => {
