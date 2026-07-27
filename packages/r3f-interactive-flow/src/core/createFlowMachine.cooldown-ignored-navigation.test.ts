@@ -3,6 +3,84 @@ import { describe, expect, it } from "vitest";
 import { createFlowMachine } from "./createFlowMachine";
 
 describe("createFlowMachine cooldown ignored navigation hardening", () => {
+  it("exposes the complete provider cooldown lifecycle without redefining lock state", () => {
+    const machine = createFlowMachine({
+      phases: ["intro", "work", "contact"] as const,
+      transitionDurationMs: 100,
+      cooldownMs: 300
+    });
+
+    expect(machine.isCoolingDown).toBe(false);
+    expect(machine.getSnapshot().isCoolingDown).toBe(false);
+
+    expect(machine.next()).toBe(true);
+    machine.update(99);
+    expect(machine.getSnapshot()).toMatchObject({
+      isTransitioning: true,
+      isCoolingDown: false
+    });
+
+    machine.update(1);
+    expect(machine.getSnapshot()).toMatchObject({
+      isTransitioning: false,
+      isCoolingDown: true
+    });
+    expect(machine.next()).toBe(false);
+
+    const coolingSnapshot = machine.getSnapshot();
+    expect(machine.goTo("contact")).toBe(false);
+    expect(machine.getSnapshot()).toEqual(coolingSnapshot);
+
+    machine.lock();
+    machine.update(299);
+    expect(machine.getSnapshot()).toMatchObject({ isCoolingDown: true, isLocked: true });
+
+    machine.update(1);
+    expect(machine.getSnapshot()).toMatchObject({ isCoolingDown: false, isLocked: true });
+    machine.unlock();
+
+    const freshMachine = createFlowMachine({
+      phases: ["intro", "work"] as const,
+      transitionDurationMs: 100,
+      cooldownMs: 300
+    });
+    expect(freshMachine.getSnapshot().isCoolingDown).toBe(false);
+  });
+
+  it("handles zero duration, zero cooldown, and a large update delta", () => {
+    const immediate = createFlowMachine({
+      phases: ["intro", "work"] as const,
+      transitionDurationMs: 0,
+      cooldownMs: 300
+    });
+
+    expect(immediate.next()).toBe(true);
+    expect(immediate.getSnapshot().isCoolingDown).toBe(true);
+    immediate.update(300);
+    expect(immediate.getSnapshot().isCoolingDown).toBe(false);
+
+    const noCooldown = createFlowMachine({
+      phases: ["intro", "work"] as const,
+      transitionDurationMs: 100,
+      cooldownMs: 0
+    });
+    noCooldown.next();
+    noCooldown.update(100);
+    expect(noCooldown.getSnapshot().isCoolingDown).toBe(false);
+
+    const consumedInOneUpdate = createFlowMachine({
+      phases: ["intro", "work"] as const,
+      transitionDurationMs: 100,
+      cooldownMs: 300
+    });
+    consumedInOneUpdate.next();
+    consumedInOneUpdate.update(400);
+    expect(consumedInOneUpdate.getSnapshot()).toMatchObject({
+      isTransitioning: false,
+      isCoolingDown: false
+    });
+  });
+
   it("does not reset or extend cooldown when valid navigation is ignored during cooldown", () => {
     const machine = createFlowMachine({
       phases: ["intro", "work", "contact"] as const,

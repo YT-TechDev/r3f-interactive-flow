@@ -336,6 +336,7 @@ describe("FlowProvider and hooks", () => {
       progress: 0,
       direction: "none",
       isTransitioning: false,
+      isCoolingDown: false,
       isLocked: false
     });
     expect(container.textContent).toContain('"phase":"intro"');
@@ -365,6 +366,7 @@ describe("FlowProvider and hooks", () => {
     expect(Object.keys(latestControls ?? {}).sort()).toEqual([
       "direction",
       "goTo",
+      "isCoolingDown",
       "isLocked",
       "isTransitioning",
       "lock",
@@ -1281,7 +1283,8 @@ describe("FlowProvider provider-owned transition clock", () => {
       phase: "work",
       progress: 1,
       direction: "none",
-      isTransitioning: false
+      isTransitioning: false,
+      isCoolingDown: true
     });
     expect(pendingFrameCount()).toBe(1);
 
@@ -1301,6 +1304,7 @@ describe("FlowProvider provider-owned transition clock", () => {
 
     runFrameAt(1300);
 
+    expect(latestControls?.isCoolingDown).toBe(false);
     expect(pendingFrameCount()).toBe(0);
 
     let afterCooldownAccepted: boolean | undefined;
@@ -1316,6 +1320,44 @@ describe("FlowProvider provider-owned transition clock", () => {
       direction: "none",
       isTransitioning: false
     });
+  });
+
+  it("synchronizes cooldown boundaries without cooldown-only frame renders", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let renderCount = 0;
+
+    renderFlow(
+      <ControlsProbe
+        onRender={(controls) => {
+          latestControls = controls;
+          renderCount += 1;
+        }}
+      />,
+      undefined,
+      { transition: { duration: 100, cooldown: 300 } }
+    );
+
+    act(() => {
+      latestControls?.next();
+    });
+    expect(latestControls?.isCoolingDown).toBe(false);
+
+    advanceClock(16);
+    advanceClock(100);
+    expect(latestControls).toMatchObject({
+      isTransitioning: false,
+      isCoolingDown: true
+    });
+    const completionRenderCount = renderCount;
+
+    advanceClock(150);
+    advanceClock(149);
+    expect(latestControls?.isCoolingDown).toBe(true);
+    expect(renderCount).toBe(completionRenderCount);
+
+    advanceClock(1);
+    expect(latestControls?.isCoolingDown).toBe(false);
+    expect(renderCount).toBe(completionRenderCount + 1);
   });
 
   it("advances React progress continuously through a Canvas-free navigation", () => {
@@ -1893,12 +1935,16 @@ describe("FlowProvider provider-owned transition clock", () => {
       transition: { duration: 100, cooldown: 300 }
     });
 
+    expect(latestControls?.isCoolingDown).toBe(false);
+
     act(() => {
       latestControls?.next();
     });
     advanceClock(16);
     advanceClock(100);
     advanceClock(150);
+
+    expect(latestControls?.isCoolingDown).toBe(true);
 
     renderInlineFlow({
       children: <ControlsProbe onRender={(controls) => (latestControls = controls)} />,
@@ -1909,6 +1955,7 @@ describe("FlowProvider provider-owned transition clock", () => {
       latestControls?.next();
     });
     expect(latestControls).toMatchObject({ phase: "work", isTransitioning: false });
+    expect(latestControls?.isCoolingDown).toBe(true);
     expect(pendingFrameCount()).toBe(1);
 
     advanceClock(149);
@@ -2010,6 +2057,7 @@ describe("FlowProvider provider-owned transition clock", () => {
       progress: 0,
       direction: "none",
       isTransitioning: false,
+      isCoolingDown: false,
       isLocked: false
     });
 
@@ -2023,6 +2071,7 @@ describe("FlowProvider provider-owned transition clock", () => {
       progress: 1,
       direction: "none",
       isTransitioning: false,
+      isCoolingDown: true,
       isLocked: false
     });
     expect(pendingFrameCount()).toBe(1);

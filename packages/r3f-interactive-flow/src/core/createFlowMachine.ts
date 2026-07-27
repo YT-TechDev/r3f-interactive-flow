@@ -150,14 +150,25 @@ export function createFlowMachine<TPhase extends string>(
     return phase;
   };
 
-  const getSnapshot = (): FlowSnapshot<TPhase> => ({
-    phase: getCurrentPhase(),
-    phaseIndex,
-    progress,
-    direction,
-    isTransitioning,
-    isLocked
-  });
+  const getSnapshot = (): FlowSnapshot<TPhase> => {
+    const snapshot = {
+      phase: getCurrentPhase(),
+      phaseIndex,
+      progress,
+      direction,
+      isTransitioning,
+      isLocked
+    } as FlowSnapshot<TPhase>;
+
+    // Keep existing snapshot enumeration stable while making the additive
+    // lifecycle field available to direct consumers and React composition.
+    Object.defineProperty(snapshot, "isCoolingDown", {
+      enumerable: false,
+      value: cooldownRemainingMs > 0
+    });
+
+    return snapshot;
+  };
 
   const resolveTransitionForPhase = (sourcePhase: TPhase): ResolvedTransition => {
     const phaseTransition = options.transition?.byPhase?.[sourcePhase];
@@ -260,6 +271,9 @@ export function createFlowMachine<TPhase extends string>(
     },
     get isTransitioning() {
       return isTransitioning;
+    },
+    get isCoolingDown() {
+      return cooldownRemainingMs > 0;
     },
     get isLocked() {
       return isLocked;
