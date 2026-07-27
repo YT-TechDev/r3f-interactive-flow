@@ -1,5 +1,52 @@
 # r3f-interactive-flow
 
+## 2.11.0
+
+`r3f-interactive-flow@2.11.0` is a focused, backward-compatible
+flow-runtime-completion release. It makes machine-wide provider cooldown
+readiness observable through the existing flow snapshot and controls:
+
+```ts
+const { isCoolingDown } = useFlow();
+```
+
+### Added
+
+- `FlowSnapshot<TPhase>`, `FlowControls<TPhase>`, and `useFlow<TPhase>()` expose
+  `isCoolingDown: boolean`.
+- `isCoolingDown` represents machine-wide provider cooldown only. It becomes
+  observable after a positive-duration transition completes, while accepted
+  zero-duration navigation may expose it synchronously. It returns to `false`
+  when cooldown expires and remains `false` when the configured cooldown is
+  zero.
+- Manual lock remains separate from provider cooldown. Hook-local wheel,
+  touch, and keyboard cooldown also remains separate and does not affect
+  `isCoolingDown`.
+- The provider continues to own the single machine-advancing clock.
+  Cooldown-only frames synchronize React state only at the discrete cooldown
+  boundary; they do not trigger per-frame React state updates.
+
+### Preserved boundaries
+
+- Navigation results remain boolean, and `useFlowProgress` is unchanged.
+- `FlowFrameState` and `useFlowFrame` are unchanged.
+- DOM input behavior is unchanged.
+- Runtime exports and named root type exports are unchanged.
+- Package exports, peer ranges, runtime dependencies, scripts, and CI are
+  unchanged.
+- No legacy or deprecated option was removed, and no migration is required.
+
+### Validation
+
+- Issue #474 confirmed runtime completion.
+- Issue #475 reported 22 files with 456 tests and a focused 7 files with 124
+  tests. The production audit, release gate, declarations, and packed consumer
+  passed.
+- Local browser execution was unavailable for Issue #475. PR #473 browser CI
+  passed the equivalent runtime tree with 1 file and 10 tests.
+- This release-preparation Pull Request still requires exact-head browser CI
+  before merge.
+
 ## 2.10.0
 
 `r3f-interactive-flow@2.10.0` is a mature v2 maintenance-baseline release. It
