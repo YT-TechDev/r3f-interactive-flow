@@ -365,6 +365,21 @@ instance, starts only after that hook produces an accepted input navigation,
 and throttles only that hook — it does not lock the machine and does not block
 direct `next`/`prev`/`goTo` calls or other hook instances.
 
+`useFlow()` exposes the machine-wide provider cooldown lifecycle as
+`isCoolingDown`. It remains `false` during a positive-duration transition,
+becomes `true` when that transition completes with positive provider cooldown,
+and returns to `false` at expiry. An accepted zero-duration transition with
+positive provider cooldown exposes `true` synchronously. Hook-local input
+cooldown is separate and never changes this field.
+
+```tsx
+const { isTransitioning, isCoolingDown, isLocked } = useFlow<Phase>();
+const disabled = isTransitioning || isCoolingDown || isLocked;
+```
+
+`isCoolingDown` is a boolean lifecycle boundary, not a countdown; it exposes no
+remaining time.
+
 ```tsx
 <FlowProvider phases={phases} transition={{ duration: 700, cooldown: 250 }}>
   {/* ... */}

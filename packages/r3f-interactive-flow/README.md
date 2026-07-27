@@ -112,7 +112,7 @@ This section is the complete public transition contract and stands on its own. C
 
 ### Initial snapshot
 
-On mount, the snapshot reports the configured `initialPhase` (or the first phase in `phases`), `progress: 0`, `direction: "none"`, and `isTransitioning: false`.
+On mount, the snapshot reports the configured `initialPhase` (or the first phase in `phases`), `progress: 0`, `direction: "none"`, `isTransitioning: false`, and `isCoolingDown: false`.
 
 The navigation controls have these signatures:
 
@@ -149,7 +149,7 @@ Use `isTransitioning` as the lifecycle signal, not `progress === 1` alone. Non-f
 
 ### Completion
 
-At raw completion: `progress` is forced to `1`, `direction` becomes `"none"`, `isTransitioning` becomes `false`, and provider cooldown begins (if configured). The completed snapshot stays stable through cooldown-only time — nothing mutates it again until the next accepted navigation.
+At raw completion: `progress` is forced to `1`, `direction` becomes `"none"`, `isTransitioning` becomes `false`, and provider cooldown begins (if configured). `isCoolingDown` is `true` while that machine-wide provider cooldown has positive time remaining, then changes to `false` at expiry. Other completed snapshot fields stay stable through cooldown-only time.
 
 ### Adjacent and non-adjacent `goTo()`
 
@@ -196,8 +196,17 @@ An accepted transition with `duration: 0` returns `true` and completes synchrono
 ### Manual lock and cooldown composition
 
 - **Manual lock** (`lock()`/`unlock()`) blocks new valid navigation. It does not pause, cancel, or slow an active transition, and it does not pause provider cooldown. It is a navigation gate, not a clock pause.
-- **Provider cooldown** belongs to the provider-owned flow machine. It starts once a transition completes (including synchronous zero-duration completion) and rejects manual controls and all input hooks globally until it elapses. It continues to run while manual lock is active. It is not exposed as a remaining-time value.
+- **Provider cooldown** belongs to the provider-owned flow machine. It starts once a transition completes (including synchronous zero-duration completion) and rejects manual controls and all input hooks globally until it elapses. `useFlow()` exposes this machine-wide lifecycle as `isCoolingDown`: positive-duration transitions set it after completion, while accepted zero-duration transitions may set it synchronously. It continues to run while manual lock is active. The boolean is not a countdown and exposes no remaining time.
 - **Hook-local cooldown** belongs only to one `useWheelInput`/`useTouchInput`/`useKeyboardInput` instance. It starts only after that hook produces an accepted navigation and throttles only that hook — it does not lock the machine and does not block direct `next`/`prev`/`goTo` calls or other hook instances when provider state is otherwise ready.
+
+For a control that should be unavailable at every provider-owned navigation gate:
+
+```ts
+const { isTransitioning, isCoolingDown, isLocked } = useFlow();
+const disabled = isTransitioning || isCoolingDown || isLocked;
+```
+
+Hook-local input cooldown never changes `isCoolingDown`.
 
 ### React and R3F sampling
 

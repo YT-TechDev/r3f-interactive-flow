@@ -92,9 +92,13 @@ export function FlowProvider<TPhase extends string>({
       // Synchronize the React snapshot on every frame that advances a
       // transition, including the completion frame, so DOM consumers
       // (useFlowProgress and useFlow().progress) move continuously from 0 to 1.
-      // Cooldown-only frames change no React-facing value, so they intentionally
-      // skip React work to avoid per-frame renders while idle-settling.
-      if (before.isTransitioning || after.isTransitioning) {
+      // Cooldown-only frames skip React work while the boolean is unchanged;
+      // synchronize only the exact expiry boundary.
+      if (
+        before.isTransitioning ||
+        after.isTransitioning ||
+        before.isCoolingDown !== after.isCoolingDown
+      ) {
         setSnapshot(after);
       }
 
@@ -148,6 +152,7 @@ export function FlowProvider<TPhase extends string>({
   const controls = useMemo<FlowControls<TPhase>>(
     () => ({
       ...snapshot,
+      isCoolingDown: snapshot.isCoolingDown,
       next: () => {
         const accepted = machine.next();
         requestSync();

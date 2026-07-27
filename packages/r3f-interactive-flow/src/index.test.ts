@@ -241,6 +241,7 @@ describe("public API", () => {
       progress: 0.25,
       direction: "next",
       isTransitioning: true,
+      isCoolingDown: false,
       isLocked: false,
       next: vi.fn<() => boolean>(() => true),
       prev: vi.fn<() => boolean>(() => false),
@@ -262,6 +263,7 @@ describe("public API", () => {
 
     expect(controls.phase).toBe("intro");
     expect(controls.progress).toBe(0.25);
+    expect(controls.isCoolingDown).toBe(false);
     expect(controls.goTo).toHaveBeenCalledWith("work");
     expect(goToResult).toBe(true);
     expect(nextResult).toBe(true);

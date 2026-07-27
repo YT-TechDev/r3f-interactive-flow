@@ -18,6 +18,7 @@ export type FlowSnapshot<TPhase extends string> = {
   progress: number;
   direction: FlowDirection;
   isTransitioning: boolean;
+  isCoolingDown: boolean;
   isLocked: boolean;
 };
 
