@@ -1,5 +1,58 @@
 # r3f-interactive-flow
 
+## 2.10.0
+
+`r3f-interactive-flow@2.10.0` is a mature v2 maintenance-baseline release. It
+records completed audit, package, compatibility, deprecation, and validation
+evidence while preserving the established v2.9.0 runtime contract.
+
+### Mature v2 baseline
+
+- The architecture, transitions, input handling, frame bridge, package
+  boundaries, security posture, and rollback safety were audited without
+  finding a confirmed runtime blocker.
+- The v2 line remains the maintenance direction; no confirmed breaking
+  requirement justifies v3 planning.
+
+### Package and compatibility evidence
+
+- The intended seven runtime exports and eight named root type exports remain
+  aligned across ESM, CommonJS, and declarations.
+- Root-only exports, private-subpath rejection, `"use client"` preservation,
+  peer externalization, zero runtime dependencies, and the absence of an
+  import-time browser-global requirement were verified.
+- Package output, raw and compressed size, and representative tree-shaking
+  were measured as bounded audit evidence, without introducing a permanent
+  size threshold or universal bundler guarantee.
+- Consumer documentation now distinguishes declared peer ranges from exercised
+  configurations, React/DOM responsibilities from Canvas-bound work, and
+  package-root imports from private paths.
+
+### Legacy and maintenance decisions
+
+- `transitionDurationMs`, `cooldownMs`, top-level `easing`, `nextKeys`, and
+  `prevKeys` all remain available; none was removed.
+- The timing options remain supported compatibility surface, and the existing
+  machine-readable deprecation of `nextKeys` and `prevKeys` is preserved.
+
+### Validation
+
+- Final maturity validation passed the production audit, all ten
+  `release:check` stages, 22 Node test files with 453 tests, package smoke and
+  peer-compatibility lanes, browser input smoke with 1 file and 10 tests, and
+  clean Git checks on the approved baseline.
+- The published-consumer check remains historical evidence for its pinned
+  `r3f-interactive-flow@2.4.0` package only.
+
+### Compatibility
+
+- This release adds no runtime feature and makes no breaking change.
+- The v2.9.0 navigation-acceptance behavior remains authoritative.
+- Public snapshots, `FlowFrameState`, `FlowProviderProps`, runtime exports,
+  package boundaries, runtime dependencies, peer ranges, scripts, and CI remain
+  unchanged.
+- No migration is required.
+
 ## 2.9.0
 
 `r3f-interactive-flow@2.9.0` is a focused, backward-compatible minor release.
