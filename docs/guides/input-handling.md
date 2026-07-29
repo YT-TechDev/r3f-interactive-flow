@@ -115,11 +115,16 @@ cooldowns can all reject input without moving to another phase.
 
 `preventDefault` defaults to `true` on every input hook. Accepted navigation may
 call `preventDefault()` when the hook's option is true. Later events in an
-already committed touch gesture may also be prevented. Threshold misses,
+already committed touch gesture may also be prevented. For `useTouchInput`,
+event cancelability controls only whether the hook can request native-event
+prevention for an accepted or already-committed touch event; it does not control
+navigation acceptance. An accepted non-cancelable threshold-crossing event may
+still commit one navigation, but the hook does not call `preventDefault()` for
+that event. Threshold misses,
 ignored/actionable/editable origins, boundaries, locks, transitions, provider
 cooldown, hook-local cooldown, repeated keys, typing targets, and other rejected
 navigation attempts remain unprevented. Set `preventDefault: false` to allow
-accepted navigation without suppressing native behavior.
+accepted navigation without requesting native-event prevention.
 
 ## Wheel input
 
@@ -208,14 +213,32 @@ nothing. Touch gesture distance is position-based and does not use a clock.
 
 A gesture starts at `touchstart`. Threshold crossing during `touchmove` attempts
 navigation and, when accepted, creates a committed touch gesture. One accepted
-navigation can happen per committed touch gesture. Later `touchmove` events in
-the same committed touch gesture may remain prevented when configured, but they
-never navigate again. If a stream does not produce a qualifying `touchmove`,
-`touchend` provides a bounded fallback using the start and end positions.
+navigation can happen per committed touch gesture. The first accepted
+threshold-crossing `touchmove` calls `preventDefault()` only when prevention is
+configured and that event is cancelable. Later `touchmove` events in the same
+committed touch gesture follow the same rule, but they never navigate again. If
+a stream does not produce a qualifying `touchmove`, `touchend` provides a
+bounded fallback using the start and end positions; an accepted fallback also
+calls `preventDefault()` only when configured and cancelable.
 Missing `touches[0]` during `touchmove` does not invent a new gesture, and the
 later `touchend` fallback remains bounded. `touchcancel` before or after
 commitment clears gesture state. Unmount/remount during an active uncommitted
 gesture does not replay it.
+
+Non-cancelable events do not receive an ineffective prevention attempt. A
+browser may make later touch events non-cancelable after native scrolling has
+started, so `preventDefault: true` is not a promise that the hook can always
+interrupt scrolling at that point. Navigation acceptance remains governed by
+the existing flow-navigation result, independently of event cancelability.
+
+The regression evidence for this boundary is intentionally narrow: a
+Playwright-managed Chromium browser test used CDP-driven touch delivery,
+observed a genuine `cancelable === false` `touchmove`, committed navigation
+exactly once, and emitted no matching intervention warning after the fix. This
+is Chromium-specific automated evidence, not physical-device, Chrome DevTools
+internal-path, Safari, Firefox, WebKit, cross-browser, or native-scroll
+certification. CDP-driven delivery is not claimed to use the same internal path
+as manual Chrome DevTools responsive emulation.
 
 Ignored/actionable origin status is fixed from the gesture origin for the
 gesture lifetime, even if later event targets leave that region. Disable,
