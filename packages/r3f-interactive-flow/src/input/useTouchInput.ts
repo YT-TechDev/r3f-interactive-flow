@@ -175,7 +175,7 @@ export function useTouchInput<TPhase extends string>(options: UseTouchInputOptio
       }
 
       if (gestureCommittedRef.current) {
-        if (preventDefault) {
+        if (preventDefault && touchEvent.cancelable !== false) {
           touchEvent.preventDefault();
         }
 
@@ -200,7 +200,7 @@ export function useTouchInput<TPhase extends string>(options: UseTouchInputOptio
 
       gestureCommittedRef.current = true;
 
-      if (preventDefault) {
+      if (preventDefault && touchEvent.cancelable !== false) {
         touchEvent.preventDefault();
       }
     };
@@ -244,7 +244,7 @@ export function useTouchInput<TPhase extends string>(options: UseTouchInputOptio
         return;
       }
 
-      if (preventDefault) {
+      if (preventDefault && touchEvent.cancelable !== false) {
         touchEvent.preventDefault();
       }
     };
