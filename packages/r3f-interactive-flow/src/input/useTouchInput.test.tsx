@@ -16,6 +16,7 @@ type MinimalTouch = {
 };
 
 class MinimalTouchEvent {
+  cancelable: boolean;
   changedTouches: MinimalTouch[];
   defaultPrevented = false;
   target: EventTarget | MinimalEventTarget | null = null;
@@ -24,15 +25,22 @@ class MinimalTouchEvent {
 
   constructor(
     type: string,
-    eventInitDict: { changedTouches?: MinimalTouch[]; touches?: MinimalTouch[] } = {}
+    eventInitDict: {
+      cancelable?: boolean;
+      changedTouches?: MinimalTouch[];
+      touches?: MinimalTouch[];
+    } = {}
   ) {
     this.type = type;
+    this.cancelable = eventInitDict.cancelable ?? true;
     this.changedTouches = eventInitDict.changedTouches ?? [];
     this.touches = eventInitDict.touches ?? [];
   }
 
   preventDefault(): void {
-    this.defaultPrevented = true;
+    if (this.cancelable) {
+      this.defaultPrevented = true;
+    }
   }
 }
 
@@ -71,15 +79,22 @@ function MachineProbe({
 
 function dispatchTouch(
   type: string,
-  eventInitDict: { changedTouches?: MinimalTouch[]; touches?: MinimalTouch[] } = {},
+  eventInitDict: {
+    cancelable?: boolean;
+    changedTouches?: MinimalTouch[];
+    touches?: MinimalTouch[];
+  } = {},
   dispatchTarget: MinimalEventTarget = windowTarget,
-  eventTarget?: EventTarget | MinimalEventTarget | null
+  eventTarget?: EventTarget | MinimalEventTarget | null,
+  onEventCreated?: (event: MinimalTouchEvent) => void
 ): MinimalTouchEvent {
   const event = new MinimalTouchEvent(type, eventInitDict);
 
   if (eventTarget !== undefined) {
     event.target = eventTarget;
   }
+
+  onEventCreated?.(event);
 
   act(() => {
     dispatchTarget.dispatchEvent(event);
@@ -667,6 +682,39 @@ describe("useTouchInput", () => {
     expect(latestControls?.direction).toBe("next");
   });
 
+  it("accepts navigation but does not call preventDefault for a first accepted non-cancelable threshold-crossing touchmove", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let machine: FlowMachine<TestPhase> | undefined;
+    let preventDefaultSpy: ReturnType<typeof vi.spyOn> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe onRender={(renderedMachine) => (machine = renderedMachine)} />
+      </>
+    );
+
+    const nextSpy = machine ? vi.spyOn(machine, "next") : undefined;
+
+    dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] });
+    const commitEvent = dispatchTouch(
+      "touchmove",
+      { touches: [{ clientX: 0, clientY: 59 }], cancelable: false },
+      windowTarget,
+      undefined,
+      (event) => {
+        preventDefaultSpy = vi.spyOn(event, "preventDefault");
+      }
+    );
+
+    expect(preventDefaultSpy).not.toHaveBeenCalled();
+    expect(commitEvent.defaultPrevented).toBe(false);
+    expect(nextSpy).toHaveBeenCalledTimes(1);
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
   it("does not call preventDefault for an accepted touchmove when preventDefault is false", () => {
     let latestControls: FlowControls<TestPhase> | undefined;
 
@@ -922,6 +970,41 @@ describe("useTouchInput", () => {
     expect(latestControls?.direction).toBe("next");
   });
 
+  it("accepts navigation but does not call preventDefault for an accepted non-cancelable touchend fallback", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let machine: FlowMachine<TestPhase> | undefined;
+    let preventDefaultSpy: ReturnType<typeof vi.spyOn> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe onRender={(renderedMachine) => (machine = renderedMachine)} />
+      </>,
+      undefined,
+      { transitionDurationMs: 100, cooldownMs: 0 }
+    );
+
+    const nextSpy = machine ? vi.spyOn(machine, "next") : undefined;
+
+    dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] });
+    const endEvent = dispatchTouch(
+      "touchend",
+      { changedTouches: [{ clientX: 0, clientY: 59 }], cancelable: false },
+      windowTarget,
+      undefined,
+      (event) => {
+        preventDefaultSpy = vi.spyOn(event, "preventDefault");
+      }
+    );
+
+    expect(preventDefaultSpy).not.toHaveBeenCalled();
+    expect(endEvent.defaultPrevented).toBe(false);
+    expect(nextSpy).toHaveBeenCalledTimes(1);
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
   it("clears committed gesture state when touchcancel follows an accepted touchmove", () => {
     let latestControls: FlowControls<TestPhase> | undefined;
     let machine: FlowMachine<TestPhase> | undefined;
@@ -1047,6 +1130,43 @@ describe("useTouchInput", () => {
 
     expect(commitEvent.defaultPrevented).toBe(true);
     expect(laterMoveEvent.defaultPrevented).toBe(true);
+    expect(endEvent.defaultPrevented).toBe(false);
+    expect(nextSpy).toHaveBeenCalledTimes(1);
+    expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
+  });
+
+  it("prevents the cancelable commit but not a later non-cancelable touchmove, and does not navigate again", () => {
+    let latestControls: FlowControls<TestPhase> | undefined;
+    let machine: FlowMachine<TestPhase> | undefined;
+    let laterPreventDefaultSpy: ReturnType<typeof vi.spyOn> | undefined;
+
+    renderFlow(
+      <>
+        <TouchInputProbe options={{ threshold: 40 }} />
+        <ControlsProbe onRender={(controls) => (latestControls = controls)} />
+        <MachineProbe onRender={(renderedMachine) => (machine = renderedMachine)} />
+      </>
+    );
+
+    const nextSpy = machine ? vi.spyOn(machine, "next") : undefined;
+
+    dispatchTouch("touchstart", { touches: [{ clientX: 0, clientY: 100 }] });
+    const commitEvent = dispatchTouch("touchmove", { touches: [{ clientX: 0, clientY: 59 }] });
+    const laterMoveEvent = dispatchTouch(
+      "touchmove",
+      { touches: [{ clientX: 0, clientY: 20 }], cancelable: false },
+      windowTarget,
+      undefined,
+      (event) => {
+        laterPreventDefaultSpy = vi.spyOn(event, "preventDefault");
+      }
+    );
+    const endEvent = dispatchTouch("touchend", { changedTouches: [{ clientX: 0, clientY: 20 }] });
+
+    expect(commitEvent.defaultPrevented).toBe(true);
+    expect(laterPreventDefaultSpy).not.toHaveBeenCalled();
+    expect(laterMoveEvent.defaultPrevented).toBe(false);
     expect(endEvent.defaultPrevented).toBe(false);
     expect(nextSpy).toHaveBeenCalledTimes(1);
     expect(latestControls?.phase).toBe("work");

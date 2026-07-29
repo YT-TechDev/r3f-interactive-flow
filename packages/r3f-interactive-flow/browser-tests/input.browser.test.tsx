@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import type { Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { userEvent } from "vitest/browser";
+import { cdp, userEvent } from "vitest/browser";
 
 import {
   FlowProvider,
@@ -661,5 +661,108 @@ describe("Chromium input event smoke coverage", () => {
     expect(readSnapshot().phaseIndex).toBe(2);
 
     window.removeEventListener("keydown", recordKeydown);
+  });
+});
+
+function ScrollSpacer() {
+  return <div data-testid="scroll-spacer" style={{ height: "4000px", width: "100%" }} />;
+}
+
+const INTERVENTION_WARNING_TEXT =
+  "Ignored attempt to cancel a touchmove event with cancelable=false";
+
+async function dispatchCdpTouch(
+  type: "touchStart" | "touchMove" | "touchEnd",
+  x: number,
+  y?: number
+): Promise<void> {
+  await cdp().send("Input.dispatchTouchEvent", {
+    type,
+    touchPoints: type === "touchEnd" ? [] : [{ x, y: y ?? 0 }]
+  });
+}
+
+async function dispatchCdpTouchMoveSteps(
+  x: number,
+  startY: number,
+  stepCount: number,
+  stepDeltaY: number
+): Promise<number> {
+  let y = startY;
+
+  for (let index = 0; index < stepCount; index += 1) {
+    y += stepDeltaY;
+    await dispatchCdpTouch("touchMove", x, y);
+    await new Promise((resolve) => {
+      setTimeout(resolve, 16);
+    });
+  }
+
+  return y;
+}
+
+describe("Chromium non-cancelable touchmove regression (#478)", () => {
+  it("accepts navigation exactly once for a genuine Chromium-delivered non-cancelable touchmove without an intervention warning", async () => {
+    mount(
+      <App inputOptions={{ touch: true, wheel: false }}>
+        <ScrollSpacer />
+      </App>
+    );
+
+    const session = cdp();
+    await session.send("Log.enable", {});
+
+    const interventionMessages: string[] = [];
+    const observedCancelable: boolean[] = [];
+
+    const onLogEntry = (params: { entry: { text: string } }): void => {
+      if (params.entry.text.includes(INTERVENTION_WARNING_TEXT)) {
+        interventionMessages.push(params.entry.text);
+      }
+    };
+    const onTouchMoveCapture = (event: Event): void => {
+      observedCancelable.push((event as TouchEvent).cancelable);
+    };
+
+    session.on("Log.entryAdded", onLogEntry);
+    window.addEventListener("touchmove", onTouchMoveCapture, {
+      capture: true,
+      passive: true
+    });
+
+    try {
+      expect(readSnapshot().phaseIndex).toBe(0);
+
+      await dispatchCdpTouch("touchStart", 100, 300);
+      const yAfterCommit = await dispatchCdpTouchMoveSteps(100, 300, 40, -5);
+      await new Promise((resolve) => {
+        setTimeout(resolve, 200);
+      });
+
+      expect(observedCancelable).toContain(false);
+      expect(readSnapshot().phaseIndex).toBe(1);
+      expect(interventionMessages).toEqual([]);
+
+      await dispatchCdpTouchMoveSteps(100, yAfterCommit, 10, -5);
+      await new Promise((resolve) => {
+        setTimeout(resolve, 200);
+      });
+
+      expect(readSnapshot().phaseIndex).toBe(1);
+      expect(interventionMessages).toEqual([]);
+
+      await dispatchCdpTouch("touchEnd", 100);
+      await new Promise((resolve) => {
+        setTimeout(resolve, 200);
+      });
+
+      expect(readSnapshot().phaseIndex).toBe(1);
+      expect(interventionMessages).toEqual([]);
+    } finally {
+      window.removeEventListener("touchmove", onTouchMoveCapture, { capture: true });
+      session.off("Log.entryAdded", onLogEntry);
+      await session.send("Log.disable", {});
+      window.scrollTo(0, 0);
+    }
   });
 });
