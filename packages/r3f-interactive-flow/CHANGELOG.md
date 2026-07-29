@@ -1,5 +1,49 @@
 # r3f-interactive-flow
 
+## 2.11.1
+
+`r3f-interactive-flow@2.11.1` is a focused, backward-compatible
+touch-input robustness patch. It avoids ineffective `preventDefault()` calls
+for non-cancelable touch events while preserving the existing navigation and
+gesture contracts.
+
+### Fixed
+
+- `useTouchInput` now requests native-event prevention only when the relevant
+  touch event is cancelable.
+- The correction covers:
+  - the first accepted threshold-crossing `touchmove`;
+  - later `touchmove` events in an already committed gesture;
+  - the accepted `touchend` fallback.
+- This avoids preventions that cannot affect browser behavior and removes the
+  corresponding avoidable Chromium intervention warning.
+
+### Preserved behavior
+
+- Event cancelability does not determine navigation acceptance.
+- An accepted non-cancelable touch event may still commit navigation.
+- One committed gesture still produces at most one navigation.
+- Cancelable accepted events remain prevented when configured.
+- `preventDefault: false` remains unchanged.
+- Rejected input remains unprevented.
+- Transition, provider cooldown, hook-local cooldown, manual lock, phase
+  boundaries, multi-touch invalidation, `touchcancel`, listener replacement,
+  and cleanup behavior remain unchanged.
+- Public runtime exports, public types, package exports, dependencies, peer
+  ranges, and package structure remain unchanged.
+- No migration is required.
+
+### Validation
+
+- PR #479 added focused coverage for all three corrected call sites.
+- Its Chromium regression observed a genuine non-cancelable `touchmove`,
+  produced the intervention warning before the correction, produced no matching
+  warning after the correction, and preserved exactly one navigation for one
+  continuous committed gesture.
+- The full Node test suite and browser input suite passed on the merged fix.
+- PR #480 aligned the root README, distributed package README, and input guide
+  with the corrected public behavior.
+
 ## 2.11.0
 
 `r3f-interactive-flow@2.11.0` is a focused, backward-compatible
