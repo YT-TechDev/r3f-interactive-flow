@@ -51,10 +51,7 @@ function WheelInputProbe(): null {
   return null;
 }
 
-function dispatchCancelableWheel(cancelable: boolean): {
-  event: MinimalCancelableWheelEvent;
-  preventDefaultSpy: ReturnType<typeof vi.spyOn>;
-} {
+function dispatchCancelableWheel(cancelable: boolean) {
   const event = new WheelEvent("wheel", {
     cancelable,
     deltaY: 41
@@ -84,6 +81,7 @@ describe("useWheelInput cancelability", () => {
     expect(preventDefaultSpy).toHaveBeenCalledOnce();
     expect(event.defaultPrevented).toBe(true);
     expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
   });
 
   it("accepts a non-cancelable wheel event without calling preventDefault", () => {
@@ -103,5 +101,6 @@ describe("useWheelInput cancelability", () => {
     expect(preventDefaultSpy).not.toHaveBeenCalled();
     expect(event.defaultPrevented).toBe(false);
     expect(latestControls?.phase).toBe("work");
+    expect(latestControls?.direction).toBe("next");
   });
 });
