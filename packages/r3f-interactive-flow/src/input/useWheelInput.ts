@@ -211,7 +211,7 @@ export function useWheelInput<TPhase extends string>(options: UseWheelInputOptio
       lastNavigationAtRef.current = now;
       hasConsumedBurstRef.current = true;
 
-      if (preventDefault) {
+      if (preventDefault && wheelEvent.cancelable !== false) {
         wheelEvent.preventDefault();
       }
     };
