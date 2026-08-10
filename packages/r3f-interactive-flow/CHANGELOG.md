@@ -1,5 +1,48 @@
 # r3f-interactive-flow
 
+## 2.12.0
+
+`r3f-interactive-flow@2.12.0` is a focused, backward-compatible runtime and
+input resilience release. It revalidates the completed v2 runtime boundary and
+corrects one DOM wheel-event prevention edge case without expanding the public
+API.
+
+### Fixed
+
+- `useWheelInput` now requests `preventDefault()` for an accepted wheel event
+  only when prevention is enabled and the event is not explicitly
+  non-cancelable.
+- Navigation acceptance remains independent of `event.cancelable`: an accepted
+  explicitly non-cancelable wheel event still navigates but does not receive an
+  ineffective prevention attempt.
+- Accepted cancelable wheel events retain configured prevention, rejected wheel
+  navigation remains unprevented, and `preventDefault: false` is unchanged.
+
+### Preserved behavior
+
+- Wheel threshold, axis, delta normalization, burst, hook-local cooldown,
+  provider cooldown, target, ignore, rerender, and cleanup behavior are
+  unchanged.
+- Touch and keyboard behavior are unchanged.
+- Core runtime, React lifecycle, provider-owned clock, and read-only R3F frame
+  bridge behavior are unchanged.
+- Public runtime exports, public types, package exports, runtime dependencies,
+  peer ranges, and package structure remain unchanged.
+- No migration is required.
+
+### Documentation and validation
+
+- PR #488 aligned the package README and input guide with the wheel
+  cancelability boundary while keeping touch-only committed-gesture semantics
+  scoped to touch.
+- Final v2.12.0 validation (#489) passed the exact candidate tree across build,
+  package output, packed consumer, supported peer compatibility, typecheck,
+  23 Node test files with 461 tests, lint, formatting, Vite example build,
+  package dry-run, published-package consumer verification, and the bounded
+  Chromium browser input suite with 1 file and 11 tests.
+- Browser evidence remains Chromium-specific and is not Safari/WebKit, Firefox,
+  physical-device, accessibility, or universal cross-browser certification.
+
 ## 2.11.1
 
 `r3f-interactive-flow@2.11.1` is a focused, backward-compatible
