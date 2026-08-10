@@ -114,17 +114,18 @@ cooldowns can all reject input without moving to another phase.
 ## `preventDefault` follows accepted navigation
 
 `preventDefault` defaults to `true` on every input hook. Accepted navigation may
-call `preventDefault()` when the hook's option is true. Later events in an
-already committed touch gesture may also be prevented. For `useTouchInput`,
-event cancelability controls only whether the hook can request native-event
-prevention for an accepted or already-committed touch event; it does not control
-navigation acceptance. An accepted non-cancelable threshold-crossing event may
-still commit one navigation, but the hook does not call `preventDefault()` for
-that event. Threshold misses,
+call `preventDefault()` when the hook's option is true. For `useWheelInput` and
+`useTouchInput`, event cancelability controls only whether the hook can request
+native-event prevention; it does not control navigation acceptance. An accepted
+explicitly non-cancelable wheel event or threshold-crossing touch event may still
+navigate, but the hook does not call `preventDefault()` for that event. Later
+events in an already committed touch gesture may also be prevented when they are
+cancelable; that committed-gesture behavior is touch-specific. Threshold misses,
 ignored/actionable/editable origins, boundaries, locks, transitions, provider
 cooldown, hook-local cooldown, repeated keys, typing targets, and other rejected
 navigation attempts remain unprevented. Set `preventDefault: false` to allow
-accepted navigation without requesting native-event prevention.
+accepted navigation without requesting native-event prevention. `preventDefault:
+true` does not guarantee that the browser can always interrupt native behavior.
 
 ## Wheel input
 
@@ -154,8 +155,10 @@ direction deltas may accumulate in one short burst. Direction reversal, target
 change, and inactivity reset pending burst intent. One burst produces at most
 one accepted navigation. Rejected input does not consume hook-local cooldown and
 does not queue later navigation. Accepted navigation may call `preventDefault()`
-when enabled; rejected navigation remains unprevented. Wheel burst inactivity
-and hook-local cooldown use monotonic elapsed time.
+when enabled and the event is not explicitly non-cancelable. An accepted
+non-cancelable wheel event still navigates without a prevention attempt; rejected
+navigation remains unprevented. Wheel burst inactivity and hook-local cooldown
+use monotonic elapsed time.
 
 Do not rely on physical trackpad uniformity across every browser or device.
 
