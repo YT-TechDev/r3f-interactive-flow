@@ -1,5 +1,32 @@
 # r3f-interactive-flow
 
+## 2.12.1
+
+`r3f-interactive-flow@2.12.1` is a backward-compatible maintenance release
+that records updates to development tooling, CI, and example dependencies since
+`v2.12.0`. There are no library runtime fixes or new consumer-facing features
+in this patch.
+
+### Repository maintenance
+
+- PR #499 updated the workspace and Vite example development toolchain,
+  including React, React DOM, React Three Fiber, Three.js, TypeScript tooling,
+  Playwright, Vite, and related packages.
+- PR #500 updated the pinned GitHub Actions Node setup action.
+- PR #502 updated Vite in the published-package validation fixture.
+- PR #503 aligned Vitest and its browser adapter at `4.1.11`.
+- PR #504 updated Vite from `8.3.1` to `8.3.3`, refreshing its resolved
+  development-tooling dependencies in the lockfile.
+
+### Compatibility and migration
+
+- Library runtime source, exported APIs and TypeScript declarations, package
+  exports, runtime dependencies, and peer dependency ranges are unchanged
+  relative to `v2.12.0`.
+- The development-tooling updates do not change consumers' installed
+  React/Three/R3F peer dependency ranges.
+- No consumer migration is required.
+
 ## 2.12.0
 
 `r3f-interactive-flow@2.12.0` is a focused, backward-compatible runtime and
