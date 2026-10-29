@@ -22,7 +22,7 @@
     "test:browser:input": "pnpm --dir packages/r3f-interactive-flow exec vitest run --config vitest.browser.config.ts"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.31.1",
+    "@changesets/cli": "^3.0.3",
     "@react-three/fiber": "^9.8.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
